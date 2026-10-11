@@ -89,4 +89,22 @@ Harlen" (a Mayor quest) spawns him next to the player on acceptance, visible onl
 night, completed by talking to him. Boot-smoke-tested clean (entity/attribute/renderer registration
 included). **Never played through in a live client.**
 
+**Item 2 built, same day** (see
+[context/classes/QuestWaypoint.md](context/classes/QuestWaypoint.md)) — knowledge-scaled vague-
+circle quest hints. **Corrected a wrong assumption first**: Lyfe owns the minimap/map, not
+Cartographyr, which only owns the underlying geographic data. Lyfe gained real new capability for
+this (`api.Lyfe#setQuestWaypoint`/`#clearQuestWaypoint`, a server-pushed waypoint separate from the
+player's own manual pin, plus `#grantKnowledgeFactors`/`#getKnownFactorCount`) — its existing
+waypoint system was a simple client-only manual pin with no server/radius concept at all. New
+`quest.QuestWaypointTicker` (only registered when Lyfe is loaded) recomputes a deterministically-
+seeded circle every second, radius scaled by known-factor count, sharpening to near-exact once the
+player gets close (and grants the final factor). "Find Old Harlen" now targets a real point 80-200
+blocks away instead of spawning at the player's feet. **Known simplification**: the circle is
+always shown for the whole quest, not auto-hidden beyond a knowledge-scaled distance as the
+original spec also asked for — flagged, not forgotten. `./gradlew build` green in both repos,
+boot-smoke-tested clean with all 8 suite mods together. **Never rendered in a live client.**
+
+Of the user's original ten points, only item 10 (party sharing, explicitly deferred until a party
+system exists anywhere in the suite) has no work started at all.
+
 See [context/classes/](context/classes/) for per-class reference.
