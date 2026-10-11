@@ -25,77 +25,69 @@ import net.minecraft.world.item.ItemStack;
  * rewards may be different, location details, etc") is a real, randomly-generated, per-acceptance
  * identity -- never shown in any UI. {@link #definitionId()} still names which static {@link
  * QuestDefinition} this instance is of, but is no longer the instance's own key: the same player
- * can hold two completely independent instances of the same definition at once (e.g. "Night
- * Raiders" offered by two different Farmers in two different settlements), each with its own
- * progress, hint location, and eventual rewards -- a single shared `definitionId` key could never
- * represent that.
+ * can hold two completely independent instances of the same definition at once, each with its own
+ * progress, hint location, and eventual rewards.
  *
  * <p>{@code hintPos}/{@code hintDimensionId} (design doc item 2) are an optional *true*, hidden
- * target position this specific instance cares about -- never shown directly to the player. {@code
- * quest.QuestWaypointTicker} uses it (plus the player's own knowledge quality, via {@code
- * bridge.LyfeWaypointBridge}) to compute and push the actual vague-circle hint they see. An escort
- * quest (see below) keeps this continuously updated to the live caravan's own position instead of a
+ * target position this specific instance cares about -- never shown directly to the player. An
+ * escort quest keeps this continuously updated to the live caravan's own position instead of a
  * single fixed point, which is what lets the existing kill-geofence/mob-spawn-guarantee logic track
  * a moving target with no changes to either.
  *
  * <p>{@code locationName} is the *currently displayed* resolved phrase substituted into a quest's
- * {@code {location}}-tokened flavor text (see {@code quest.QuestText#resolve}) -- for an on-site
- * quest it's set once at assignment and never changes; for a region quest (see below) it starts as
- * {@link #directionPhrase()} and is live-upgraded by {@code QuestWaypointTicker} once the player's
- * real knowledge of {@link #knowledgePlaceId()} is good enough. Empty for a quest with no resolvable
- * real location (the token then falls back to a generic phrase).
+ * {@code {location}}-tokened flavor text -- for an on-site quest it's set once at assignment and
+ * never changes; for a region quest it starts as {@link #directionPhrase()} and is live-upgraded by
+ * {@code QuestWaypointTicker} once the player's real knowledge of {@link #knowledgePlaceId()} is
+ * good enough.
  *
- * <p>{@code pendingRewardItems} (added 2026-10-11, explicit user spec: turning in a quest should
- * open a reward-collection GUI with a "Take All" button, only actually flagging the quest complete
- * once everything's been collected -- see {@code quest.QuestRewardMenu}'s own doc) holds the
- * Gold/Item reward stacks still waiting to be picked up while {@link #status()} is {@link
- * QuestStatus#AWAITING_REWARD_PICKUP}. Persisted (not just an in-memory menu) so closing the GUI
- * without collecting everything and coming back later doesn't lose or duplicate anything.
+ * <p>{@code pendingRewardItems} holds the Gold/Item reward stacks still waiting to be picked up
+ * while {@link #status()} is {@link QuestStatus#AWAITING_REWARD_PICKUP}. {@code rewardMultiplier}
+ * scales Gold/Item/XP rewards (region-quest distance scaling, or the road-quest efficiency bonus).
  *
- * <p>{@code rewardMultiplier} (added 2026-10-11, explicit user spec: "scale the reward with the
- * difficulty/distance from starting point a player would need to travel") -- applied to Gold/Item/XP
- * reward amounts in {@code QuestEngine} when a quest's real target turned out to be a real
- * Cartographyr Region/Settlement a meaningful distance from the issuing NPC (see {@code
- * NpcQuests#registerRegionHook}). {@code 1.0} (no scaling) for every quest that doesn't set it --
- * on-site quests, and anything built before this existed.
+ * <p>{@code knowledgePlaceId}/{@code directionPhrase}/{@code realLocationName} -- the real
+ * Cartographyr place this quest is about (a region quest's target, or a road quest's destination
+ * settlement), its stable direction phrase, and its true name, used as the real {@code
+ * bridge.LyfeWaypointBridge} knowledge key so "already been there" resolves to full knowledge for
+ * free. {@code mobsSpawned} is whether {@code QuestMobSpawnTicker} has already topped up live mobs
+ * near this instance's target to guarantee completability.
  *
- * <p><b>Region-quest fields, added 2026-10-11</b> (explicit user correction/clarification: a quest's
- * real target was always meant to be a real Cartographyr place, with vague *text* -- not pre-granted
- * knowledge -- giving the initial vague marker, sharpening to a precise one for free once the player
- * turns out to already know that real place from ordinary exploration, same as any other knowledge):
- * <ul>
- *   <li>{@code knowledgePlaceId} -- the real Cartographyr {@code geo.EntityId#value()} of the picked
- *   Region/Settlement, used as the {@code bridge.LyfeWaypointBridge} placeId *instead of* a synthetic
- *   per-instance one. This is what makes "already been there" naturally resolve to full knowledge --
- *   {@code location.LocationTracker} in Lyfe already calls {@code markVisited} with this exact same
- *   real key during ordinary exploration, so a player's existing knowledge just carries over with no
- *   special-casing needed. Empty for anything that isn't a real-Cartographyr-backed quest (on-site
- *   quests, {@code findOldHarlen}'s synthetic point).</li>
- *   <li>{@code directionPhrase} -- the stable "to the east of Bramton" text, computed once at
- *   assignment from the real bearing giver-&gt;target, never changes afterward.</li>
- *   <li>{@code realLocationName} -- the target's true Cartographyr name (e.g. "the Whispering
- *   Forest"), known internally from the start but not shown in {@link #locationName()} until the
- *   player's knowledge of {@link #knowledgePlaceId()} is good enough.</li>
- *   <li>{@code mobsSpawned} -- whether {@code quest.QuestMobSpawnTicker} has already topped up live
- *   mobs near this instance's target to guarantee the kill milestone is actually completable (fires
- *   once per unguarded stake for an escort quest, see below, or once ever for a plain region quest)
- *   -- "there may be other wolves there and they'd also count, but it should make sure the player is
- *   able to do the quest otherwise."</li>
- * </ul>
+ * <p>{@link #escort()} bundles the caravan-raid quest style's own state (added 2026-10-11) --
+ * {@code entityUuid} is the live {@code quest.entity.CaravanEntity} this instance owns;
+ * {@code remainingRoute} is every waypoint not yet reached, popped by {@code QuestEscortTicker} as
+ * the caravan advances (empty, after starting non-empty, means it reached the end alive).
  *
- * <p><b>Escort fields, added 2026-10-11</b> (caravan-raid quest style, see design-document.md's
- * quest taxonomy): {@code escortEntityUuid} is the live {@code quest.entity.CaravanEntity} this
- * instance owns (spawned at assignment, one per instance -- two players on the same escort
- * definition each get their own caravan). {@code escortRemainingRoute} is every waypoint the caravan
- * has not yet reached, in order -- {@code quest.QuestEscortTicker} pops the head off once the
- * caravan arrives there, so an empty list (after starting non-empty) means the caravan reached its
- * final destination alive and the escort milestone completes.
+ * <p>{@link #roadQuest()} bundles the inter-settlement road-connection quest style's own state
+ * (added 2026-10-11, see {@code RoadQuestLogic}'s own doc) -- {@code originPlaceId} is the
+ * settlement that posted it (the destination reuses {@link #knowledgePlaceId()} above);
+ * {@code minStakes}/{@code optimalStakeCap} are the thresholds {@code RoadQuestTicker} checks the
+ * player's live Highway Stake count against. Both nested records exist specifically to keep this
+ * record's own field count within Mojang's {@code RecordCodecBuilder} group-arity limit (16) as
+ * more quest styles have been added.
  */
 public record QuestInstance(UUID instanceId, Identifier definitionId, QuestStatus status, Map<String, Integer> milestoneProgress,
                              long assignedAtGameTime, Optional<BlockPos> hintPos, Optional<String> hintDimensionId,
                              Optional<String> locationName, List<ItemStack> pendingRewardItems, double rewardMultiplier,
                              Optional<Long> knowledgePlaceId, Optional<String> directionPhrase, Optional<String> realLocationName,
-                             boolean mobsSpawned, Optional<UUID> escortEntityUuid, List<BlockPos> escortRemainingRoute) {
+                             boolean mobsSpawned, EscortData escort, RoadQuestData roadQuest) {
+
+    public record EscortData(Optional<UUID> entityUuid, List<BlockPos> remainingRoute) {
+        public static final EscortData NONE = new EscortData(Optional.empty(), List.of());
+
+        public static final Codec<EscortData> CODEC = RecordCodecBuilder.create(i -> i.group(
+                UUIDUtil.CODEC.optionalFieldOf("entity_uuid").forGetter(EscortData::entityUuid),
+                BlockPos.CODEC.listOf().optionalFieldOf("remaining_route", List.of()).forGetter(EscortData::remainingRoute)
+        ).apply(i, EscortData::new));
+    }
+
+    public record RoadQuestData(Optional<Long> originPlaceId, int minStakes, int optimalStakeCap) {
+        public static final RoadQuestData NONE = new RoadQuestData(Optional.empty(), 0, 0);
+
+        public static final Codec<RoadQuestData> CODEC = RecordCodecBuilder.create(i -> i.group(
+                Codec.LONG.optionalFieldOf("origin_place_id").forGetter(RoadQuestData::originPlaceId),
+                Codec.INT.optionalFieldOf("min_stakes", 0).forGetter(RoadQuestData::minStakes),
+                Codec.INT.optionalFieldOf("optimal_stake_cap", 0).forGetter(RoadQuestData::optimalStakeCap)
+        ).apply(i, RoadQuestData::new));
+    }
 
     public static final Codec<QuestInstance> CODEC = RecordCodecBuilder.create(instance -> instance.group(
             UUIDUtil.CODEC.fieldOf("instance_id").forGetter(QuestInstance::instanceId),
@@ -112,78 +104,87 @@ public record QuestInstance(UUID instanceId, Identifier definitionId, QuestStatu
             Codec.STRING.optionalFieldOf("direction_phrase").forGetter(QuestInstance::directionPhrase),
             Codec.STRING.optionalFieldOf("real_location_name").forGetter(QuestInstance::realLocationName),
             Codec.BOOL.optionalFieldOf("mobs_spawned", false).forGetter(QuestInstance::mobsSpawned),
-            UUIDUtil.CODEC.optionalFieldOf("escort_entity_uuid").forGetter(QuestInstance::escortEntityUuid),
-            BlockPos.CODEC.listOf().optionalFieldOf("escort_remaining_route", List.of()).forGetter(QuestInstance::escortRemainingRoute)
+            EscortData.CODEC.optionalFieldOf("escort", EscortData.NONE).forGetter(QuestInstance::escort),
+            RoadQuestData.CODEC.optionalFieldOf("road_quest", RoadQuestData.NONE).forGetter(QuestInstance::roadQuest)
     ).apply(instance, QuestInstance::new));
 
     public static QuestInstance freshlyAssigned(Identifier definitionId, long gameTime) {
         return new QuestInstance(UUID.randomUUID(), definitionId, QuestStatus.IN_PROGRESS, Map.of(), gameTime, Optional.empty(), Optional.empty(),
-                Optional.empty(), List.of(), 1.0, Optional.empty(), Optional.empty(), Optional.empty(), false, Optional.empty(), List.of());
+                Optional.empty(), List.of(), 1.0, Optional.empty(), Optional.empty(), Optional.empty(), false, EscortData.NONE, RoadQuestData.NONE);
     }
 
     public QuestInstance withStatus(QuestStatus newStatus) {
         return new QuestInstance(instanceId, definitionId, newStatus, milestoneProgress, assignedAtGameTime, hintPos, hintDimensionId,
-                locationName, pendingRewardItems, rewardMultiplier, knowledgePlaceId, directionPhrase, realLocationName, mobsSpawned, escortEntityUuid, escortRemainingRoute);
+                locationName, pendingRewardItems, rewardMultiplier, knowledgePlaceId, directionPhrase, realLocationName, mobsSpawned, escort, roadQuest);
     }
 
     public QuestInstance withProgress(String milestoneId, int amount) {
         Map<String, Integer> updated = new java.util.HashMap<>(milestoneProgress);
         updated.put(milestoneId, amount);
         return new QuestInstance(instanceId, definitionId, status, Map.copyOf(updated), assignedAtGameTime, hintPos, hintDimensionId,
-                locationName, pendingRewardItems, rewardMultiplier, knowledgePlaceId, directionPhrase, realLocationName, mobsSpawned, escortEntityUuid, escortRemainingRoute);
+                locationName, pendingRewardItems, rewardMultiplier, knowledgePlaceId, directionPhrase, realLocationName, mobsSpawned, escort, roadQuest);
     }
 
     public QuestInstance withHint(BlockPos pos, String dimensionId, Optional<String> newLocationName) {
         return new QuestInstance(instanceId, definitionId, status, milestoneProgress, assignedAtGameTime, Optional.of(pos), Optional.of(dimensionId),
-                newLocationName, pendingRewardItems, rewardMultiplier, knowledgePlaceId, directionPhrase, realLocationName, mobsSpawned, escortEntityUuid, escortRemainingRoute);
+                newLocationName, pendingRewardItems, rewardMultiplier, knowledgePlaceId, directionPhrase, realLocationName, mobsSpawned, escort, roadQuest);
     }
 
     public QuestInstance withRewardMultiplier(double newRewardMultiplier) {
         return new QuestInstance(instanceId, definitionId, status, milestoneProgress, assignedAtGameTime, hintPos, hintDimensionId,
-                locationName, pendingRewardItems, newRewardMultiplier, knowledgePlaceId, directionPhrase, realLocationName, mobsSpawned, escortEntityUuid, escortRemainingRoute);
+                locationName, pendingRewardItems, newRewardMultiplier, knowledgePlaceId, directionPhrase, realLocationName, mobsSpawned, escort, roadQuest);
     }
 
     /** Transitions to {@link QuestStatus#AWAITING_REWARD_PICKUP} carrying the still-uncollected reward stacks. */
     public QuestInstance withPendingRewardItems(List<ItemStack> items) {
         return new QuestInstance(instanceId, definitionId, QuestStatus.AWAITING_REWARD_PICKUP, milestoneProgress, assignedAtGameTime, hintPos, hintDimensionId,
-                locationName, List.copyOf(items), rewardMultiplier, knowledgePlaceId, directionPhrase, realLocationName, mobsSpawned, escortEntityUuid, escortRemainingRoute);
+                locationName, List.copyOf(items), rewardMultiplier, knowledgePlaceId, directionPhrase, realLocationName, mobsSpawned, escort, roadQuest);
     }
 
     /** Sets the real-knowledge wiring for a region quest -- see this class's own doc. {@code locationName} starts equal to {@code newDirectionPhrase}, upgraded later by {@code QuestWaypointTicker}. */
     public QuestInstance withRegionKnowledge(long newKnowledgePlaceId, String newDirectionPhrase, String newRealLocationName) {
         return new QuestInstance(instanceId, definitionId, status, milestoneProgress, assignedAtGameTime, hintPos, hintDimensionId,
                 Optional.of(newDirectionPhrase), pendingRewardItems, rewardMultiplier,
-                Optional.of(newKnowledgePlaceId), Optional.of(newDirectionPhrase), Optional.of(newRealLocationName), mobsSpawned, escortEntityUuid, escortRemainingRoute);
+                Optional.of(newKnowledgePlaceId), Optional.of(newDirectionPhrase), Optional.of(newRealLocationName), mobsSpawned, escort, roadQuest);
     }
 
     /** Upgrades {@link #locationName()} once the player's real knowledge of {@link #knowledgePlaceId()} is good enough -- see {@code QuestWaypointTicker}. */
     public QuestInstance withUpgradedLocationName(String upgradedLocationName) {
         return new QuestInstance(instanceId, definitionId, status, milestoneProgress, assignedAtGameTime, hintPos, hintDimensionId,
-                Optional.of(upgradedLocationName), pendingRewardItems, rewardMultiplier, knowledgePlaceId, directionPhrase, realLocationName, mobsSpawned, escortEntityUuid, escortRemainingRoute);
+                Optional.of(upgradedLocationName), pendingRewardItems, rewardMultiplier, knowledgePlaceId, directionPhrase, realLocationName, mobsSpawned, escort, roadQuest);
     }
 
     public QuestInstance withMobsSpawned() {
         return new QuestInstance(instanceId, definitionId, status, milestoneProgress, assignedAtGameTime, hintPos, hintDimensionId,
-                locationName, pendingRewardItems, rewardMultiplier, knowledgePlaceId, directionPhrase, realLocationName, true, escortEntityUuid, escortRemainingRoute);
+                locationName, pendingRewardItems, rewardMultiplier, knowledgePlaceId, directionPhrase, realLocationName, true, escort, roadQuest);
     }
 
     /** Resets {@link #mobsSpawned()} to {@code false} for one cycle -- used by {@code QuestEscortTicker} to re-trigger {@code QuestMobSpawnTicker}'s existing spawn-guarantee logic at each new unguarded stake. */
     public QuestInstance withMobsSpawnedReset() {
         return new QuestInstance(instanceId, definitionId, status, milestoneProgress, assignedAtGameTime, hintPos, hintDimensionId,
-                locationName, pendingRewardItems, rewardMultiplier, knowledgePlaceId, directionPhrase, realLocationName, false, escortEntityUuid, escortRemainingRoute);
+                locationName, pendingRewardItems, rewardMultiplier, knowledgePlaceId, directionPhrase, realLocationName, false, escort, roadQuest);
     }
 
     /** Binds the live caravan entity and its full route -- set once, right after the caravan is spawned at assignment (see {@code NpcQuests#registerEscortHook}). */
     public QuestInstance withEscort(UUID caravanUuid, List<BlockPos> route) {
         return new QuestInstance(instanceId, definitionId, status, milestoneProgress, assignedAtGameTime, hintPos, hintDimensionId,
-                locationName, pendingRewardItems, rewardMultiplier, knowledgePlaceId, directionPhrase, realLocationName, mobsSpawned, Optional.of(caravanUuid), List.copyOf(route));
+                locationName, pendingRewardItems, rewardMultiplier, knowledgePlaceId, directionPhrase, realLocationName, mobsSpawned,
+                new EscortData(Optional.of(caravanUuid), List.copyOf(route)), roadQuest);
     }
 
-    /** Pops the just-reached waypoint off the front of {@link #escortRemainingRoute()} -- see {@code QuestEscortTicker}. */
+    /** Pops the just-reached waypoint off the front of the escort route -- see {@code QuestEscortTicker}. */
     public QuestInstance withEscortWaypointReached() {
-        List<BlockPos> remaining = escortRemainingRoute.isEmpty() ? escortRemainingRoute : escortRemainingRoute.subList(1, escortRemainingRoute.size());
+        List<BlockPos> remaining = escort.remainingRoute().isEmpty() ? escort.remainingRoute() : escort.remainingRoute().subList(1, escort.remainingRoute().size());
         return new QuestInstance(instanceId, definitionId, status, milestoneProgress, assignedAtGameTime, hintPos, hintDimensionId,
-                locationName, pendingRewardItems, rewardMultiplier, knowledgePlaceId, directionPhrase, realLocationName, mobsSpawned, escortEntityUuid, List.copyOf(remaining));
+                locationName, pendingRewardItems, rewardMultiplier, knowledgePlaceId, directionPhrase, realLocationName, mobsSpawned,
+                new EscortData(escort.entityUuid(), List.copyOf(remaining)), roadQuest);
+    }
+
+    /** Sets this road-connection instance's origin settlement and stake-count thresholds -- the destination settlement itself reuses {@link #withRegionKnowledge} (its placeId goes into {@link #knowledgePlaceId()}). See {@code RoadQuestLogic#acceptOffer}. */
+    public QuestInstance withRoadQuestData(long newRoadOriginPlaceId, int newRoadMinStakes, int newRoadOptimalStakeCap) {
+        return new QuestInstance(instanceId, definitionId, status, milestoneProgress, assignedAtGameTime, hintPos, hintDimensionId,
+                locationName, pendingRewardItems, rewardMultiplier, knowledgePlaceId, directionPhrase, realLocationName, mobsSpawned, escort,
+                new RoadQuestData(Optional.of(newRoadOriginPlaceId), newRoadMinStakes, newRoadOptimalStakeCap));
     }
 
     public boolean isMilestoneComplete(QuestMilestone milestone) {

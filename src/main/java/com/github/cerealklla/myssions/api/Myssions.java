@@ -120,4 +120,31 @@ public final class Myssions {
     public static boolean hasPendingBoardOffer(MinecraftServer server, UUID plotId) {
         return IssuerQuestBoard.get(server).get(plotId).isPresent();
     }
+
+    // --- Inter-settlement road-connection quests (added 2026-10-11) -- see
+    // quest.RoadQuestLogic/quest.RoadQuestRegistry's own doc. Settlements are identified by their
+    // Cartographyr placeId, not any Settlemynts-specific id, since that's the one identity every
+    // settlement (player-founded or natural) already has.
+
+    /** Current state of the (unordered) pair, if any -- `empty` means free for either side to post. */
+    public static Optional<com.github.cerealklla.myssions.quest.RoadQuestRegistry.Entry> getRoadQuestState(
+            MinecraftServer server, long placeIdA, long placeIdB) {
+        return com.github.cerealklla.myssions.quest.RoadQuestRegistry.get(server).get(placeIdA, placeIdB);
+    }
+
+    /** Every settlement placeId already {@code CONNECTED} to this one -- used to gate the escort/caravan quest style on a real connection existing. */
+    public static java.util.List<Long> getConnectedNeighbors(MinecraftServer server, long placeId) {
+        return com.github.cerealklla.myssions.quest.RoadQuestRegistry.get(server).connectedNeighborsOf(placeId);
+    }
+
+    /** Posts a new road-connection offer for this settlement pair -- see {@code RoadQuestLogic#postOffer}'s own doc. False if the pair already has any entry, or either settlement can't be resolved. */
+    public static boolean postRoadQuestOffer(net.minecraft.server.level.ServerLevel level, long postingSettlementPlaceId,
+                                              long targetSettlementPlaceId, Optional<UUID> postingPlotId, Optional<UUID> posterPlayerId) {
+        return com.github.cerealklla.myssions.quest.RoadQuestLogic.postOffer(level, postingSettlementPlaceId, targetSettlementPlaceId, postingPlotId, posterPlayerId);
+    }
+
+    /** Accepts an existing posted road-connection offer -- see {@code RoadQuestLogic#acceptOffer}'s own doc. */
+    public static boolean acceptRoadQuestOffer(ServerPlayer player, long postingSettlementPlaceId, long targetSettlementPlaceId) {
+        return com.github.cerealklla.myssions.quest.RoadQuestLogic.acceptOffer(player, postingSettlementPlaceId, targetSettlementPlaceId);
+    }
 }

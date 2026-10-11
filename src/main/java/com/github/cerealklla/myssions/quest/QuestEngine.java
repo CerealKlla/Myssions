@@ -149,6 +149,15 @@ public final class QuestEngine {
         }
     }
 
+    /** Sets a road-connection instance's origin settlement and stake-count thresholds -- see {@code RoadQuestLogic#acceptOffer}. */
+    public static void setRoadQuestData(ServerPlayer player, UUID instanceId, long roadOriginPlaceId, int minStakes, int optimalStakeCap) {
+        PlayerQuestData data = player.getData(ModAttachments.QUEST_DATA);
+        QuestInstance instance = data.quests().get(instanceId);
+        if (instance != null) {
+            player.setData(ModAttachments.QUEST_DATA, data.withQuest(instance.withRoadQuestData(roadOriginPlaceId, minStakes, optimalStakeCap)));
+        }
+    }
+
     public static void setActiveQuest(ServerPlayer player, UUID instanceId) {
         PlayerQuestData data = player.getData(ModAttachments.QUEST_DATA);
         if (!data.quests().containsKey(instanceId)) {

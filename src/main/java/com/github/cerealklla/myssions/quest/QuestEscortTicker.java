@@ -51,13 +51,13 @@ public final class QuestEscortTicker {
     private void tickPlayer(ServerPlayer player) {
         var data = player.getData(ModAttachments.QUEST_DATA);
         for (QuestInstance instance : List.copyOf(data.quests().values())) {
-            if (instance.status() != QuestStatus.IN_PROGRESS || instance.escortEntityUuid().isEmpty()) {
+            if (instance.status() != QuestStatus.IN_PROGRESS || instance.escort().entityUuid().isEmpty()) {
                 continue;
             }
             if (!(player.level() instanceof ServerLevel level)) {
                 continue;
             }
-            UUID caravanUuid = instance.escortEntityUuid().get();
+            UUID caravanUuid = instance.escort().entityUuid().get();
             Entity entity = level.getEntity(caravanUuid);
             if (!(entity instanceof CaravanEntity caravan) || !caravan.isAlive()) {
                 QuestEngine.failQuest(player, instance.instanceId());
@@ -75,7 +75,7 @@ public final class QuestEscortTicker {
             if (updated == null) {
                 continue;
             }
-            List<BlockPos> remaining = updated.escortRemainingRoute();
+            List<BlockPos> remaining = updated.escort().remainingRoute();
             if (remaining.isEmpty()) {
                 completeEscort(player, caravan, updated);
                 continue;

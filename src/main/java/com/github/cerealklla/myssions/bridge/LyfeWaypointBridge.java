@@ -51,4 +51,19 @@ public final class LyfeWaypointBridge {
     public static int knownFactorCount(ServerPlayer player, long placeId) {
         return Lyfe.getKnownFactorCount(player, placeId);
     }
+
+    /**
+     * Copies {@code fromPlayer}'s real knowledge factors for {@code placeId} onto {@code toPlayer}
+     * -- added 2026-10-11 for the road-connection quest's "pass the knowledge the Mayor has to the
+     * player" spec. Purely additive on the receiving end (same {@code learnLocationFactors}
+     * semantics every other grant already relies on). Only meaningful while {@code fromPlayer} is
+     * online -- no offline-attachment-read path exists yet; the caller should fall back to a flat
+     * grant otherwise.
+     */
+    public static void copyKnowledge(ServerPlayer fromPlayer, ServerPlayer toPlayer, long placeId) {
+        java.util.Set<KnowledgeFactor> factors = Lyfe.getKnownFactors(fromPlayer, placeId);
+        if (!factors.isEmpty()) {
+            Lyfe.grantKnowledgeFactors(toPlayer, placeId, factors);
+        }
+    }
 }

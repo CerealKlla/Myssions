@@ -48,6 +48,7 @@ public class MyssionsMod {
         NeoForge.EVENT_BUS.register(new QuestKillListener());
         NeoForge.EVENT_BUS.register(new com.github.cerealklla.myssions.quest.QuestMobSpawnTicker());
         NeoForge.EVENT_BUS.register(new com.github.cerealklla.myssions.quest.QuestEscortTicker());
+        NeoForge.EVENT_BUS.register(new com.github.cerealklla.myssions.quest.RoadQuestTicker());
         NeoForge.EVENT_BUS.register(new QuestNpcTalkListener());
         NeoForge.EVENT_BUS.addListener((RegisterCommandsEvent event) -> DebugCommands.register(event.getDispatcher()));
 
@@ -78,6 +79,7 @@ public class MyssionsMod {
         // synced, via the QUEST_DATA attachment's own .sync() -- see PlayerQuestData's own doc.
         SampleQuests.registerAll();
         NpcQuests.registerAll();
+        com.github.cerealklla.myssions.quest.RoadQuestDefinitions.registerAll();
         LOGGER.info("Myssions common setup");
     }
 
