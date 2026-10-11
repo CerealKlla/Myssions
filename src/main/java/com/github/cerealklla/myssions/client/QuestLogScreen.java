@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import com.github.cerealklla.myssions.net.AbandonQuestPayload;
 import com.github.cerealklla.myssions.net.RetryQuestPayload;
 import com.github.cerealklla.myssions.net.SetActiveQuestPayload;
 import com.github.cerealklla.myssions.quest.QuestDefinition;
@@ -56,6 +57,7 @@ public final class QuestLogScreen extends Screen {
     private int listScroll;
     private int detailsScroll;
     private Button actionButton;
+    private Button abandonButton;
 
     // Set the instant "Set as Active Quest" is clicked, read in place of the (possibly still-stale)
     // synced attachment until it catches up -- fixes a real 2026-10-11 user report ("I have to click
@@ -142,6 +144,10 @@ public final class QuestLogScreen extends Screen {
             removeWidget(actionButton);
             actionButton = null;
         }
+        if (abandonButton != null) {
+            removeWidget(abandonButton);
+            abandonButton = null;
+        }
         if (selectedId == null) {
             return;
         }
@@ -159,6 +165,14 @@ public final class QuestLogScreen extends Screen {
                             b -> setActive())
                     .bounds(detailsLeft, buttonY, 150, 20).build());
             actionButton.active = !isActiveQuest;
+            // Only while genuinely IN_PROGRESS, 2026-10-11 explicit request -- an AWAITING_REWARD_PICKUP
+            // instance already has a real reward waiting; abandoning it would just throw that away with
+            // no warning beyond the confirm dialog, and QuestEngine#abandonQuest itself only accepts
+            // IN_PROGRESS anyway, so don't offer a button that would silently no-op.
+            if (instance.status() == QuestStatus.IN_PROGRESS) {
+                abandonButton = addRenderableWidget(Button.builder(Component.literal("Abandon Quest"), b -> confirmAbandon())
+                        .bounds(detailsLeft + 160, buttonY, 150, 20).build());
+            }
         } else if (instance.status() == QuestStatus.FAILED) {
             actionButton = addRenderableWidget(Button.builder(Component.literal("Retry"), b -> retry())
                     .bounds(detailsLeft, buttonY, 150, 20).build());
@@ -184,6 +198,35 @@ public final class QuestLogScreen extends Screen {
             return;
         }
         Minecraft.getInstance().getConnection().send(new ServerboundCustomPayloadPacket(new RetryQuestPayload(selectedId)));
+        rebuildListRows();
+        rebuildActionButton();
+    }
+
+    /** "Abandon Quest" (2026-10-11 explicit request) -- confirms first via vanilla's own {@code
+     * ConfirmScreen} (same dialog type used for e.g. "Delete World") since this is a real, one-click
+     * loss of in-progress quest state, not an easily-reversible action. */
+    private void confirmAbandon() {
+        if (selectedId == null) {
+            return;
+        }
+        UUID instanceId = selectedId;
+        var data = Minecraft.getInstance().player.getData(ModAttachments.QUEST_DATA);
+        QuestInstance instance = data.quests().get(instanceId);
+        String questName = instance == null ? "this quest"
+                : QuestRegistry.get(instance.definitionId()).map(QuestDefinition::name).orElse("this quest");
+        Minecraft.getInstance().setScreen(new net.minecraft.client.gui.screens.ConfirmScreen(
+                confirmed -> {
+                    Minecraft.getInstance().setScreen(this);
+                    if (confirmed) {
+                        abandon(instanceId);
+                    }
+                },
+                Component.literal("Abandon Quest"),
+                Component.literal("Give up on \"" + questName + "\"? You can retry it later from Failed Quests.")));
+    }
+
+    private void abandon(UUID instanceId) {
+        Minecraft.getInstance().getConnection().send(new ServerboundCustomPayloadPacket(new AbandonQuestPayload(instanceId)));
         rebuildListRows();
         rebuildActionButton();
     }

@@ -52,48 +52,51 @@ public final class QuestWaypointTicker {
 
     private void tickPlayer(ServerPlayer player) {
         var data = player.getData(ModAttachments.QUEST_DATA);
-        boolean anyShown = false;
-        for (QuestInstance instance : data.quests().values()) {
-            if (instance.status() != QuestStatus.IN_PROGRESS || instance.hintPos().isEmpty() || instance.hintDimensionId().isEmpty()) {
-                continue;
-            }
-            Identifier dimensionId = Identifier.tryParse(instance.hintDimensionId().get());
-            if (dimensionId == null || !player.level().dimension().identifier().equals(dimensionId)) {
-                continue;
-            }
-            BlockPos truePos = instance.hintPos().get();
-            // A real Cartographyr-backed region quest uses the place's own real id (so ordinary
-            // exploration knowledge carries straight in/out of the quest, see QuestInstance
-            // #knowledgePlaceId's own doc); everything else falls back to the old synthetic
-            // per-instance key.
-            long placeId = instance.knowledgePlaceId().orElseGet(() -> placeIdFor(instance.instanceId()));
-
-            double distance = Math.sqrt(player.distanceToSqr(truePos.getX() + 0.5, truePos.getY(), truePos.getZ() + 0.5));
-            if (distance <= DISCOVERY_RADIUS_BLOCKS) {
-                LyfeWaypointBridge.grantKnowledge(player, placeId, true, true, true);
-            }
-
-            int knownFactors = LyfeWaypointBridge.knownFactorCount(player, placeId);
-            double fraction = knownFactors / 3.0;
-            double radius = MAX_RADIUS_BLOCKS - (MAX_RADIUS_BLOCKS - MIN_RADIUS_BLOCKS) * fraction;
-            BlockPos center = seededOffset(truePos, placeId, radius);
-
-            // "the Milestone text could be upgraded from 'to the east of <Settlement>' to 'to the
-            // east of <Settlement>, in the Whispering Forest'" -- explicit user spec, 2026-10-11.
-            // Full knowledge (every factor) is this mod's own bar for "you genuinely know this
-            // place," same threshold the vague-circle math above already collapses to near-exact at.
-            if (knownFactors >= 3 && instance.realLocationName().isPresent() && instance.directionPhrase().isPresent()) {
-                String upgraded = instance.directionPhrase().get() + ", in " + instance.realLocationName().get();
-                QuestEngine.upgradeLocationName(player, instance.instanceId(), upgraded);
-            }
-
-            LyfeWaypointBridge.setWaypoint(player, player.level().dimension(), center, radius);
-            anyShown = true;
-            break; // Only one quest waypoint shown at a time -- matches the user's own single-active-waypoint precedent.
-        }
-        if (!anyShown) {
+        // Follows PlayerQuestData#activeQuestId -- the same "which quest is current" concept the
+        // Active Quest HUD/quest log already use -- instead of the old behavior, which iterated
+        // data.quests().values() (a plain HashMap, arbitrary order) and showed whichever in-progress
+        // quest with a hint happened to come first. Real bug, 2026-10-11: with more than one quest
+        // in progress, an older quest could permanently win that arbitrary order and block a newer
+        // quest's own marker from ever showing at all -- looked exactly like "a stuck marker from a
+        // previous quest."
+        QuestInstance instance = data.activeQuestId().map(data.quests()::get).orElse(null);
+        if (instance == null || instance.status() != QuestStatus.IN_PROGRESS
+                || instance.hintPos().isEmpty() || instance.hintDimensionId().isEmpty()) {
             LyfeWaypointBridge.clearWaypoint(player);
+            return;
         }
+        Identifier dimensionId = Identifier.tryParse(instance.hintDimensionId().get());
+        if (dimensionId == null || !player.level().dimension().identifier().equals(dimensionId)) {
+            LyfeWaypointBridge.clearWaypoint(player);
+            return;
+        }
+        BlockPos truePos = instance.hintPos().get();
+        // A real Cartographyr-backed region quest uses the place's own real id (so ordinary
+        // exploration knowledge carries straight in/out of the quest, see QuestInstance
+        // #knowledgePlaceId's own doc); everything else falls back to the old synthetic
+        // per-instance key.
+        long placeId = instance.knowledgePlaceId().orElseGet(() -> placeIdFor(instance.instanceId()));
+
+        double distance = Math.sqrt(player.distanceToSqr(truePos.getX() + 0.5, truePos.getY(), truePos.getZ() + 0.5));
+        if (distance <= DISCOVERY_RADIUS_BLOCKS) {
+            LyfeWaypointBridge.grantKnowledge(player, placeId, true, true, true);
+        }
+
+        int knownFactors = LyfeWaypointBridge.knownFactorCount(player, placeId);
+        double fraction = knownFactors / 3.0;
+        double radius = MAX_RADIUS_BLOCKS - (MAX_RADIUS_BLOCKS - MIN_RADIUS_BLOCKS) * fraction;
+        BlockPos center = seededOffset(truePos, placeId, radius);
+
+        // "the Milestone text could be upgraded from 'to the east of <Settlement>' to 'to the
+        // east of <Settlement>, in the Whispering Forest'" -- explicit user spec, 2026-10-11.
+        // Full knowledge (every factor) is this mod's own bar for "you genuinely know this
+        // place," same threshold the vague-circle math above already collapses to near-exact at.
+        if (knownFactors >= 3 && instance.realLocationName().isPresent() && instance.directionPhrase().isPresent()) {
+            String upgraded = instance.directionPhrase().get() + ", in " + instance.realLocationName().get();
+            QuestEngine.upgradeLocationName(player, instance.instanceId(), upgraded);
+        }
+
+        LyfeWaypointBridge.setWaypoint(player, player.level().dimension(), center, radius);
     }
 
     /**

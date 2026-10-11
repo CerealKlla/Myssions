@@ -86,6 +86,11 @@ public final class Myssions {
         QuestEngine.setActiveQuest(player, instanceId);
     }
 
+    /** Player-initiated give-up on an in-progress instance -- lands it in Failed Quests, retryable same as a timed-out one. See {@code QuestEngine#abandonQuest}'s own doc. */
+    public static void abandonQuest(ServerPlayer player, UUID instanceId) {
+        QuestEngine.abandonQuest(player, instanceId);
+    }
+
     /** Running total of quests completed for a given Issuer id -- groundwork for a future karma/reputation system. */
     public static int getCompletedCountForIssuer(ServerPlayer player, String issuerId) {
         return QuestEngine.getCompletedCountForIssuer(player, issuerId);

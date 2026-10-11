@@ -11,6 +11,8 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.levelgen.Heightmap;
 
+import com.github.cerealklla.myssions.MyssionsMod;
+
 /**
  * Shared, reusable {@code QuestAssignmentHooks} implementations for the three taxonomy shapes that
  * don't vary by profession -- real-location/distance-scaled kill, buy-item-from-local-shop, and
@@ -141,8 +143,22 @@ final class QuestHooks {
                     double multiplier = REGION_REWARD_MIN_MULTIPLIER + (REGION_REWARD_MAX_MULTIPLIER - REGION_REWARD_MIN_MULTIPLIER) * fraction;
                     QuestEngine.setRewardMultiplier(player, instanceId, multiplier);
 
+                    // Temporary debug logging (2026-10-11, explicit user request while chasing a
+                    // "marker never showed up" report) -- remove once that's resolved and confirmed
+                    // live, not a standing feature.
                     if (com.github.cerealklla.myssions.bridge.LyfeWaypointBridge.isLoaded()) {
+                        int priorFactors = com.github.cerealklla.myssions.bridge.LyfeWaypointBridge.knownFactorCount(player, target.placeId());
                         com.github.cerealklla.myssions.bridge.LyfeWaypointBridge.grantKnowledge(player, target.placeId(), true, true, false);
+                        int afterFactors = com.github.cerealklla.myssions.bridge.LyfeWaypointBridge.knownFactorCount(player, target.placeId());
+                        MyssionsMod.LOGGER.info(
+                                "[QuestDebug] {} accepted region quest {} -- target '{}' (placeId={}), prior knowledge factors={}, after grant={}, direction='{}', activeQuestId will be {}",
+                                player.getGameProfile().name(), questId, target.displayName(), target.placeId(),
+                                priorFactors, afterFactors, directionPhrase,
+                                player.getData(com.github.cerealklla.myssions.registration.ModAttachments.QUEST_DATA).activeQuestId()
+                                        .map(Object::toString).orElse("<none set -- this quest's marker will NOT show until 'Set as Active Quest' is clicked>"));
+                    } else {
+                        MyssionsMod.LOGGER.info("[QuestDebug] {} accepted region quest {} -- Lyfe not loaded, no knowledge/waypoint possible",
+                                player.getGameProfile().name(), questId);
                     }
                     player.sendSystemMessage(Component.literal("You get a rough idea where to look -- check your map."));
                 });

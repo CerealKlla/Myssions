@@ -106,5 +106,13 @@ public class MyssionsMod {
                         Myssions.retryQuest(player, payload.instanceId());
                     }
                 });
+
+        registrar.playToServer(com.github.cerealklla.myssions.net.AbandonQuestPayload.TYPE,
+                com.github.cerealklla.myssions.net.AbandonQuestPayload.STREAM_CODEC,
+                (payload, context) -> {
+                    if (context.player() instanceof ServerPlayer player) {
+                        Myssions.abandonQuest(player, payload.instanceId());
+                    }
+                });
     }
 }

@@ -247,6 +247,14 @@ public final class QuestEngine {
     private static void finalizeInstance(ServerPlayer player, PlayerQuestData data, QuestDefinition definition, QuestInstance instance) {
         QuestInstance completed = instance.withStatus(QuestStatus.COMPLETED);
         PlayerQuestData updatedData = data.withQuest(completed).withIssuerCompletionIncremented(definition.issuerId());
+        // Real report, 2026-10-11: a completed quest stayed the Active Quest HUD/waypoint target
+        // forever, since nothing ever cleared activeQuestId on completion -- only PlayerQuestData's
+        // own doc ("which instance (if any) shows on the Active Quest HUD") implies it should only
+        // ever point at something still in progress. Only clear it if THIS instance was the one
+        // active, not unconditionally.
+        if (updatedData.activeQuestId().map(instance.instanceId()::equals).orElse(false)) {
+            updatedData = updatedData.withActiveQuest(null);
+        }
         player.setData(ModAttachments.QUEST_DATA, updatedData);
         player.sendSystemMessage(Component.literal("Quest complete: " + definition.name()));
     }
@@ -584,8 +592,45 @@ public final class QuestEngine {
         if (instance == null || instance.status() != QuestStatus.IN_PROGRESS) {
             return;
         }
-        player.setData(ModAttachments.QUEST_DATA, data.withQuest(instance.withStatus(QuestStatus.FAILED)));
+        PlayerQuestData updatedData = data.withQuest(instance.withStatus(QuestStatus.FAILED));
+        // Same reasoning as finalizeInstance's own completion fix -- a failed quest shouldn't keep
+        // squatting on the Active Quest HUD/waypoint either.
+        if (updatedData.activeQuestId().map(instanceId::equals).orElse(false)) {
+            updatedData = updatedData.withActiveQuest(null);
+        }
+        player.setData(ModAttachments.QUEST_DATA, updatedData);
         QuestRegistry.get(instance.definitionId()).ifPresent(def ->
                 player.sendSystemMessage(Component.literal("Quest failed: " + def.name())));
+    }
+
+    /**
+     * Player-initiated give-up, from {@code client.QuestLogScreen}'s new "Abandon Quest" button
+     * (2026-10-11 explicit request). Reuses {@link QuestStatus#FAILED} rather than adding a distinct
+     * status -- an abandoned quest should land in the exact same "Failed Quests" bucket a timed-out
+     * one does, with the same existing Retry path, rather than introducing a parallel UI/state story
+     * for what's functionally the same "not in progress anymore, but resumable" outcome.
+     */
+    public static void abandonQuest(ServerPlayer player, UUID instanceId) {
+        PlayerQuestData data = player.getData(ModAttachments.QUEST_DATA);
+        QuestInstance instance = data.quests().get(instanceId);
+        if (instance == null || instance.status() != QuestStatus.IN_PROGRESS) {
+            return;
+        }
+        // An escort instance's caravan is a real live entity with nothing else watching it once the
+        // quest stops being IN_PROGRESS (QuestEscortTicker only ever acts on in-progress instances) --
+        // same cleanup QuestEscortTicker#completeEscort already does on a normal finish.
+        if (instance.escort().entityUuid().isPresent() && player.level() instanceof net.minecraft.server.level.ServerLevel level) {
+            net.minecraft.world.entity.Entity entity = level.getEntity(instance.escort().entityUuid().get());
+            if (entity instanceof com.github.cerealklla.myssions.quest.entity.CaravanEntity caravan) {
+                caravan.discard();
+            }
+        }
+        PlayerQuestData updatedData = data.withQuest(instance.withStatus(QuestStatus.FAILED));
+        if (updatedData.activeQuestId().map(instanceId::equals).orElse(false)) {
+            updatedData = updatedData.withActiveQuest(null);
+        }
+        player.setData(ModAttachments.QUEST_DATA, updatedData);
+        QuestRegistry.get(instance.definitionId()).ifPresent(def ->
+                player.sendSystemMessage(Component.literal("Quest abandoned: " + def.name())));
     }
 }
