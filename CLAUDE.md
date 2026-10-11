@@ -166,4 +166,11 @@ CLAUDE.md for its half. `./gradlew build` green in both repos, whole-suite boot-
 **Never opened in a live client** — new GUI/menu-registration code that only a real `runClient`
 session can actually verify.
 
+**Kill-tracking geo-fenced for on-site quests, 2026-10-11** (see
+[context/decisions.md](context/decisions.md)) — explicit user correction confirming a long-flagged
+gap: a kill now only counts toward a milestone if it happened within 64 blocks of the quest's own
+real location (the six on-site quests from the previous day's retrofit); the four quests with no
+real location stay "kill anywhere," deliberately. `./gradlew build` green, whole-suite boot-smoke-
+tested clean. **Not yet live-tested or re-deployed.**
+
 See [context/classes/](context/classes/) for per-class reference.

@@ -15,10 +15,13 @@ import com.github.cerealklla.myssions.MyssionsMod;
  * Config Sign instead (see {@code bridge.QuestSignInteractListener}), a deliberate stand-in flagged
  * here and in context/decisions.md for whenever a real Mayor NPC exists.
  *
- * <p><b>Kill-tracking is still NOT geo-fenced</b> -- the actual counting ({@code
- * quest.QuestKillListener}) matches a kill anywhere, not just at the named location, for every
- * quest here including the six below with a real waypoint hint. This is an honest, flagged
- * simplification, not an oversight; real region-arrival checking is separate, still-unbuilt work.
+ * <p><b>Kill-tracking is now geo-fenced for the six on-site quests</b> (fixed 2026-10-11, explicit
+ * user correction: "if I kill zombies somewhere else will not count toward the quest Milestones ...
+ * that is how it SHOULD behave") -- {@code quest.QuestKillListener} only counts a kill within a
+ * radius of the instance's own real {@code hintPos}, which only the six on-site quests below ever
+ * have set. The other four quests (two Lumberjack wilderness quests, both Mayor quests) have no
+ * real hint at all, so kill-tracking for those stays deliberately "anywhere" -- there's no real
+ * location to fence against, not an oversight.
  *
  * <p><b>Six on-site quests now DO point a real waypoint at their issuing plot</b> (added
  * 2026-10-10, real user feedback -- a milestone saying "near the fields" meant nothing once the
