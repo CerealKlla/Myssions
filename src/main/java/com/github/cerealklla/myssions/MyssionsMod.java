@@ -47,6 +47,7 @@ public class MyssionsMod {
         NeoForge.EVENT_BUS.register(new QuestDeadlineTicker());
         NeoForge.EVENT_BUS.register(new QuestKillListener());
         NeoForge.EVENT_BUS.register(new com.github.cerealklla.myssions.quest.QuestMobSpawnTicker());
+        NeoForge.EVENT_BUS.register(new com.github.cerealklla.myssions.quest.QuestEscortTicker());
         NeoForge.EVENT_BUS.register(new QuestNpcTalkListener());
         NeoForge.EVENT_BUS.addListener((RegisterCommandsEvent event) -> DebugCommands.register(event.getDispatcher()));
 
@@ -67,6 +68,7 @@ public class MyssionsMod {
 
     private void registerAttributes(net.neoforged.neoforge.event.entity.EntityAttributeCreationEvent event) {
         event.put(ModEntities.QUEST_NPC.get(), QuestNpcEntity.createAttributes().build());
+        event.put(ModEntities.CARAVAN.get(), com.github.cerealklla.myssions.quest.entity.CaravanEntity.createAttributes().build());
     }
 
     private void commonSetup(FMLCommonSetupEvent event) {

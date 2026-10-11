@@ -46,6 +46,9 @@ public class MyssionsModClient {
         // bespoke model, same precedent as Settlemynts' own plot worker NPCs.
         event.registerEntityRenderer(com.github.cerealklla.myssions.registration.ModEntities.QUEST_NPC.get(),
                 net.minecraft.client.renderer.entity.VillagerRenderer::new);
+        // Same reasoning -- a real Villager subclass needs no bespoke model.
+        event.registerEntityRenderer(com.github.cerealklla.myssions.registration.ModEntities.CARAVAN.get(),
+                net.minecraft.client.renderer.entity.VillagerRenderer::new);
     }
 
     @SubscribeEvent

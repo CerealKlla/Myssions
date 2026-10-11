@@ -190,4 +190,23 @@ Forest" as real knowledge improves, and guarantee completability via `quest.Ques
 what's naturally there). The 6 on-site quests are unaffected. `./gradlew build` green, whole-suite
 boot-smoke-tested clean. **Not yet live-tested or deployed.**
 
+**Escort/caravan-raid and unborn-town quest styles added, 2026-10-11** (see
+[context/decisions.md](context/decisions.md), design-document.md's quest taxonomy categories 4/5) —
+Phase 1 scope, explicit user choice: prove out the two new mechanics with one sample quest each, not
+the full 10-quests-per-profession content expansion also requested the same session (separate, later
+work). New `quest.entity.CaravanEntity`/`FollowRouteGoal` (a moving Villager subclass driven entirely
+by `quest.QuestEscortTicker`, which continuously overwrites `hintPos` with the caravan's live
+position — this alone makes `QuestKillListener`'s geofence and `QuestMobSpawnTicker`'s
+spawn-guarantee track a moving target with zero changes to either class) and a new
+`QuestMilestone#isEscortMilestone` completed when the caravan reaches its final waypoint alive.
+Bandits only attack an unguarded stake (a direct online-player-proximity check at the moment of
+arrival — a simplified stand-in for the user's fuller "persisted Escort status" framing) and are an
+*optional* bonus milestone, since a well-guarded run may trigger no raid at all. First quest:
+`merchantCaravanEscort` (Traveling Merchant's first quest ever). Separately, `scoutTheFrontier`
+(Mayor) is the first "unborn town" quest, naming a real town before its chunks generate via
+Cartographyr's new `findOrPredictSettlementNear` (vanilla seed-math placement prediction, explicitly
+NOT forced chunk generation — an earlier force-generation design was rejected by the user mid-session
+over lag-spike risk; see Cartographyr's own CLAUDE.md). `./gradlew build` green in both repos,
+whole-suite (8 mods) boot-smoke-tested clean. **Not yet live-tested or deployed.**
+
 See [context/classes/](context/classes/) for per-class reference.

@@ -97,4 +97,27 @@ public final class CartographyrRegionBridge {
         return Optional.of(new RegionTarget(new BlockPos(x, y, z), entity.dimension(), DisplayText.shortForEntity(entity),
                 distances.get(chosen), entity.id().value()));
     }
+
+    /**
+     * Wraps {@code Cartography.findOrPredictSettlementNear} for the "unborn town" quest style
+     * (added 2026-10-11) -- see that method's own doc. Deliberately never calls {@code
+     * ServerLevel#getHeight} for a {@link com.github.cerealklla.cartographyr.geo.LifecycleState#PLANNED}
+     * result: that call loads/generates the target chunk's heightmap, which is exactly the forced
+     * generation the user explicitly rejected for this feature. A planned (not-yet-generated)
+     * result instead reuses {@code origin}'s own Y as a harmless approximation -- only ever used for
+     * a hint/waypoint marker, never real navigation that needs an accurate ground height.
+     */
+    public static Optional<RegionTarget> findUnbornTownNear(ServerLevel level, BlockPos origin, double radiusBlocks) {
+        return Cartography.findOrPredictSettlementNear(level, origin, radiusBlocks).map(entity -> {
+            int x = entity.geometry().centerBlockX();
+            int z = entity.geometry().centerBlockZ();
+            int y = entity.lifecycleState() == com.github.cerealklla.cartographyr.geo.LifecycleState.PLANNED
+                    ? origin.getY() : level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z);
+            double dx = x - origin.getX();
+            double dz = z - origin.getZ();
+            double dist = Math.sqrt(dx * dx + dz * dz);
+            return new RegionTarget(new BlockPos(x, y, z), entity.dimension(), DisplayText.shortForEntity(entity),
+                    dist, entity.id().value());
+        });
+    }
 }

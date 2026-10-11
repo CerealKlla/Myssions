@@ -46,6 +46,7 @@ public final class NpcQuests {
     private static final String LUMBERYARD_ZONE_TYPE = "blueprynts:lumberyard";
     private static final String FARM_ZONE_TYPE = "blueprynts:farm";
     private static final String TOWN_HALL_ZONE_TYPE = "settlemynts:town_hall";
+    private static final String TRAVELING_MERCHANT_ZONE_TYPE = "blueprynts:traveling_merchant_stall";
 
     private NpcQuests() {
     }
@@ -60,11 +61,13 @@ public final class NpcQuests {
         List<Identifier> farmerQuests = List.of(
                 nightRaiders(), skeletonScarecrows(), burrowingNuisance(), midnightHowlers());
         List<Identifier> mayorQuests = List.of(
-                warbandAtTheGates(), clearTheCaves(), findOldHarlen());
+                warbandAtTheGates(), clearTheCaves(), findOldHarlen(), scoutTheFrontier());
+        List<Identifier> travelingMerchantQuests = List.of(merchantCaravanEscort());
 
         IssuerQuestPools.register(LUMBERYARD_ZONE_TYPE, lumberjackQuests);
         IssuerQuestPools.register(FARM_ZONE_TYPE, farmerQuests);
         IssuerQuestPools.register(TOWN_HALL_ZONE_TYPE, mayorQuests);
+        IssuerQuestPools.register(TRAVELING_MERCHANT_ZONE_TYPE, travelingMerchantQuests);
     }
 
     // ---- Lumberjack ----
@@ -403,6 +406,142 @@ public final class NpcQuests {
                 }
             });
         });
+    }
+
+    // ---- Traveling Merchant (caravan-raid quest style, added 2026-10-11) ----
+
+    private static final double ESCORT_WAYPOINT_SPACING_BLOCKS = 45.0;
+    private static final int ESCORT_WAYPOINT_COUNT = 3;
+
+    /**
+     * The first caravan-raid quest (design-document.md's quest taxonomy, 4th category) -- a straight
+     * road of {@link #ESCORT_WAYPOINT_COUNT} waypoints in one random direction from the Traveling
+     * Merchant's own stall, each {@link #ESCORT_WAYPOINT_SPACING_BLOCKS} apart. Bandits (reusing
+     * vanilla's Pillager, no custom "bandit" entity exists yet) are an optional, bonus-only
+     * encounter -- the quest's only real required milestone is the caravan reaching the end of the
+     * road alive; see {@link #registerEscortHook}'s own doc for how the raid itself is gated.
+     */
+    private static Identifier merchantCaravanEscort() {
+        Identifier questId = id("merchant_caravan_escort");
+        QuestRegistry.register(new QuestDefinition(questId, "Guard the Caravan",
+                "I've got a caravan heading out along the road, and the last one that went out "
+                        + "light on guards never made it. Stay close the whole way -- if bandits don't see "
+                        + "anyone watching the caravan, they'll hit it. Keep them off and see it through safely.",
+                TRAVELING_MERCHANT_ZONE_TYPE,
+                List.of(
+                        new QuestMilestone("fend_off_bandits", "Fend off any Bandits that attack the caravan",
+                                true, 3, java.util.Optional.of(Identifier.fromNamespaceAndPath("minecraft", "pillager")),
+                                java.util.Optional.empty(), false, false, false),
+                        QuestMilestone.escort("escort_caravan", "Escort the caravan safely to the end of the road")
+                ),
+                List.of(QuestReward.gold(20), QuestReward.intangible("The caravan reaches its destination safely")),
+                QuestTimeLimit.NONE));
+        registerEscortHook(questId);
+        return questId;
+    }
+
+    /**
+     * Spawns a {@code quest.entity.CaravanEntity} at the Traveling Merchant's own stall and gives it
+     * a straight {@link #ESCORT_WAYPOINT_COUNT}-point road in one random direction -- {@code
+     * quest.QuestEscortTicker} owns everything from here on (moving the caravan, continuously
+     * updating the hidden hint to its live position, and re-arming {@code QuestMobSpawnTicker}'s
+     * existing spawn-guarantee at each waypoint the caravan reaches without a nearby player, which is
+     * the actual raid trigger -- explicit user spec: "being near the caravan grants players an
+     * 'Escort' status... checks at each roadway stake if any players have a status... if not trigger
+     * the attack"). A no-op if Settlemynts isn't loaded or the plot can't be resolved.
+     */
+    private static void registerEscortHook(Identifier questId) {
+        QuestAssignmentHooks.register(questId, (player, instanceId, assignedId, plotId) -> {
+            if (!(player.level() instanceof net.minecraft.server.level.ServerLevel level)
+                    || !com.github.cerealklla.myssions.bridge.SettlemyntsPlotLocationBridge.isLoaded()) {
+                return;
+            }
+            com.github.cerealklla.myssions.bridge.SettlemyntsPlotLocationBridge.resolve(level, plotId).ifPresent(loc -> {
+                net.minecraft.server.level.ServerLevel roadLevel = level.getServer().getLevel(loc.dimension());
+                if (roadLevel == null) {
+                    return;
+                }
+                double angle = player.getRandom().nextDouble() * Math.PI * 2;
+                List<net.minecraft.core.BlockPos> route = new java.util.ArrayList<>();
+                for (int i = 1; i <= ESCORT_WAYPOINT_COUNT; i++) {
+                    double distance = ESCORT_WAYPOINT_SPACING_BLOCKS * i;
+                    int x = loc.pos().getX() + (int) Math.round(Math.cos(angle) * distance);
+                    int z = loc.pos().getZ() + (int) Math.round(Math.sin(angle) * distance);
+                    int groundY = roadLevel.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z);
+                    route.add(new net.minecraft.core.BlockPos(x, groundY, z));
+                }
+
+                com.github.cerealklla.myssions.quest.entity.CaravanEntity caravan =
+                        new com.github.cerealklla.myssions.quest.entity.CaravanEntity(
+                                com.github.cerealklla.myssions.registration.ModEntities.CARAVAN.get(), roadLevel);
+                caravan.setPos(loc.pos().getX() + 0.5, loc.pos().getY(), loc.pos().getZ() + 0.5);
+                caravan.configure(player.getUUID(), instanceId);
+                caravan.setTargetPos(route.get(0));
+                roadLevel.addFreshEntity(caravan);
+
+                QuestEngine.assignEscort(player, instanceId, caravan.getUUID(), route);
+                QuestEngine.setHint(player, instanceId, loc.pos(), loc.dimension().identifier().toString());
+                player.sendSystemMessage(net.minecraft.network.chat.Component.literal(
+                        "The caravan sets out -- stay close, or bandits may see their chance."));
+            });
+        });
+    }
+
+    // "2 miles" -- the user's own original phrasing for this quest style's search radius.
+    private static final double UNBORN_TOWN_SEARCH_RADIUS_BLOCKS = 2 * 1609.0;
+
+    /**
+     * The "unborn town" quest style (design-document.md's quest taxonomy, 4th category) -- explicit
+     * user spec, 2026-10-11: a quest can name a real town that hasn't generated yet, using vanilla's
+     * own structure-placement seed math (no forced generation -- a user correction mid-design,
+     * since force-generating the chunks to check would risk real server-tick lag spikes) to predict
+     * where it will sit, via {@code bridge.CartographyrRegionBridge#findUnbornTownNear} ->
+     * {@code Cartography.findOrPredictSettlementNear}. The player only ever sees the name; the real
+     * chunk generates naturally whenever they (or anyone else) actually walk there, at which point
+     * Cartographyr's own discovery listener promotes the same placeholder in place rather than
+     * creating a second, differently-named entity for it.
+     *
+     * <p><b>Known Phase 1 simplification</b>: this quest is offered from the same Town Hall pool as
+     * every other Mayor quest, with no "only near the edge of the known world" eligibility gate yet
+     * (the user's stated preference) -- {@code IssuerQuestPools}/{@code IssuerQuestBoard} have no
+     * per-quest eligibility-predicate mechanism to hook today; adding one is real, separate follow-up
+     * work, not done here. In practice this rarely matters: near a well-explored area the bridge just
+     * returns an already-real, already-discovered town instead of a predicted one.
+     */
+    private static Identifier scoutTheFrontier() {
+        Identifier questId = id("scout_the_frontier");
+        QuestRegistry.register(new QuestDefinition(questId, "Scout the Frontier",
+                "Traders keep talking about a town out past the edge of what we've properly mapped. "
+                        + "Nobody from here has actually laid eyes on it. Go find it, see what's really out "
+                        + "there, and bring back word.",
+                TOWN_HALL_ZONE_TYPE,
+                List.of(QuestMilestone.talk("report_back", "Return and report what you found")),
+                List.of(QuestReward.gold(15), QuestReward.intangible("The map grows a little less empty")),
+                QuestTimeLimit.NONE));
+        QuestAssignmentHooks.register(questId, (player, instanceId, assignedId, plotId) -> {
+            if (!(player.level() instanceof net.minecraft.server.level.ServerLevel level)
+                    || !com.github.cerealklla.myssions.bridge.CartographyrRegionBridge.isLoaded()) {
+                return;
+            }
+            com.github.cerealklla.myssions.bridge.CartographyrRegionBridge.findUnbornTownNear(
+                    level, player.blockPosition(), UNBORN_TOWN_SEARCH_RADIUS_BLOCKS
+            ).ifPresentOrElse(target -> {
+                String direction = directionWord(player.blockPosition(), target.pos());
+                QuestEngine.setHint(player, instanceId, target.pos(), target.dimension().identifier().toString(),
+                        java.util.Optional.of(target.displayName()));
+
+                // A named NPC-reporting step (same shape as findOldHarlen) stands in for "report back
+                // to the Mayor" -- spawned right next to the player so the talk milestone has a real
+                // interaction target without needing a whole dedicated turn-in flow for this one quest.
+                QuestNpcSpawner.spawn(level, player.blockPosition(), player.getUUID(), instanceId, false, "A Passing Scout");
+
+                player.sendSystemMessage(net.minecraft.network.chat.Component.literal(
+                        "Word is there's a town called " + target.displayName() + ", " + direction + " of here. "
+                                + "Find it and report back."));
+            }, () -> player.sendSystemMessage(net.minecraft.network.chat.Component.literal(
+                    "Nobody can point to anywhere unmapped worth scouting right now.")));
+        });
+        return questId;
     }
 
     /**

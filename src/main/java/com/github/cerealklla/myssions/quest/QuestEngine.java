@@ -122,6 +122,33 @@ public final class QuestEngine {
         }
     }
 
+    /** Binds a freshly-spawned caravan and its full route to an escort instance -- called once, right after assignment. See {@code NpcQuests#registerEscortHook}. */
+    public static void assignEscort(ServerPlayer player, UUID instanceId, UUID caravanUuid, List<net.minecraft.core.BlockPos> route) {
+        PlayerQuestData data = player.getData(ModAttachments.QUEST_DATA);
+        QuestInstance instance = data.quests().get(instanceId);
+        if (instance != null) {
+            player.setData(ModAttachments.QUEST_DATA, data.withQuest(instance.withEscort(caravanUuid, route)));
+        }
+    }
+
+    /** Pops the just-reached waypoint off the escort route -- see {@code QuestEscortTicker}. */
+    public static void advanceEscortWaypoint(ServerPlayer player, UUID instanceId) {
+        PlayerQuestData data = player.getData(ModAttachments.QUEST_DATA);
+        QuestInstance instance = data.quests().get(instanceId);
+        if (instance != null) {
+            player.setData(ModAttachments.QUEST_DATA, data.withQuest(instance.withEscortWaypointReached()));
+        }
+    }
+
+    /** Re-arms the completability spawn-guarantee for one more cycle -- used when a caravan arrives at an unguarded stake, so {@code QuestMobSpawnTicker}'s existing logic fires again against the updated hint position. */
+    public static void resetMobsSpawned(ServerPlayer player, UUID instanceId) {
+        PlayerQuestData data = player.getData(ModAttachments.QUEST_DATA);
+        QuestInstance instance = data.quests().get(instanceId);
+        if (instance != null) {
+            player.setData(ModAttachments.QUEST_DATA, data.withQuest(instance.withMobsSpawnedReset()));
+        }
+    }
+
     public static void setActiveQuest(ServerPlayer player, UUID instanceId) {
         PlayerQuestData data = player.getData(ModAttachments.QUEST_DATA);
         if (!data.quests().containsKey(instanceId)) {

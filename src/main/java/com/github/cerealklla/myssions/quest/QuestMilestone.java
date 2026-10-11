@@ -10,7 +10,8 @@ import net.minecraft.resources.Identifier;
 /**
  * One step of a {@link QuestDefinition} -- a plain description plus an optional flag and a
  * required count (e.g. "Kill 5 Zombies" has {@code requiredCount == 5}; most milestones are
- * {@code 1}). Three real trigger types are modeled directly (added 2026-10-10):
+ * {@code 1}). Four real trigger types are modeled directly (added 2026-10-10, escort added
+ * 2026-10-11):
  *
  * <ul>
  *   <li>{@link #killTargetEntityType()} present -- {@code quest.QuestKillListener} increments this
@@ -24,6 +25,9 @@ import net.minecraft.resources.Identifier;
  *   <li>{@link #isTalkMilestone()} true -- completed simply by interacting with the one {@code
  *   quest.QuestNpcEntity} spawned for this quest (design doc items 8/9 -- a named, possibly
  *   day/night-conditional, per-player-visible NPC), see that entity's own doc.</li>
+ *   <li>{@link #isEscortMilestone()} true -- completed by {@code quest.QuestEscortTicker} when this
+ *   instance's {@code quest.entity.CaravanEntity} reaches the final waypoint of its route alive (the
+ *   caravan-raid quest style) -- not by any kill/deliver/talk event.</li>
  * </ul>
  *
  * A milestone with none of these is a plain manual one, completed only via a direct {@code
@@ -34,7 +38,7 @@ import net.minecraft.resources.Identifier;
  */
 public record QuestMilestone(String id, String description, boolean optional, int requiredCount,
                               Optional<Identifier> killTargetEntityType, Optional<String> proofId,
-                              boolean isDeliverMilestone, boolean isTalkMilestone) {
+                              boolean isDeliverMilestone, boolean isTalkMilestone, boolean isEscortMilestone) {
 
     public static final Codec<QuestMilestone> CODEC = RecordCodecBuilder.create(instance -> instance.group(
             Codec.STRING.fieldOf("id").forGetter(QuestMilestone::id),
@@ -44,26 +48,31 @@ public record QuestMilestone(String id, String description, boolean optional, in
             Identifier.CODEC.optionalFieldOf("kill_target_entity_type").forGetter(QuestMilestone::killTargetEntityType),
             Codec.STRING.optionalFieldOf("proof_id").forGetter(QuestMilestone::proofId),
             Codec.BOOL.optionalFieldOf("is_deliver_milestone", false).forGetter(QuestMilestone::isDeliverMilestone),
-            Codec.BOOL.optionalFieldOf("is_talk_milestone", false).forGetter(QuestMilestone::isTalkMilestone)
+            Codec.BOOL.optionalFieldOf("is_talk_milestone", false).forGetter(QuestMilestone::isTalkMilestone),
+            Codec.BOOL.optionalFieldOf("is_escort_milestone", false).forGetter(QuestMilestone::isEscortMilestone)
     ).apply(instance, QuestMilestone::new));
 
     public static QuestMilestone simple(String id, String description) {
-        return new QuestMilestone(id, description, false, 1, Optional.empty(), Optional.empty(), false, false);
+        return new QuestMilestone(id, description, false, 1, Optional.empty(), Optional.empty(), false, false, false);
     }
 
     public static QuestMilestone simple(String id, String description, boolean optional) {
-        return new QuestMilestone(id, description, optional, 1, Optional.empty(), Optional.empty(), false, false);
+        return new QuestMilestone(id, description, optional, 1, Optional.empty(), Optional.empty(), false, false, false);
     }
 
     public static QuestMilestone kill(String id, String description, Identifier entityType, int count, String proofId) {
-        return new QuestMilestone(id, description, false, count, Optional.of(entityType), Optional.of(proofId), false, false);
+        return new QuestMilestone(id, description, false, count, Optional.of(entityType), Optional.of(proofId), false, false, false);
     }
 
     public static QuestMilestone deliver(String id, String description, String proofId, int count) {
-        return new QuestMilestone(id, description, false, count, Optional.empty(), Optional.of(proofId), true, false);
+        return new QuestMilestone(id, description, false, count, Optional.empty(), Optional.of(proofId), true, false, false);
     }
 
     public static QuestMilestone talk(String id, String description) {
-        return new QuestMilestone(id, description, false, 1, Optional.empty(), Optional.empty(), false, true);
+        return new QuestMilestone(id, description, false, 1, Optional.empty(), Optional.empty(), false, true, false);
+    }
+
+    public static QuestMilestone escort(String id, String description) {
+        return new QuestMilestone(id, description, false, 1, Optional.empty(), Optional.empty(), false, false, true);
     }
 }
