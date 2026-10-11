@@ -57,6 +57,16 @@ public final class QuestLogScreen extends Screen {
     private int detailsScroll;
     private Button actionButton;
 
+    // Set the instant "Set as Active Quest" is clicked, read in place of the (possibly still-stale)
+    // synced attachment until it catches up -- fixes a real 2026-10-11 user report ("I have to click
+    // the Make Active Quest 2x before it actually clicks"). Root cause: setActive() used to rebuild
+    // the list/button by re-reading the client's own QUEST_DATA attachment immediately after sending
+    // the request packet, but that attachment only updates once the server's resync round-trips back
+    // -- so the first click silently appeared to do nothing (button stayed enabled, label unchanged)
+    // even though it had already taken effect server-side, and the user's second click was actually
+    // a redundant repeat of the first that just happened to land after the real sync caught up.
+    private UUID optimisticActiveQuestId;
+
     public QuestLogScreen() {
         super(Component.literal("Quests"));
     }
@@ -70,29 +80,52 @@ public final class QuestLogScreen extends Screen {
         rebuildActionButton();
     }
 
+    /** The effective active-quest id for rendering purposes -- prefers a just-clicked optimistic
+     * value over the real synced attachment until that sync catches up and matches it. See {@link
+     * #optimisticActiveQuestId}'s own doc. */
+    private UUID effectiveActiveQuestId(com.github.cerealklla.myssions.quest.PlayerQuestData data) {
+        if (optimisticActiveQuestId != null) {
+            if (data.activeQuestId().map(optimisticActiveQuestId::equals).orElse(false)) {
+                // The real sync has caught up -- drop the optimistic override, the authoritative
+                // value now agrees with it anyway.
+                optimisticActiveQuestId = null;
+            } else {
+                return optimisticActiveQuestId;
+            }
+        }
+        return data.activeQuestId().orElse(null);
+    }
+
     private void rebuildListRows() {
         var data = Minecraft.getInstance().player.getData(ModAttachments.QUEST_DATA);
+        UUID activeId = effectiveActiveQuestId(data);
         List<ListRow> rows = new ArrayList<>();
         List<QuestInstance> active = new ArrayList<>();
+        List<QuestInstance> completed = new ArrayList<>();
         List<QuestInstance> failed = new ArrayList<>();
         for (QuestInstance instance : data.quests().values()) {
-            if (instance.status() == QuestStatus.FAILED) {
-                failed.add(instance);
-            } else {
-                active.add(instance);
+            switch (instance.status()) {
+                case FAILED -> failed.add(instance);
+                // Grouped to the bottom with Failed, 2026-10-11 user request -- previously mixed in
+                // with everything else in insertion order instead of standing out as "done."
+                case COMPLETED -> completed.add(instance);
+                default -> active.add(instance);
             }
         }
         for (QuestInstance instance : active) {
             QuestRegistry.get(instance.definitionId()).ifPresent(def -> {
-                boolean isActiveQuest = data.activeQuestId().map(id -> id.equals(instance.instanceId())).orElse(false);
-                int color = instance.status() == QuestStatus.COMPLETED ? DIM_TEXT_COLOR : (isActiveQuest ? ACTIVE_TEXT_COLOR : TEXT_COLOR);
-                String prefix = switch (instance.status()) {
-                    case COMPLETED -> "[Done] ";
-                    case AWAITING_REWARD_PICKUP -> "[Ready] ";
-                    default -> isActiveQuest ? "* " : "";
-                };
+                boolean isActiveQuest = instance.instanceId().equals(activeId);
+                String prefix = instance.status() == QuestStatus.AWAITING_REWARD_PICKUP ? "[Ready] " : (isActiveQuest ? "* " : "");
+                int color = isActiveQuest ? ACTIVE_TEXT_COLOR : TEXT_COLOR;
                 rows.add(new ListRow(instance.instanceId(), prefix + def.name(), color, false));
             });
+        }
+        if (!completed.isEmpty()) {
+            rows.add(new ListRow(null, "-- Completed Quests --", HEADER_COLOR, true));
+            for (QuestInstance instance : completed) {
+                QuestRegistry.get(instance.definitionId())
+                        .ifPresent(def -> rows.add(new ListRow(instance.instanceId(), "[Done] " + def.name(), DIM_TEXT_COLOR, false)));
+            }
         }
         if (!failed.isEmpty()) {
             rows.add(new ListRow(null, "-- Failed Quests --", HEADER_COLOR, true));
@@ -120,7 +153,7 @@ public final class QuestLogScreen extends Screen {
         int detailsLeft = width * LIST_WIDTH_FRACTION_NUM / FRACTION_DEN + MARGIN * 2;
         int buttonY = MARGIN;
         if (instance.status() == QuestStatus.IN_PROGRESS || instance.status() == QuestStatus.AWAITING_REWARD_PICKUP) {
-            boolean isActiveQuest = data.activeQuestId().map(id -> id.equals(selectedId)).orElse(false);
+            boolean isActiveQuest = selectedId.equals(effectiveActiveQuestId(data));
             actionButton = addRenderableWidget(Button.builder(
                             Component.literal(isActiveQuest ? "Active Quest" : "Set as Active Quest"),
                             b -> setActive())
@@ -137,8 +170,11 @@ public final class QuestLogScreen extends Screen {
             return;
         }
         Minecraft.getInstance().getConnection().send(new ServerboundCustomPayloadPacket(new SetActiveQuestPayload(selectedId)));
-        // Optimistic local refresh -- the server-authoritative attachment sync will confirm this
-        // shortly after, but rebuilding immediately off the click avoids a visible round-trip delay.
+        // Real optimistic update (2026-10-11 fix, see optimisticActiveQuestId's own doc) -- the
+        // previous version's comment claimed this already happened, but it only re-read the same
+        // still-stale attachment, so the button never visually updated until the server's resync
+        // round-tripped back, making the first click look like it had done nothing.
+        optimisticActiveQuestId = selectedId;
         rebuildListRows();
         rebuildActionButton();
     }
