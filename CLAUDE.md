@@ -130,4 +130,16 @@ tested clean with all 8 suite mods together. **Never live-tested.**
 on a quest offer/delivery from its own chat screen, no shift+right-click required. `./gradlew build`
 green in both repos, whole-suite boot-smoke-tested clean. **Not yet live-tested or deployed.**
 
+**Six on-site quests retrofitted with a real location/waypoint, same day** (see
+[context/decisions.md](context/decisions.md)) — real live-test feedback: a Farmer quest milestone
+just said "near the fields," meaningless once left and forgotten, when the player already stood at
+that exact plot to accept it. New `quest.QuestText#resolve` substitutes a `{location}` token with a
+per-instance `QuestInstance#locationName()`; `NpcQuests#registerOnSiteHook` (the four Farmer quests
+plus two of the four Lumberjack quests) resolves the real plot location via new
+`bridge.SettlemyntsPlotLocationBridge` -> Settlemynts' new `api.Settlemynts#findPlotLocation`, sets
+a real hint, and grants full knowledge immediately (not a rough bearing). The other four quests
+(genuinely distant/vague wilderness or road threats) are deliberately untouched.
+`quest.QuestAssignmentHooks` widened to also carry the issuing `plotId`. `./gradlew build` green in
+both repos, whole-suite boot-smoke-tested clean. **Not yet live-tested or deployed.**
+
 See [context/classes/](context/classes/) for per-class reference.

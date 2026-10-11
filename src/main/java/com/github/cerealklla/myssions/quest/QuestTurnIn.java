@@ -125,7 +125,7 @@ public final class QuestTurnIn {
         }
         if (QuestEngine.assignQuest(player, offeredId)) {
             board.clear(plotId);
-            QuestAssignmentHooks.fire(player, offeredId);
+            QuestAssignmentHooks.fire(player, offeredId, plotId);
         }
     }
 }

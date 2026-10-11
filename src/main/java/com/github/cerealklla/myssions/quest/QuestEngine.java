@@ -66,10 +66,15 @@ public final class QuestEngine {
 
     /** Sets an in-progress quest instance's hidden true hint position -- see {@link QuestInstance#hintPos()}'s own doc. */
     public static void setHint(ServerPlayer player, Identifier definitionId, net.minecraft.core.BlockPos pos, String dimensionId) {
+        setHint(player, definitionId, pos, dimensionId, Optional.empty());
+    }
+
+    /** As above, also recording a real place name for the quest's {@code {location}}-tokened text -- see {@link QuestInstance#locationName()}'s own doc. */
+    public static void setHint(ServerPlayer player, Identifier definitionId, net.minecraft.core.BlockPos pos, String dimensionId, Optional<String> locationName) {
         PlayerQuestData data = player.getData(ModAttachments.QUEST_DATA);
         QuestInstance instance = data.quests().get(definitionId);
         if (instance != null) {
-            player.setData(ModAttachments.QUEST_DATA, data.withQuest(instance.withHint(pos, dimensionId)));
+            player.setData(ModAttachments.QUEST_DATA, data.withQuest(instance.withHint(pos, dimensionId, locationName)));
         }
     }
 

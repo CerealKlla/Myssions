@@ -23,9 +23,16 @@ import net.minecraft.resources.Identifier;
  * {@code bridge.LyfeWaypointBridge}) to compute and push the actual vague-circle hint they see.
  * Per-instance, not per-definition, since where the hint points can genuinely vary by who got the
  * quest and when (e.g. "Find Old Harlen" picks a fresh nearby spot for each player).
+ *
+ * <p>{@code locationName} (added 2026-10-10, same day's on-site-quest retrofit) is a real place
+ * name -- e.g. a settlement's own name -- to substitute into a quest's {@code {location}}-tokened
+ * flavor text (see {@code quest.QuestText#resolve}), so a player who's left the area still knows
+ * where "near the fields" actually means. Empty for quests with no resolvable real location (the
+ * "{location}" token then falls back to a generic phrase).
  */
 public record QuestInstance(Identifier definitionId, QuestStatus status, Map<String, Integer> milestoneProgress,
-                             long assignedAtGameTime, Optional<BlockPos> hintPos, Optional<String> hintDimensionId) {
+                             long assignedAtGameTime, Optional<BlockPos> hintPos, Optional<String> hintDimensionId,
+                             Optional<String> locationName) {
 
     public static final Codec<QuestInstance> CODEC = RecordCodecBuilder.create(instance -> instance.group(
             Identifier.CODEC.fieldOf("definition_id").forGetter(QuestInstance::definitionId),
@@ -33,25 +40,26 @@ public record QuestInstance(Identifier definitionId, QuestStatus status, Map<Str
             Codec.unboundedMap(Codec.STRING, Codec.INT).optionalFieldOf("milestone_progress", Map.of()).forGetter(QuestInstance::milestoneProgress),
             Codec.LONG.fieldOf("assigned_at_game_time").forGetter(QuestInstance::assignedAtGameTime),
             BlockPos.CODEC.optionalFieldOf("hint_pos").forGetter(QuestInstance::hintPos),
-            Codec.STRING.optionalFieldOf("hint_dimension_id").forGetter(QuestInstance::hintDimensionId)
+            Codec.STRING.optionalFieldOf("hint_dimension_id").forGetter(QuestInstance::hintDimensionId),
+            Codec.STRING.optionalFieldOf("location_name").forGetter(QuestInstance::locationName)
     ).apply(instance, QuestInstance::new));
 
     public static QuestInstance freshlyAssigned(Identifier definitionId, long gameTime) {
-        return new QuestInstance(definitionId, QuestStatus.IN_PROGRESS, Map.of(), gameTime, Optional.empty(), Optional.empty());
+        return new QuestInstance(definitionId, QuestStatus.IN_PROGRESS, Map.of(), gameTime, Optional.empty(), Optional.empty(), Optional.empty());
     }
 
     public QuestInstance withStatus(QuestStatus newStatus) {
-        return new QuestInstance(definitionId, newStatus, milestoneProgress, assignedAtGameTime, hintPos, hintDimensionId);
+        return new QuestInstance(definitionId, newStatus, milestoneProgress, assignedAtGameTime, hintPos, hintDimensionId, locationName);
     }
 
     public QuestInstance withProgress(String milestoneId, int amount) {
         Map<String, Integer> updated = new java.util.HashMap<>(milestoneProgress);
         updated.put(milestoneId, amount);
-        return new QuestInstance(definitionId, status, Map.copyOf(updated), assignedAtGameTime, hintPos, hintDimensionId);
+        return new QuestInstance(definitionId, status, Map.copyOf(updated), assignedAtGameTime, hintPos, hintDimensionId, locationName);
     }
 
-    public QuestInstance withHint(BlockPos pos, String dimensionId) {
-        return new QuestInstance(definitionId, status, milestoneProgress, assignedAtGameTime, Optional.of(pos), Optional.of(dimensionId));
+    public QuestInstance withHint(BlockPos pos, String dimensionId, Optional<String> newLocationName) {
+        return new QuestInstance(definitionId, status, milestoneProgress, assignedAtGameTime, Optional.of(pos), Optional.of(dimensionId), newLocationName);
     }
 
     public boolean isMilestoneComplete(QuestMilestone milestone) {

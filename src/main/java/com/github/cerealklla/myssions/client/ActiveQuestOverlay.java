@@ -5,6 +5,7 @@ import com.github.cerealklla.myssions.quest.QuestInstance;
 import com.github.cerealklla.myssions.quest.QuestMilestone;
 import com.github.cerealklla.myssions.quest.QuestRegistry;
 import com.github.cerealklla.myssions.quest.QuestStatus;
+import com.github.cerealklla.myssions.quest.QuestText;
 import com.github.cerealklla.myssions.registration.ModAttachments;
 
 import net.minecraft.ChatFormatting;
@@ -53,7 +54,7 @@ public final class ActiveQuestOverlay implements GuiLayer {
         Font font = minecraft.font;
         int maxTextWidth = font.width(definition.name());
         for (QuestMilestone milestone : definition.milestones()) {
-            maxTextWidth = Math.max(maxTextWidth, font.width("- " + milestone.description()));
+            maxTextWidth = Math.max(maxTextWidth, font.width("- " + QuestText.resolve(milestone.description(), instance)));
         }
         int lineCount = 1 + definition.milestones().size();
         int left = MARGIN;
@@ -67,7 +68,7 @@ public final class ActiveQuestOverlay implements GuiLayer {
         y += font.lineHeight;
         for (QuestMilestone milestone : definition.milestones()) {
             boolean complete = instance.isMilestoneComplete(milestone);
-            String line = "- " + milestone.description() + (milestone.optional() ? " (optional)" : "");
+            String line = "- " + QuestText.resolve(milestone.description(), instance) + (milestone.optional() ? " (optional)" : "");
             if (complete) {
                 line = ChatFormatting.STRIKETHROUGH + line;
             }

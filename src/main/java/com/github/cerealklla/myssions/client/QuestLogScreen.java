@@ -248,7 +248,7 @@ public final class QuestLogScreen extends Screen {
         y = drawWrapped(graphics, "Milestones:", left, y, wrapWidth, HEADER_COLOR, lineHeight);
         for (QuestMilestone milestone : definition.milestones()) {
             boolean complete = instance.isMilestoneComplete(milestone);
-            String text = "- " + milestone.description() + (milestone.optional() ? " (optional)" : "")
+            String text = "- " + com.github.cerealklla.myssions.quest.QuestText.resolve(milestone.description(), instance) + (milestone.optional() ? " (optional)" : "")
                     + (milestone.requiredCount() > 1 ? " (" + instance.milestoneProgress().getOrDefault(milestone.id(), 0) + "/" + milestone.requiredCount() + ")" : "");
             if (complete) {
                 text = strikethrough(text);
