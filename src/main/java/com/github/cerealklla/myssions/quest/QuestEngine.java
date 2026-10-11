@@ -145,6 +145,61 @@ public final class QuestEngine {
         }
     }
 
+    /**
+     * Completes a "deliver" milestone (design doc item 7) if the player holds enough of its named
+     * proof item -- consumes exactly {@link QuestMilestone#requiredCount()} units in one go (our
+     * own quest content always grants exactly that many via {@code QuestKillListener}, so a
+     * partial turn-in never makes sense here). False if the milestone isn't a deliver milestone,
+     * the quest isn't in progress, it's already done, or the player doesn't have enough proof yet.
+     */
+    public static boolean tryDeliverProof(ServerPlayer player, Identifier definitionId, String milestoneId) {
+        Optional<QuestDefinition> definitionOpt = QuestRegistry.get(definitionId);
+        if (definitionOpt.isEmpty()) {
+            return false;
+        }
+        QuestDefinition definition = definitionOpt.get();
+        QuestMilestone milestone = definition.milestones().stream().filter(m -> m.id().equals(milestoneId)).findFirst().orElse(null);
+        if (milestone == null || milestone.proofId().isEmpty()) {
+            return false;
+        }
+        PlayerQuestData data = player.getData(ModAttachments.QUEST_DATA);
+        QuestInstance instance = data.quests().get(definitionId);
+        if (instance == null || instance.status() != QuestStatus.IN_PROGRESS || instance.isMilestoneComplete(milestone)) {
+            return false;
+        }
+        String proofId = milestone.proofId().get();
+        int needed = milestone.requiredCount();
+        if (countProof(player, proofId) < needed) {
+            return false;
+        }
+        consumeProof(player, proofId, needed);
+        reportMilestoneProgress(player, definitionId, milestoneId, needed);
+        return true;
+    }
+
+    private static int countProof(ServerPlayer player, String proofId) {
+        int total = 0;
+        for (int i = 0; i < player.getInventory().getContainerSize(); i++) {
+            ItemStack stack = player.getInventory().getItem(i);
+            if (stack.getItem() instanceof QuestProofItem && QuestProofItem.proofIdOf(stack).equals(proofId)) {
+                total += stack.getCount();
+            }
+        }
+        return total;
+    }
+
+    private static void consumeProof(ServerPlayer player, String proofId, int amount) {
+        int remaining = amount;
+        for (int i = 0; i < player.getInventory().getContainerSize() && remaining > 0; i++) {
+            ItemStack stack = player.getInventory().getItem(i);
+            if (stack.getItem() instanceof QuestProofItem && QuestProofItem.proofIdOf(stack).equals(proofId)) {
+                int take = Math.min(remaining, stack.getCount());
+                stack.shrink(take);
+                remaining -= take;
+            }
+        }
+    }
+
     /** Called by {@code quest.QuestDeadlineTicker} once a quest's own time limit has passed. */
     public static void failQuest(ServerPlayer player, Identifier definitionId) {
         PlayerQuestData data = player.getData(ModAttachments.QUEST_DATA);

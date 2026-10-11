@@ -1,31 +1,63 @@
 package com.github.cerealklla.myssions.quest;
 
+import java.util.Optional;
+
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
+
+import net.minecraft.resources.Identifier;
 
 /**
  * One step of a {@link QuestDefinition} -- a plain description plus an optional flag and a
  * required count (e.g. "Kill 5 Zombies" has {@code requiredCount == 5}; most milestones are
- * {@code 1}). Milestone-TYPE-specific mechanics (kill-tracking, location-arrival, item-delivery)
- * are deliberately NOT modeled here yet -- this first slice only needs milestones to be
- * displayable and completable via {@code api.Myssions#reportMilestoneProgress}; a future pass adds
- * real trigger wiring (mob-death listeners, region-enter listeners, etc.) on top of this same
- * shape without needing to change it.
+ * {@code 1}). Two real trigger types are now modeled directly (added 2026-10-10, for the classic
+ * "kill N, bring back proof" quest type -- item 7 of the user's own spec):
+ *
+ * <ul>
+ *   <li>{@link #killTargetEntityType()} present -- {@code quest.QuestKillListener} increments this
+ *   milestone on a matching {@code LivingDeathEvent} killed by the player, and grants one
+ *   {@code quest.QuestProofItem} (tagged {@link #proofId()}) per qualifying kill, up to
+ *   {@code requiredCount} -- so by the time the kill count is done, the player is already holding
+ *   exactly enough proof to turn in.</li>
+ *   <li>{@link #deliverProofId()} present -- completed by physically handing that many proof items
+ *   back to the quest's issuer (an NPC or a sign interaction, see {@code quest.QuestTurnIn}), not
+ *   by any automatic event.</li>
+ * </ul>
+ *
+ * A milestone with neither is a plain manual one, completed only via a direct {@code
+ * api.Myssions#reportMilestoneProgress}/{@code #completeMilestone} call (e.g. scripted dialogue,
+ * or a future mod wiring its own trigger). {@link #proofId()} is shared by both a kill milestone
+ * (what it grants) and the matching deliver milestone (what it consumes) within the same quest --
+ * deliberately a bare string, not a whole {@link QuestReward}, since it names a *kind* of proof
+ * item, not an amount to grant as a reward.
  */
-public record QuestMilestone(String id, String description, boolean optional, int requiredCount) {
+public record QuestMilestone(String id, String description, boolean optional, int requiredCount,
+                              Optional<Identifier> killTargetEntityType, Optional<String> proofId,
+                              boolean isDeliverMilestone) {
 
     public static final Codec<QuestMilestone> CODEC = RecordCodecBuilder.create(instance -> instance.group(
             Codec.STRING.fieldOf("id").forGetter(QuestMilestone::id),
             Codec.STRING.fieldOf("description").forGetter(QuestMilestone::description),
             Codec.BOOL.optionalFieldOf("optional", false).forGetter(QuestMilestone::optional),
-            Codec.INT.optionalFieldOf("required_count", 1).forGetter(QuestMilestone::requiredCount)
+            Codec.INT.optionalFieldOf("required_count", 1).forGetter(QuestMilestone::requiredCount),
+            Identifier.CODEC.optionalFieldOf("kill_target_entity_type").forGetter(QuestMilestone::killTargetEntityType),
+            Codec.STRING.optionalFieldOf("proof_id").forGetter(QuestMilestone::proofId),
+            Codec.BOOL.optionalFieldOf("is_deliver_milestone", false).forGetter(QuestMilestone::isDeliverMilestone)
     ).apply(instance, QuestMilestone::new));
 
-    public QuestMilestone(String id, String description) {
-        this(id, description, false, 1);
+    public static QuestMilestone simple(String id, String description) {
+        return new QuestMilestone(id, description, false, 1, Optional.empty(), Optional.empty(), false);
     }
 
-    public QuestMilestone(String id, String description, boolean optional) {
-        this(id, description, optional, 1);
+    public static QuestMilestone simple(String id, String description, boolean optional) {
+        return new QuestMilestone(id, description, optional, 1, Optional.empty(), Optional.empty(), false);
+    }
+
+    public static QuestMilestone kill(String id, String description, Identifier entityType, int count, String proofId) {
+        return new QuestMilestone(id, description, false, count, Optional.of(entityType), Optional.of(proofId), false);
+    }
+
+    public static QuestMilestone deliver(String id, String description, String proofId, int count) {
+        return new QuestMilestone(id, description, false, count, Optional.empty(), Optional.of(proofId), true);
     }
 }

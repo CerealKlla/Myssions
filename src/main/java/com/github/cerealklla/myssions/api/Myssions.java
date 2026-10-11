@@ -60,6 +60,11 @@ public final class Myssions {
         QuestEngine.reportMilestoneProgress(player, definitionId, milestoneId, Integer.MAX_VALUE / 2);
     }
 
+    /** Attempts to complete a "deliver proof" milestone from the player's own held/inventory items. See {@code QuestEngine#tryDeliverProof}'s own doc. */
+    public static boolean tryDeliverProof(ServerPlayer player, Identifier definitionId, String milestoneId) {
+        return QuestEngine.tryDeliverProof(player, definitionId, milestoneId);
+    }
+
     public static void setActiveQuest(ServerPlayer player, Identifier definitionId) {
         QuestEngine.setActiveQuest(player, definitionId);
     }

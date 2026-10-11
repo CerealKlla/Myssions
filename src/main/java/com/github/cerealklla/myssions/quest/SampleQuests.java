@@ -27,9 +27,9 @@ public final class SampleQuests {
                 "Someone in town could use a hand clearing out a few pests. Bring back proof of three kills, and report back once you're done.",
                 "test_issuer",
                 List.of(
-                        new QuestMilestone("kill_three", "Kill 3 Zombies", false, 3),
-                        new QuestMilestone("report_back", "Report back", false, 1),
-                        new QuestMilestone("optional_bonus", "(Optional) Kill 5 more for good measure", true, 5)
+                        QuestMilestone.simple("kill_three", "Kill 3 Zombies"),
+                        QuestMilestone.simple("report_back", "Report back"),
+                        QuestMilestone.simple("optional_bonus", "(Optional) Kill 5 more for good measure", true)
                 ),
                 List.of(
                         QuestReward.gold(10),
