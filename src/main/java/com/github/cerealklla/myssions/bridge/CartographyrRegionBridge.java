@@ -34,7 +34,7 @@ public final class CartographyrRegionBridge {
         return ModList.get().isLoaded("cartographyr");
     }
 
-    public record RegionTarget(BlockPos pos, ResourceKey<Level> dimension, String displayName, double distanceBlocks) {
+    public record RegionTarget(BlockPos pos, ResourceKey<Level> dimension, String displayName, double distanceBlocks, long placeId) {
     }
 
     // Don't pick something that's basically right next to the quest giver already -- the whole
@@ -94,6 +94,7 @@ public final class CartographyrRegionBridge {
         int x = entity.geometry().centerBlockX();
         int z = entity.geometry().centerBlockZ();
         int y = level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z);
-        return Optional.of(new RegionTarget(new BlockPos(x, y, z), entity.dimension(), DisplayText.shortForEntity(entity), distances.get(chosen)));
+        return Optional.of(new RegionTarget(new BlockPos(x, y, z), entity.dimension(), DisplayText.shortForEntity(entity),
+                distances.get(chosen), entity.id().value()));
     }
 }

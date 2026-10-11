@@ -174,13 +174,20 @@ real location stay "kill anywhere," deliberately. `./gradlew build` green, whole
 tested clean. **Not yet live-tested or re-deployed.**
 
 **Off-site quests now target real Cartographyr Regions/Settlements, reward scaled by distance,
-2026-10-11** (see [context/decisions.md](context/decisions.md)) — explicit user correction: quests
-were always supposed to pick real Cartographyr places, not vague flavor text, and reward should scale
-with distance traveled. The four off-site quests (Timber Wolves, Web-Choked Grove, A Warband at the
-Gates, Clear the Caves) now pick a real, named, distance-weighted-random Region/Settlement within 1
-mile of the issuing NPC (new `bridge.CartographyrRegionBridge`), substitute its real name into their
-text, and scale Gold/Item/XP rewards `0.75x`-`2.0x` by how far it landed (new `QuestInstance
-#rewardMultiplier`). The 6 on-site quests are unaffected. `./gradlew build` green, whole-suite
+2026-10-11** (see [context/design-document.md](context/design-document.md)'s new "Quest design
+taxonomy" section — the durable reference to read before designing any future quest, and
+[context/decisions.md](context/decisions.md) for the two same-day build rounds) — explicit user
+correction: quests were always supposed to pick real Cartographyr places, not vague flavor text, and
+reward should scale with distance traveled. The four off-site quests (Timber Wolves, Web-Choked
+Grove, A Warband at the Gates, Clear the Caves) now pick a real, named, distance-weighted-random
+Region/Settlement within 1 mile of the issuing NPC (`bridge.CartographyrRegionBridge`), scale
+Gold/Item/XP rewards `0.75x`-`2.0x` by how far it landed (`QuestInstance#rewardMultiplier`), use the
+real place's own Cartographyr identity as the knowledge key (so a player who's already explored it
+gets an exact marker for free, same key `location.LocationTracker` already writes to), live-upgrade
+their milestone text from "to the east of Bramton" to "to the east of Bramton, in the Whispering
+Forest" as real knowledge improves, and guarantee completability via `quest.QuestMobSpawnTicker`
+(tops up live mobs near the real target the first time a player gets close, never duplicating past
+what's naturally there). The 6 on-site quests are unaffected. `./gradlew build` green, whole-suite
 boot-smoke-tested clean. **Not yet live-tested or deployed.**
 
 See [context/classes/](context/classes/) for per-class reference.

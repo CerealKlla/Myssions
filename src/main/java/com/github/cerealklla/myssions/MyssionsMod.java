@@ -46,6 +46,7 @@ public class MyssionsMod {
 
         NeoForge.EVENT_BUS.register(new QuestDeadlineTicker());
         NeoForge.EVENT_BUS.register(new QuestKillListener());
+        NeoForge.EVENT_BUS.register(new com.github.cerealklla.myssions.quest.QuestMobSpawnTicker());
         NeoForge.EVENT_BUS.register(new QuestNpcTalkListener());
         NeoForge.EVENT_BUS.addListener((RegisterCommandsEvent event) -> DebugCommands.register(event.getDispatcher()));
 

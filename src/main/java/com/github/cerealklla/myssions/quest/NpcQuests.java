@@ -328,22 +328,46 @@ public final class NpcQuests {
                 com.github.cerealklla.myssions.bridge.CartographyrRegionBridge.pickWeightedNearby(
                         originLevel, origin.pos(), REGION_QUEST_MAX_RADIUS_BLOCKS, player.getRandom()
                 ).ifPresent(target -> {
+                    String settlementName = origin.settlementName().isBlank() ? "here" : origin.settlementName();
+                    String direction = directionWord(origin.pos(), target.pos());
+                    String directionPhrase = "to the " + direction + " of " + settlementName;
+
+                    // The real position is set as the hint immediately (what QuestWaypointTicker
+                    // actually points a waypoint circle at) -- only the *displayed text* starts vague;
+                    // see QuestInstance#withRegionKnowledge's own doc for why these are deliberately
+                    // decoupled.
                     QuestEngine.setHint(player, instanceId, target.pos(), target.dimension().identifier().toString(),
-                            java.util.Optional.of(target.displayName()));
+                            java.util.Optional.of(directionPhrase));
+                    QuestEngine.setRegionKnowledge(player, instanceId, target.placeId(), directionPhrase, target.displayName());
 
                     double fraction = Math.max(0.0, Math.min(1.0, target.distanceBlocks() / REGION_QUEST_MAX_RADIUS_BLOCKS));
                     double multiplier = REGION_REWARD_MIN_MULTIPLIER + (REGION_REWARD_MAX_MULTIPLIER - REGION_REWARD_MIN_MULTIPLIER) * fraction;
                     QuestEngine.setRewardMultiplier(player, instanceId, multiplier);
 
                     if (com.github.cerealklla.myssions.bridge.LyfeWaypointBridge.isLoaded()) {
-                        long placeId = QuestWaypointTicker.placeIdFor(instanceId);
-                        com.github.cerealklla.myssions.bridge.LyfeWaypointBridge.grantKnowledge(player, placeId, true, true, false);
+                        // A vague verbal description is itself a (small) form of knowledge -- rough
+                        // bearing and distance, not the exact spot. Purely additive (see
+                        // knowledge.PlayerKnowledge#learnLocationFactors): a player who already knows
+                        // this real place from ordinary exploration keeps whatever they already had,
+                        // which is exactly what makes an already-visited target resolve to a precise
+                        // marker for free -- explicit user spec, 2026-10-11.
+                        com.github.cerealklla.myssions.bridge.LyfeWaypointBridge.grantKnowledge(player, target.placeId(), true, true, false);
                     }
                     player.sendSystemMessage(net.minecraft.network.chat.Component.literal(
                             "You get a rough idea where to look -- check your map."));
                 });
             });
         });
+    }
+
+    /** Plain 8-point compass direction from {@code origin} to {@code target}, Minecraft's own coordinate convention (-Z is north, +X is east). */
+    private static String directionWord(net.minecraft.core.BlockPos origin, net.minecraft.core.BlockPos target) {
+        String[] points = {"north", "northeast", "east", "southeast", "south", "southwest", "west", "northwest"};
+        double dx = target.getX() - origin.getX();
+        double dz = target.getZ() - origin.getZ();
+        double bearingDegrees = (Math.toDegrees(Math.atan2(dx, -dz)) + 360.0) % 360.0;
+        int index = ((int) Math.round(bearingDegrees / 45.0)) % 8;
+        return points[index];
     }
 
     /**

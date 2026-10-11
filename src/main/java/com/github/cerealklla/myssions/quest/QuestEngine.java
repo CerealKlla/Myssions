@@ -95,6 +95,33 @@ public final class QuestEngine {
         }
     }
 
+    /** Wires a region quest up to real Cartographyr-backed knowledge -- see {@link QuestInstance#withRegionKnowledge}'s own doc. Called once, right after {@link #setHint}, from {@code NpcQuests#registerRegionHook}. */
+    public static void setRegionKnowledge(ServerPlayer player, UUID instanceId, long knowledgePlaceId, String directionPhrase, String realLocationName) {
+        PlayerQuestData data = player.getData(ModAttachments.QUEST_DATA);
+        QuestInstance instance = data.quests().get(instanceId);
+        if (instance != null) {
+            player.setData(ModAttachments.QUEST_DATA, data.withQuest(instance.withRegionKnowledge(knowledgePlaceId, directionPhrase, realLocationName)));
+        }
+    }
+
+    /** Upgrades the displayed location phrase once the player's real knowledge is good enough -- see {@code QuestWaypointTicker}. No-op if the instance is gone or already shows this exact phrase. */
+    public static void upgradeLocationName(ServerPlayer player, UUID instanceId, String upgradedLocationName) {
+        PlayerQuestData data = player.getData(ModAttachments.QUEST_DATA);
+        QuestInstance instance = data.quests().get(instanceId);
+        if (instance != null && !instance.locationName().map(upgradedLocationName::equals).orElse(false)) {
+            player.setData(ModAttachments.QUEST_DATA, data.withQuest(instance.withUpgradedLocationName(upgradedLocationName)));
+        }
+    }
+
+    /** Marks this instance's completability-ensuring spawn as already done -- see {@code QuestMobSpawnTicker}. */
+    public static void markMobsSpawned(ServerPlayer player, UUID instanceId) {
+        PlayerQuestData data = player.getData(ModAttachments.QUEST_DATA);
+        QuestInstance instance = data.quests().get(instanceId);
+        if (instance != null) {
+            player.setData(ModAttachments.QUEST_DATA, data.withQuest(instance.withMobsSpawned()));
+        }
+    }
+
     public static void setActiveQuest(ServerPlayer player, UUID instanceId) {
         PlayerQuestData data = player.getData(ModAttachments.QUEST_DATA);
         if (!data.quests().containsKey(instanceId)) {
