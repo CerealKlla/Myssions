@@ -29,13 +29,16 @@ import net.minecraft.server.level.ServerPlayer;
  * ground on "Take All," neither of which fits a quest-reward pickup -- plus two buttons (see {@code
  * client.QuestRewardScreen}):
  * <ul>
- *   <li>{@link #TAKE_ALL_BUTTON_ID} ("Take All") -- ordinary item transfer only, no quest-state
- *   side effect. Unlike the Loot Bag's own version, an item that doesn't fit stays in the bag's own
- *   slot instead of dropping on the ground -- the whole point is "go make room, come back," which a
- *   ground-drop would defeat.</li>
- *   <li>{@link #COMPLETE_BUTTON_ID} ("Complete Quest") -- the real completion trigger. Only
- *   finalizes ({@code QuestEngine#finalizeRewardPickup}) once every slot is actually empty; otherwise
- *   just a message, menu stays open.</li>
+ *   <li>{@link #TAKE_ALL_BUTTON_ID} ("Take All") -- transfers everything that fits, then
+ *   auto-completes the quest (2026-10-11 user request) if that emptied every slot. Unlike the Loot
+ *   Bag's own version, an item that doesn't fit stays in the bag's own slot instead of dropping on
+ *   the ground -- the whole point is "go make room, come back," which a ground-drop would defeat;
+ *   in that case the quest is deliberately left incomplete, same as before.</li>
+ *   <li>{@link #COMPLETE_BUTTON_ID} ("Complete Quest") -- the same completion trigger Take All now
+ *   calls automatically on full success, kept as its own button for a player who moved items out one
+ *   at a time via normal slot drag instead. Only finalizes ({@code
+ *   QuestEngine#finalizeRewardPickup}) once every slot is actually empty; otherwise just a message,
+ *   menu stays open.</li>
  * </ul>
  * {@link #removed(Player)} persists whatever's still sitting in the container back onto the quest
  * instance ({@code QuestEngine#syncPendingRewardItems}) if the player closes without finishing, so
@@ -82,6 +85,7 @@ public class QuestRewardMenu extends ChestMenu {
     private void takeAll(Player player) {
         // Slots 0..SLOT_COUNT-1 are this menu's own container; the rest belong to the player's own
         // inventory/hotbar (ChestMenu's own slot layout convention) and must not be touched here.
+        boolean everythingFit = true;
         for (int i = 0; i < SLOT_COUNT; i++) {
             Slot slot = getSlot(i);
             ItemStack stack = slot.getItem();
@@ -93,9 +97,19 @@ public class QuestRewardMenu extends ChestMenu {
             // has something to come back to.
             if (player.getInventory().add(stack)) {
                 slot.set(ItemStack.EMPTY);
+            } else {
+                everythingFit = false;
             }
         }
         broadcastChanges();
+
+        // Auto-complete on a fully successful Take All (2026-10-11 user request) -- previously
+        // required a separate "Complete Quest" click every time, even though that button's own guard
+        // (every slot empty) is exactly the condition Take All just satisfied. The button stays for
+        // the case a player moved items out one at a time via normal slot drag instead of Take All.
+        if (everythingFit) {
+            completeQuest(player);
+        }
     }
 
     private void completeQuest(Player player) {
