@@ -85,7 +85,7 @@ public final class NpcQuests {
                 List.of(
                         QuestMilestone.kill("kill_wolves", "Kill 4 Wolves near {location}",
                                 Identifier.fromNamespaceAndPath("minecraft", "wolf"), 4, proofId),
-                        QuestMilestone.deliver("deliver_pelts", "Bring back 4 Wolf Pelt Scraps as proof", proofId, 4)
+                        QuestMilestone.optionalDeliverWithBonus("deliver_pelts", "Bring back up to 4 Wolf Pelt Scraps for bonus gold", proofId, 4, 2)
                 ),
                 List.of(QuestReward.gold(12), QuestReward.item(Identifier.fromNamespaceAndPath("minecraft", "oak_log"), 16),
                         QuestReward.intangible("The crews can work the north clearing again")),
@@ -107,7 +107,7 @@ public final class NpcQuests {
                 List.of(
                         QuestMilestone.kill("kill_spiders", "Kill 5 Spiders near {location}",
                                 Identifier.fromNamespaceAndPath("minecraft", "spider"), 5, proofId),
-                        QuestMilestone.deliver("deliver_silk", "Bring back 5 bundles of Spider Silk as proof", proofId, 5)
+                        QuestMilestone.optionalDeliverWithBonus("deliver_silk", "Bring back up to 5 bundles of Spider Silk for bonus gold", proofId, 5, 2)
                 ),
                 List.of(QuestReward.gold(14), QuestReward.item(Identifier.fromNamespaceAndPath("minecraft", "string"), 8),
                         QuestReward.intangible("The grove is safe to fell again")),
@@ -129,7 +129,7 @@ public final class NpcQuests {
                 List.of(
                         QuestMilestone.kill("kill_creepers", "Kill 3 Creepers near my lumberyard in {location}",
                                 Identifier.fromNamespaceAndPath("minecraft", "creeper"), 3, proofId),
-                        QuestMilestone.deliver("deliver_fuses", "Bring back 3 Scorched Fuse Casings as proof", proofId, 3)
+                        QuestMilestone.optionalDeliverWithBonus("deliver_fuses", "Bring back up to 3 Scorched Fuse Casings for bonus gold", proofId, 3, 2)
                 ),
                 List.of(QuestReward.gold(10), QuestReward.item(Identifier.fromNamespaceAndPath("minecraft", "gunpowder"), 4),
                         QuestReward.intangible("No more log stacks lost to green nuisances")),
@@ -151,7 +151,7 @@ public final class NpcQuests {
                 List.of(
                         QuestMilestone.kill("kill_endermen", "Kill 3 Endermen disturbing my log stacks in {location}",
                                 Identifier.fromNamespaceAndPath("minecraft", "enderman"), 3, proofId),
-                        QuestMilestone.deliver("deliver_residue", "Bring back 3 Teleport Residue Vials as proof", proofId, 3)
+                        QuestMilestone.optionalDeliverWithBonus("deliver_residue", "Bring back up to 3 Teleport Residue Vials for bonus gold", proofId, 3, 2)
                 ),
                 List.of(QuestReward.gold(18), QuestReward.intangible("The log stacks stop moving themselves at night")),
                 QuestTimeLimit.NONE));
@@ -173,7 +173,7 @@ public final class NpcQuests {
                 List.of(
                         QuestMilestone.kill("kill_zombies", "Kill 4 Zombies near my fields in {location}",
                                 Identifier.fromNamespaceAndPath("minecraft", "zombie"), 4, proofId),
-                        QuestMilestone.deliver("deliver_rags", "Bring back 4 Trampled Field Rags as proof", proofId, 4)
+                        QuestMilestone.optionalDeliverWithBonus("deliver_rags", "Bring back up to 4 Trampled Field Rags for bonus gold", proofId, 4, 2)
                 ),
                 List.of(QuestReward.gold(10), QuestReward.item(Identifier.fromNamespaceAndPath("minecraft", "bread"), 6),
                         QuestReward.intangible("The fields can grow a night through undisturbed")),
@@ -195,7 +195,7 @@ public final class NpcQuests {
                 List.of(
                         QuestMilestone.kill("kill_skeletons", "Kill 4 Skeletons near my field's edge in {location}",
                                 Identifier.fromNamespaceAndPath("minecraft", "skeleton"), 4, proofId),
-                        QuestMilestone.deliver("deliver_bowstrings", "Bring back 4 Snapped Bowstrings as proof", proofId, 4)
+                        QuestMilestone.optionalDeliverWithBonus("deliver_bowstrings", "Bring back up to 4 Snapped Bowstrings for bonus gold", proofId, 4, 2)
                 ),
                 List.of(QuestReward.gold(11), QuestReward.item(Identifier.fromNamespaceAndPath("minecraft", "wheat_seeds"), 12),
                         QuestReward.intangible("The farmhands feel safe working the edge rows again")),
@@ -217,7 +217,7 @@ public final class NpcQuests {
                 List.of(
                         QuestMilestone.kill("kill_silverfish", "Kill 6 Silverfish in my irrigation ditch in {location}",
                                 Identifier.fromNamespaceAndPath("minecraft", "silverfish"), 6, proofId),
-                        QuestMilestone.deliver("deliver_carapace", "Bring back 6 Carapace Shards as proof", proofId, 6)
+                        QuestMilestone.optionalDeliverWithBonus("deliver_carapace", "Bring back up to 6 Carapace Shards for bonus gold", proofId, 6, 2)
                 ),
                 List.of(QuestReward.gold(13), QuestReward.item(Identifier.fromNamespaceAndPath("minecraft", "carrot"), 10),
                         QuestReward.intangible("The irrigation channel holds water properly again")),
@@ -239,7 +239,7 @@ public final class NpcQuests {
                 List.of(
                         QuestMilestone.kill("kill_wolves", "Kill 3 Wolves near my coop in {location}",
                                 Identifier.fromNamespaceAndPath("minecraft", "wolf"), 3, proofId),
-                        QuestMilestone.deliver("deliver_fur", "Bring back 3 Coop-Raider Fur Tufts as proof", proofId, 3)
+                        QuestMilestone.optionalDeliverWithBonus("deliver_fur", "Bring back up to 3 Coop-Raider Fur Tufts for bonus gold", proofId, 3, 2)
                 ),
                 List.of(QuestReward.gold(10), QuestReward.item(Identifier.fromNamespaceAndPath("minecraft", "egg"), 8),
                         QuestReward.intangible("The flock finally gets a quiet night")),
@@ -263,7 +263,7 @@ public final class NpcQuests {
                 List.of(
                         QuestMilestone.kill("kill_zombies", "Kill 6 Zombies massing near {location}",
                                 Identifier.fromNamespaceAndPath("minecraft", "zombie"), 6, proofId),
-                        QuestMilestone.deliver("deliver_insignia", "Bring back 6 Warband Insignia Scraps as proof", proofId, 6)
+                        QuestMilestone.optionalDeliverWithBonus("deliver_insignia", "Bring back up to 6 Warband Insignia Scraps for bonus gold", proofId, 6, 2)
                 ),
                 List.of(QuestReward.gold(30), QuestReward.intangible("The settlement's main road is safe to travel again")),
                 QuestTimeLimit.NONE));
@@ -284,7 +284,7 @@ public final class NpcQuests {
                 List.of(
                         QuestMilestone.kill("kill_skeletons", "Kill 5 Skeletons near {location}",
                                 Identifier.fromNamespaceAndPath("minecraft", "skeleton"), 5, proofId),
-                        QuestMilestone.deliver("deliver_bones", "Bring back 5 Arrow-Notched Bone Fragments as proof", proofId, 5)
+                        QuestMilestone.optionalDeliverWithBonus("deliver_bones", "Bring back up to 5 Arrow-Notched Bone Fragments for bonus gold", proofId, 5, 2)
                 ),
                 List.of(QuestReward.gold(28), QuestReward.intangible("The trade road stays open")),
                 QuestTimeLimit.NONE));
@@ -431,7 +431,7 @@ public final class NpcQuests {
                 List.of(
                         new QuestMilestone("fend_off_bandits", "Fend off any Bandits that attack the caravan",
                                 true, 3, java.util.Optional.of(Identifier.fromNamespaceAndPath("minecraft", "pillager")),
-                                java.util.Optional.empty(), false, false, false),
+                                java.util.Optional.empty(), false, false, false, 0),
                         QuestMilestone.escort("escort_caravan", "Escort the caravan safely to the end of the road")
                 ),
                 List.of(QuestReward.gold(20), QuestReward.intangible("The caravan reaches its destination safely")),

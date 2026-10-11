@@ -226,6 +226,7 @@ public final class QuestEngine {
         double multiplier = updated.rewardMultiplier();
         applyImmediateRewards(player, definition, multiplier);
         List<ItemStack> rewardItems = buildRewardItemStacks(definition, multiplier);
+        addBonusProofGold(rewardItems, definition, updated, multiplier);
         PlayerQuestData data = player.getData(ModAttachments.QUEST_DATA);
         if (rewardItems.isEmpty()) {
             finalizeInstance(player, data, definition, updated);
@@ -273,6 +274,27 @@ public final class QuestEngine {
         return stacks;
     }
 
+    /**
+     * Appends extra Gold Nugget stacks on top of {@code rewardItems} for every optional deliver
+     * milestone with a nonzero {@link QuestMilestone#bonusGoldPerProof()} -- "pays extra per returned
+     * proof item (up to the max)" (2026-10-11). Reads {@code updated.milestoneProgress()} directly
+     * rather than any separate tally -- for a deliver milestone, progress IS "how many proof items
+     * were actually turned in," already correct whether that's the full {@code requiredCount} or a
+     * genuine partial delivery (see {@code tryDeliverProof}'s own doc).
+     */
+    private static void addBonusProofGold(List<ItemStack> rewardItems, QuestDefinition definition, QuestInstance updated, double multiplier) {
+        for (QuestMilestone milestone : definition.milestones()) {
+            if (!milestone.isDeliverMilestone() || milestone.bonusGoldPerProof() <= 0) {
+                continue;
+            }
+            int delivered = updated.milestoneProgress().getOrDefault(milestone.id(), 0);
+            if (delivered <= 0) {
+                continue;
+            }
+            addStacks(rewardItems, Items.GOLD_NUGGET, scaledAmount(milestone.bonusGoldPerProof() * delivered, multiplier));
+        }
+    }
+
     private static int scaledAmount(int baseAmount, double multiplier) {
         return Math.max(1, (int) Math.round(baseAmount * multiplier));
     }
@@ -288,11 +310,17 @@ public final class QuestEngine {
     }
 
     /**
-     * Completes a "deliver" milestone (design doc item 7) if the player holds enough of its named
-     * proof item -- consumes exactly {@link QuestMilestone#requiredCount()} units in one go (our
-     * own quest content always grants exactly that many via {@code QuestKillListener}, so a
-     * partial turn-in never makes sense here). False if the milestone isn't a deliver milestone,
-     * the instance isn't in progress, it's already done, or the player doesn't have enough proof yet.
+     * Completes (or, for an optional bonus-paying milestone, partially advances) a "deliver"
+     * milestone (design doc item 7) if the player holds any of its named proof item. A required
+     * milestone (the common case -- our own quest content always grants exactly {@link
+     * QuestMilestone#requiredCount()} proof items via {@code QuestKillListener}, so a partial turn-in
+     * never makes sense there) still needs the FULL amount in hand, all-or-nothing, same as always.
+     * An *optional* milestone with {@link QuestMilestone#bonusGoldPerProof()} set (2026-10-11, "pays
+     * extra per returned proof item up to the max") instead accepts whatever the player currently
+     * holds, up to {@link QuestMilestone#requiredCount()} -- turning in 2 of a possible 4 is a real,
+     * useful partial delivery, not a failure. False if the milestone isn't a deliver milestone, the
+     * instance isn't in progress, it's already done, or (required milestones only) there isn't enough
+     * proof yet.
      */
     public static boolean tryDeliverProof(ServerPlayer player, UUID instanceId, String milestoneId) {
         PlayerQuestData data = player.getData(ModAttachments.QUEST_DATA);
@@ -310,12 +338,23 @@ public final class QuestEngine {
             return false;
         }
         String proofId = milestone.proofId().get();
-        int needed = milestone.requiredCount();
-        if (countProof(player, proofId) < needed) {
-            return false;
+        int remaining = milestone.requiredCount() - instance.milestoneProgress().getOrDefault(milestoneId, 0);
+        int held = countProof(player, proofId);
+
+        int toDeliver;
+        if (milestone.optional() && milestone.bonusGoldPerProof() > 0) {
+            toDeliver = Math.min(held, remaining);
+            if (toDeliver <= 0) {
+                return false;
+            }
+        } else {
+            if (held < remaining) {
+                return false;
+            }
+            toDeliver = remaining;
         }
-        consumeProof(player, proofId, needed);
-        reportMilestoneProgress(player, instanceId, milestoneId, needed);
+        consumeProof(player, proofId, toDeliver);
+        reportMilestoneProgress(player, instanceId, milestoneId, toDeliver);
         return true;
     }
 
