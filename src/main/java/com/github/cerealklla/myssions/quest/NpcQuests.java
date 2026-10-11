@@ -75,18 +75,19 @@ public final class NpcQuests {
         ProofItemCatalog.register(proofId, "Wolf Pelt Scraps",
                 "Torn from a pelt, still smells like pine sap and old blood.");
         QuestRegistry.register(new QuestDefinition(questId, "Timber Wolves",
-                "A pack of wolves has taken to stalking the tree line out past the north clearing, "
-                        + "about a day's walk through the Whispering Pines. They've already spooked off two "
-                        + "work crews -- thin the pack and I'll make it worth your while.",
+                "A pack of wolves has taken to stalking the tree line out past the north clearing. "
+                        + "They've already spooked off two work crews -- thin the pack and I'll make it worth "
+                        + "your while.",
                 LUMBERYARD_ZONE_TYPE,
                 List.of(
-                        QuestMilestone.kill("kill_wolves", "Kill 4 Wolves near the tree line",
+                        QuestMilestone.kill("kill_wolves", "Kill 4 Wolves near {location}",
                                 Identifier.fromNamespaceAndPath("minecraft", "wolf"), 4, proofId),
                         QuestMilestone.deliver("deliver_pelts", "Bring back 4 Wolf Pelt Scraps as proof", proofId, 4)
                 ),
                 List.of(QuestReward.gold(12), QuestReward.item(Identifier.fromNamespaceAndPath("minecraft", "oak_log"), 16),
                         QuestReward.intangible("The crews can work the north clearing again")),
                 QuestTimeLimit.NONE));
+        registerRegionHook(questId);
         return questId;
     }
 
@@ -96,18 +97,19 @@ public final class NpcQuests {
         ProofItemCatalog.register(proofId, "Bundled Spider Silk",
                 "A thick, sticky knot of webbing, still twitching faintly.");
         QuestRegistry.register(new QuestDefinition(questId, "Web-Choked Grove",
-                "There's a dense grove east of here, thick with spiders, that's completely fouled with "
-                        + "webbing -- we can't get a saw line through it. Clear enough of them out and bring back "
-                        + "proof so I know it's safe to send a crew in.",
+                "There's a dense grove, thick with spiders, that's completely fouled with webbing -- we "
+                        + "can't get a saw line through it. Clear enough of them out and bring back proof so I "
+                        + "know it's safe to send a crew in.",
                 LUMBERYARD_ZONE_TYPE,
                 List.of(
-                        QuestMilestone.kill("kill_spiders", "Kill 5 Spiders in the grove",
+                        QuestMilestone.kill("kill_spiders", "Kill 5 Spiders near {location}",
                                 Identifier.fromNamespaceAndPath("minecraft", "spider"), 5, proofId),
                         QuestMilestone.deliver("deliver_silk", "Bring back 5 bundles of Spider Silk as proof", proofId, 5)
                 ),
                 List.of(QuestReward.gold(14), QuestReward.item(Identifier.fromNamespaceAndPath("minecraft", "string"), 8),
                         QuestReward.intangible("The grove is safe to fell again")),
                 QuestTimeLimit.NONE));
+        registerRegionHook(questId);
         return questId;
     }
 
@@ -256,12 +258,13 @@ public final class NpcQuests {
                         + "not find out the hard way. Clear them out and bring back proof it's done.",
                 TOWN_HALL_ZONE_TYPE,
                 List.of(
-                        QuestMilestone.kill("kill_zombies", "Kill 6 Zombies massing near the road",
+                        QuestMilestone.kill("kill_zombies", "Kill 6 Zombies massing near {location}",
                                 Identifier.fromNamespaceAndPath("minecraft", "zombie"), 6, proofId),
                         QuestMilestone.deliver("deliver_insignia", "Bring back 6 Warband Insignia Scraps as proof", proofId, 6)
                 ),
                 List.of(QuestReward.gold(30), QuestReward.intangible("The settlement's main road is safe to travel again")),
                 QuestTimeLimit.NONE));
+        registerRegionHook(questId);
         return questId;
     }
 
@@ -271,18 +274,76 @@ public final class NpcQuests {
         ProofItemCatalog.register(proofId, "Arrow-Notched Bone Fragments",
                 "Splintered and grooved -- these didn't come from just walking around.");
         QuestRegistry.register(new QuestDefinition(questId, "Clear the Caves",
-                "There's a cave system near the trade road that's been spitting out more skeletons than "
-                        + "usual lately, and a merchant caravan nearly didn't make it through last week. Thin "
-                        + "them out before it costs this settlement its trade.",
+                "There's a cave system that's been spitting out more skeletons than usual lately, and a "
+                        + "merchant caravan nearly didn't make it through last week. Thin them out before it "
+                        + "costs this settlement its trade.",
                 TOWN_HALL_ZONE_TYPE,
                 List.of(
-                        QuestMilestone.kill("kill_skeletons", "Kill 5 Skeletons from the cave system",
+                        QuestMilestone.kill("kill_skeletons", "Kill 5 Skeletons near {location}",
                                 Identifier.fromNamespaceAndPath("minecraft", "skeleton"), 5, proofId),
                         QuestMilestone.deliver("deliver_bones", "Bring back 5 Arrow-Notched Bone Fragments as proof", proofId, 5)
                 ),
                 List.of(QuestReward.gold(28), QuestReward.intangible("The trade road stays open")),
                 QuestTimeLimit.NONE));
+        registerRegionHook(questId);
         return questId;
+    }
+
+    // "1 mile from the NPC quest giver" -- explicit user spec, 2026-10-11, matching Cartographyr's
+    // own real-world-feet-to-block conversion (1 block ~= 1 meter, 1 mile ~= 1609 blocks).
+    private static final double REGION_QUEST_MAX_RADIUS_BLOCKS = 1609.0;
+    private static final double REGION_REWARD_MIN_MULTIPLIER = 0.75;
+    private static final double REGION_REWARD_MAX_MULTIPLIER = 2.0;
+
+    /**
+     * Registers a real, randomized-distance Cartographyr Region/Settlement target for a quest whose
+     * threat is "out there somewhere," not at the issuing NPC's own plot -- added 2026-10-11,
+     * explicit user correction: "they were always supposed to pick real, Cartographyr locations, not
+     * vague text ... [a region] was picked because it is a certain distance from town, which then
+     * directly influences the reward quality." Picks a real nearby Region/Settlement via {@code
+     * bridge.CartographyrRegionBridge#pickWeightedNearby} (weighted toward closer candidates, capped
+     * at {@link #REGION_QUEST_MAX_RADIUS_BLOCKS}, measured from the issuing plot's own location --
+     * see {@code bridge.SettlemyntsPlotLocationBridge}), substitutes its real name into the quest's
+     * own {@code {location}}-tokened milestone text, and scales {@link QuestInstance#rewardMultiplier()}
+     * linearly between {@link #REGION_REWARD_MIN_MULTIPLIER} (right at the minimum distance) and
+     * {@link #REGION_REWARD_MAX_MULTIPLIER} (right at the mile cap) by how far the chosen target
+     * actually landed. Grants a rough bearing+distance only (not the exact spot) -- same "someone
+     * described it to you" reveal {@link #findOldHarlen} already uses, since unlike an on-site quest
+     * the player was never actually standing at the real target. A no-op (static flavor text,
+     * no multiplier, same as before this feature existed) if Settlemynts/Cartographyr aren't loaded,
+     * the plot can't be resolved, or nothing qualifies within range.
+     */
+    private static void registerRegionHook(Identifier questId) {
+        QuestAssignmentHooks.register(questId, (player, instanceId, assignedId, plotId) -> {
+            if (!(player.level() instanceof net.minecraft.server.level.ServerLevel level)
+                    || !com.github.cerealklla.myssions.bridge.SettlemyntsPlotLocationBridge.isLoaded()
+                    || !com.github.cerealklla.myssions.bridge.CartographyrRegionBridge.isLoaded()) {
+                return;
+            }
+            com.github.cerealklla.myssions.bridge.SettlemyntsPlotLocationBridge.resolve(level, plotId).ifPresent(origin -> {
+                net.minecraft.server.level.ServerLevel originLevel = level.getServer().getLevel(origin.dimension());
+                if (originLevel == null) {
+                    return;
+                }
+                com.github.cerealklla.myssions.bridge.CartographyrRegionBridge.pickWeightedNearby(
+                        originLevel, origin.pos(), REGION_QUEST_MAX_RADIUS_BLOCKS, player.getRandom()
+                ).ifPresent(target -> {
+                    QuestEngine.setHint(player, instanceId, target.pos(), target.dimension().identifier().toString(),
+                            java.util.Optional.of(target.displayName()));
+
+                    double fraction = Math.max(0.0, Math.min(1.0, target.distanceBlocks() / REGION_QUEST_MAX_RADIUS_BLOCKS));
+                    double multiplier = REGION_REWARD_MIN_MULTIPLIER + (REGION_REWARD_MAX_MULTIPLIER - REGION_REWARD_MIN_MULTIPLIER) * fraction;
+                    QuestEngine.setRewardMultiplier(player, instanceId, multiplier);
+
+                    if (com.github.cerealklla.myssions.bridge.LyfeWaypointBridge.isLoaded()) {
+                        long placeId = QuestWaypointTicker.placeIdFor(instanceId);
+                        com.github.cerealklla.myssions.bridge.LyfeWaypointBridge.grantKnowledge(player, placeId, true, true, false);
+                    }
+                    player.sendSystemMessage(net.minecraft.network.chat.Component.literal(
+                            "You get a rough idea where to look -- check your map."));
+                });
+            });
+        });
     }
 
     /**

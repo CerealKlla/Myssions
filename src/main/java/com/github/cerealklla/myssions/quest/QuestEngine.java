@@ -86,6 +86,15 @@ public final class QuestEngine {
         }
     }
 
+    /** Scales this instance's eventual Gold/Item/XP rewards -- see {@link QuestInstance#rewardMultiplier()}'s own doc. Must be called before the quest actually completes to have any effect. */
+    public static void setRewardMultiplier(ServerPlayer player, UUID instanceId, double multiplier) {
+        PlayerQuestData data = player.getData(ModAttachments.QUEST_DATA);
+        QuestInstance instance = data.quests().get(instanceId);
+        if (instance != null) {
+            player.setData(ModAttachments.QUEST_DATA, data.withQuest(instance.withRewardMultiplier(multiplier)));
+        }
+    }
+
     public static void setActiveQuest(ServerPlayer player, UUID instanceId) {
         PlayerQuestData data = player.getData(ModAttachments.QUEST_DATA);
         if (!data.quests().containsKey(instanceId)) {
@@ -151,8 +160,9 @@ public final class QuestEngine {
      * the player actually clicks "Complete Quest" (see {@link #tryCompleteQuest}).
      */
     private static void beginRewardPickup(ServerPlayer player, QuestDefinition definition, QuestInstance updated) {
-        applyImmediateRewards(player, definition);
-        List<ItemStack> rewardItems = buildRewardItemStacks(definition);
+        double multiplier = updated.rewardMultiplier();
+        applyImmediateRewards(player, definition, multiplier);
+        List<ItemStack> rewardItems = buildRewardItemStacks(definition, multiplier);
         PlayerQuestData data = player.getData(ModAttachments.QUEST_DATA);
         if (rewardItems.isEmpty()) {
             finalizeInstance(player, data, definition, updated);
@@ -170,25 +180,26 @@ public final class QuestEngine {
         player.sendSystemMessage(Component.literal("Quest complete: " + definition.name()));
     }
 
-    private static void applyImmediateRewards(ServerPlayer player, QuestDefinition definition) {
+    /** {@code multiplier} scales XP same as Gold/Item -- see {@link QuestInstance#rewardMultiplier()}'s own doc ("scale the reward with the difficulty/distance from starting point"). */
+    private static void applyImmediateRewards(ServerPlayer player, QuestDefinition definition, double multiplier) {
         for (QuestReward reward : definition.rewards()) {
             if (reward.kind() == QuestReward.Kind.XP && LyfeXpBridge.isLoaded()) {
-                LyfeXpBridge.grantXp(player, reward.skillId(), reward.amount());
+                LyfeXpBridge.grantXp(player, reward.skillId(), scaledAmount(reward.amount(), multiplier));
             }
             // INTANGIBLE: no mechanical effect yet (see QuestReward's own doc), nothing to apply.
         }
     }
 
-    /** Builds real, max-stack-respecting {@link ItemStack}s for every Gold/Item reward -- what ends up in {@code quest.QuestRewardMenu}. */
-    private static List<ItemStack> buildRewardItemStacks(QuestDefinition definition) {
+    /** Builds real, max-stack-respecting, {@code multiplier}-scaled {@link ItemStack}s for every Gold/Item reward -- what ends up in {@code quest.QuestRewardMenu}. */
+    private static List<ItemStack> buildRewardItemStacks(QuestDefinition definition, double multiplier) {
         List<ItemStack> stacks = new ArrayList<>();
         for (QuestReward reward : definition.rewards()) {
             switch (reward.kind()) {
-                case GOLD -> addStacks(stacks, Items.GOLD_NUGGET, reward.amount());
+                case GOLD -> addStacks(stacks, Items.GOLD_NUGGET, scaledAmount(reward.amount(), multiplier));
                 case ITEM -> {
                     Item item = BuiltInRegistries.ITEM.getOptional(reward.itemId()).orElse(null);
                     if (item != null) {
-                        addStacks(stacks, item, reward.amount());
+                        addStacks(stacks, item, scaledAmount(reward.amount(), multiplier));
                     }
                 }
                 default -> {
@@ -197,6 +208,10 @@ public final class QuestEngine {
             }
         }
         return stacks;
+    }
+
+    private static int scaledAmount(int baseAmount, double multiplier) {
+        return Math.max(1, (int) Math.round(baseAmount * multiplier));
     }
 
     private static void addStacks(List<ItemStack> stacks, Item item, int count) {

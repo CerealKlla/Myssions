@@ -173,4 +173,14 @@ real location (the six on-site quests from the previous day's retrofit); the fou
 real location stay "kill anywhere," deliberately. `./gradlew build` green, whole-suite boot-smoke-
 tested clean. **Not yet live-tested or re-deployed.**
 
+**Off-site quests now target real Cartographyr Regions/Settlements, reward scaled by distance,
+2026-10-11** (see [context/decisions.md](context/decisions.md)) — explicit user correction: quests
+were always supposed to pick real Cartographyr places, not vague flavor text, and reward should scale
+with distance traveled. The four off-site quests (Timber Wolves, Web-Choked Grove, A Warband at the
+Gates, Clear the Caves) now pick a real, named, distance-weighted-random Region/Settlement within 1
+mile of the issuing NPC (new `bridge.CartographyrRegionBridge`), substitute its real name into their
+text, and scale Gold/Item/XP rewards `0.75x`-`2.0x` by how far it landed (new `QuestInstance
+#rewardMultiplier`). The 6 on-site quests are unaffected. `./gradlew build` green, whole-suite
+boot-smoke-tested clean. **Not yet live-tested or deployed.**
+
 See [context/classes/](context/classes/) for per-class reference.

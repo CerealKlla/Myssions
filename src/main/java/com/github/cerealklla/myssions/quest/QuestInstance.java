@@ -46,10 +46,17 @@ import net.minecraft.world.item.ItemStack;
  * Gold/Item reward stacks still waiting to be picked up while {@link #status()} is {@link
  * QuestStatus#AWAITING_REWARD_PICKUP}. Persisted (not just an in-memory menu) so closing the GUI
  * without collecting everything and coming back later doesn't lose or duplicate anything.
+ *
+ * <p>{@code rewardMultiplier} (added 2026-10-11, explicit user spec: "scale the reward with the
+ * difficulty/distance from starting point a player would need to travel") -- applied to Gold/Item/XP
+ * reward amounts in {@code QuestEngine} when a quest's real target turned out to be a real
+ * Cartographyr Region/Settlement a meaningful distance from the issuing NPC (see {@code
+ * NpcQuests#registerRegionHook}). {@code 1.0} (no scaling) for every quest that doesn't set it --
+ * on-site quests, and anything built before this existed.
  */
 public record QuestInstance(UUID instanceId, Identifier definitionId, QuestStatus status, Map<String, Integer> milestoneProgress,
                              long assignedAtGameTime, Optional<BlockPos> hintPos, Optional<String> hintDimensionId,
-                             Optional<String> locationName, List<ItemStack> pendingRewardItems) {
+                             Optional<String> locationName, List<ItemStack> pendingRewardItems, double rewardMultiplier) {
 
     public static final Codec<QuestInstance> CODEC = RecordCodecBuilder.create(instance -> instance.group(
             UUIDUtil.CODEC.fieldOf("instance_id").forGetter(QuestInstance::instanceId),
@@ -60,30 +67,35 @@ public record QuestInstance(UUID instanceId, Identifier definitionId, QuestStatu
             BlockPos.CODEC.optionalFieldOf("hint_pos").forGetter(QuestInstance::hintPos),
             Codec.STRING.optionalFieldOf("hint_dimension_id").forGetter(QuestInstance::hintDimensionId),
             Codec.STRING.optionalFieldOf("location_name").forGetter(QuestInstance::locationName),
-            ItemStack.CODEC.listOf().optionalFieldOf("pending_reward_items", List.of()).forGetter(QuestInstance::pendingRewardItems)
+            ItemStack.CODEC.listOf().optionalFieldOf("pending_reward_items", List.of()).forGetter(QuestInstance::pendingRewardItems),
+            Codec.DOUBLE.optionalFieldOf("reward_multiplier", 1.0).forGetter(QuestInstance::rewardMultiplier)
     ).apply(instance, QuestInstance::new));
 
     public static QuestInstance freshlyAssigned(Identifier definitionId, long gameTime) {
-        return new QuestInstance(UUID.randomUUID(), definitionId, QuestStatus.IN_PROGRESS, Map.of(), gameTime, Optional.empty(), Optional.empty(), Optional.empty(), List.of());
+        return new QuestInstance(UUID.randomUUID(), definitionId, QuestStatus.IN_PROGRESS, Map.of(), gameTime, Optional.empty(), Optional.empty(), Optional.empty(), List.of(), 1.0);
     }
 
     public QuestInstance withStatus(QuestStatus newStatus) {
-        return new QuestInstance(instanceId, definitionId, newStatus, milestoneProgress, assignedAtGameTime, hintPos, hintDimensionId, locationName, pendingRewardItems);
+        return new QuestInstance(instanceId, definitionId, newStatus, milestoneProgress, assignedAtGameTime, hintPos, hintDimensionId, locationName, pendingRewardItems, rewardMultiplier);
     }
 
     public QuestInstance withProgress(String milestoneId, int amount) {
         Map<String, Integer> updated = new java.util.HashMap<>(milestoneProgress);
         updated.put(milestoneId, amount);
-        return new QuestInstance(instanceId, definitionId, status, Map.copyOf(updated), assignedAtGameTime, hintPos, hintDimensionId, locationName, pendingRewardItems);
+        return new QuestInstance(instanceId, definitionId, status, Map.copyOf(updated), assignedAtGameTime, hintPos, hintDimensionId, locationName, pendingRewardItems, rewardMultiplier);
     }
 
     public QuestInstance withHint(BlockPos pos, String dimensionId, Optional<String> newLocationName) {
-        return new QuestInstance(instanceId, definitionId, status, milestoneProgress, assignedAtGameTime, Optional.of(pos), Optional.of(dimensionId), newLocationName, pendingRewardItems);
+        return new QuestInstance(instanceId, definitionId, status, milestoneProgress, assignedAtGameTime, Optional.of(pos), Optional.of(dimensionId), newLocationName, pendingRewardItems, rewardMultiplier);
+    }
+
+    public QuestInstance withRewardMultiplier(double newRewardMultiplier) {
+        return new QuestInstance(instanceId, definitionId, status, milestoneProgress, assignedAtGameTime, hintPos, hintDimensionId, locationName, pendingRewardItems, newRewardMultiplier);
     }
 
     /** Transitions to {@link QuestStatus#AWAITING_REWARD_PICKUP} carrying the still-uncollected reward stacks. */
     public QuestInstance withPendingRewardItems(List<ItemStack> items) {
-        return new QuestInstance(instanceId, definitionId, QuestStatus.AWAITING_REWARD_PICKUP, milestoneProgress, assignedAtGameTime, hintPos, hintDimensionId, locationName, List.copyOf(items));
+        return new QuestInstance(instanceId, definitionId, QuestStatus.AWAITING_REWARD_PICKUP, milestoneProgress, assignedAtGameTime, hintPos, hintDimensionId, locationName, List.copyOf(items), rewardMultiplier);
     }
 
     public boolean isMilestoneComplete(QuestMilestone milestone) {
