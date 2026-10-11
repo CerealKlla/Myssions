@@ -79,4 +79,14 @@ oversight. `./gradlew build` green, boot-smoke-tested clean with all 8 suite mod
 (Settlemynts-optional bridge listeners registering with no classloading issues). **Never played
 through end to end in a live client.**
 
+**Items 8/9 built together, same day** (see
+[context/classes/QuestNpcEntity.md](context/classes/QuestNpcEntity.md)) — a real
+per-player-visible, day/night-conditional quest NPC. `quest.QuestNpcEntity#broadcastToPlayer` does
+double duty: gates visibility to one owning player AND to daytime-only when flagged — a hidden NPC
+is genuinely invisible to everyone, owner included, not just hidden client-side. `quest.
+QuestAssignmentHooks` lets a quest spawn its own NPC the instant it's accepted. Real demo: "Find Old
+Harlen" (a Mayor quest) spawns him next to the player on acceptance, visible only to them, gone at
+night, completed by talking to him. Boot-smoke-tested clean (entity/attribute/renderer registration
+included). **Never played through in a live client.**
+
 See [context/classes/](context/classes/) for per-class reference.
