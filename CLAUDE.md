@@ -209,4 +209,17 @@ NOT forced chunk generation — an earlier force-generation design was rejected 
 over lag-spike risk; see Cartographyr's own CLAUDE.md). `./gradlew build` green in both repos,
 whole-suite (8 mods) boot-smoke-tested clean. **Not yet live-tested or deployed.**
 
+**Inter-settlement road-connection quest built, 2026-10-11** (see
+[context/decisions.md](context/decisions.md)) — a full quest-board mechanic for connecting two
+settlements by a real paved road, the prerequisite for a planned escort-quest rework (Phase B, not
+started). New `quest.RoadQuestRegistry` (mutual-exclusion state machine, keyed by an unordered pair
+of Cartographyr placeIds), `quest.RoadQuestLogic` (posting/acceptance, stake-count formulas,
+knowledge-transfer-on-accept, waypoint placement), `quest.RoadQuestTicker` (live progress polling,
+automatic completion, buyback). New optional bridges into Settlemynts (Highway Stake
+granting/progress/tier) and Lyfe (Expeditionist skill-level gate, knowledge-factor copying).
+`QuestInstance` gained nested `EscortData`/`RoadQuestData` records after the straightforward
+flat-field approach hit Mojang's real 16-field `RecordCodecBuilder` arity limit. `./gradlew build`
+green across Lyfe/Settlemynts/Myssions, whole-suite boot-smoke-tested clean. **Not yet live-tested**
+— no Settlemynts UI exists yet for a player to actually post or accept one of these quests.
+
 See [context/classes/](context/classes/) for per-class reference.
