@@ -122,4 +122,12 @@ changes, `activeQuestId` was already a single value from the first slice. **Expl
 work, now clearly separated from this scarcity refinement. `./gradlew build` green, boot-smoke-
 tested clean with all 8 suite mods together. **Never live-tested.**
 
+**Quests surfaced inside Settlemynts' own "Press H" chat menu, same day** (see
+[context/decisions.md](context/decisions.md)) — explicit user request. New read-only
+`quest.QuestGiverPreview`/`QuestTurnIn#preview` plus `api.Myssions#previewQuestGiver`/
+`#interactWithQuestGiver`/`#hasPendingBoardOffer` let Settlemynts' own `bridge.MyssionsQuestBridge`
+(a new optional soft dependency on this mod, the right direction for a UI integration) show and act
+on a quest offer/delivery from its own chat screen, no shift+right-click required. `./gradlew build`
+green in both repos, whole-suite boot-smoke-tested clean. **Not yet live-tested or deployed.**
+
 See [context/classes/](context/classes/) for per-class reference.

@@ -199,6 +199,11 @@ public final class QuestEngine {
         return true;
     }
 
+    /** Read-only check used by {@code QuestTurnIn#preview} to tell "waiting on player" apart from "ready to turn in" without consuming anything. */
+    public static boolean hasEnoughProof(ServerPlayer player, String proofId, int needed) {
+        return countProof(player, proofId) >= needed;
+    }
+
     private static int countProof(ServerPlayer player, String proofId) {
         int total = 0;
         for (int i = 0; i < player.getInventory().getContainerSize(); i++) {

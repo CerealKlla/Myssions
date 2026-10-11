@@ -33,6 +33,56 @@ public final class QuestTurnIn {
     private QuestTurnIn() {
     }
 
+    /**
+     * Read-only mirror of {@link #interact}'s own branching -- never mutates anything, so other
+     * mods' UI (e.g. Settlemynts' "Press H" wishlist screen, 2026-10-10) can show what interacting
+     * would currently do without actually doing it.
+     */
+    public static QuestGiverPreview preview(ServerPlayer player, UUID plotId, String zoneTypeId) {
+        List<Identifier> pool = IssuerQuestPools.poolFor(zoneTypeId);
+        if (pool.isEmpty()) {
+            return QuestGiverPreview.NOTHING;
+        }
+        var data = player.getData(ModAttachments.QUEST_DATA);
+
+        for (Identifier questId : pool) {
+            QuestInstance instance = data.quests().get(questId);
+            if (instance == null || instance.status() != QuestStatus.IN_PROGRESS) {
+                continue;
+            }
+            QuestDefinition definition = QuestRegistry.get(questId).orElse(null);
+            if (definition == null) {
+                return QuestGiverPreview.NOTHING;
+            }
+            for (QuestMilestone milestone : definition.milestones()) {
+                if (milestone.isDeliverMilestone() && !instance.isMilestoneComplete(milestone)) {
+                    boolean ready = milestone.proofId().isPresent()
+                            && QuestEngine.hasEnoughProof(player, milestone.proofId().get(), milestone.requiredCount());
+                    return new QuestGiverPreview(
+                            ready ? QuestGiverPreview.Kind.READY_TO_TURN_IN : QuestGiverPreview.Kind.WAITING_ON_PLAYER,
+                            questId, definition.name(),
+                            ready ? "Bring that back to me." : "Still working on that for me? Come back once you're done.");
+                }
+            }
+            return new QuestGiverPreview(QuestGiverPreview.Kind.WAITING_ON_PLAYER, questId, definition.name(),
+                    "Still working on that for me? Come back once you're done.");
+        }
+
+        IssuerQuestBoard board = IssuerQuestBoard.get(player.level().getServer());
+        Identifier offeredId = board.get(plotId).orElse(null);
+        if (offeredId == null) {
+            return QuestGiverPreview.NOTHING;
+        }
+        if (data.quests().containsKey(offeredId)) {
+            return QuestGiverPreview.NOTHING;
+        }
+        QuestDefinition def = QuestRegistry.get(offeredId).orElse(null);
+        if (def == null) {
+            return QuestGiverPreview.NOTHING;
+        }
+        return new QuestGiverPreview(QuestGiverPreview.Kind.NEW_OFFER, offeredId, def.name(), def.description());
+    }
+
     public static void interact(ServerPlayer player, UUID plotId, String zoneTypeId) {
         List<Identifier> pool = IssuerQuestPools.poolFor(zoneTypeId);
         if (pool.isEmpty()) {

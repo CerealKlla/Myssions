@@ -1,13 +1,18 @@
 package com.github.cerealklla.myssions.api;
 
 import java.util.Optional;
+import java.util.UUID;
 
+import com.github.cerealklla.myssions.quest.IssuerQuestBoard;
 import com.github.cerealklla.myssions.quest.QuestDefinition;
 import com.github.cerealklla.myssions.quest.QuestEngine;
+import com.github.cerealklla.myssions.quest.QuestGiverPreview;
 import com.github.cerealklla.myssions.quest.QuestInstance;
 import com.github.cerealklla.myssions.quest.QuestRegistry;
+import com.github.cerealklla.myssions.quest.QuestTurnIn;
 
 import net.minecraft.resources.Identifier;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 
 /**
@@ -72,5 +77,30 @@ public final class Myssions {
     /** Running total of quests completed for a given Issuer id -- groundwork for a future karma/reputation system. */
     public static int getCompletedCountForIssuer(ServerPlayer player, String issuerId) {
         return QuestEngine.getCompletedCountForIssuer(player, issuerId);
+    }
+
+    /**
+     * Read-only preview of what talking to the quest giver on plot {@code plotId} (zone type {@code
+     * zoneTypeId}, matching {@code IssuerQuestPools}' own plain-string-literal convention) would do
+     * right now -- for another mod's own UI to show quest availability (2026-10-10, built for
+     * Settlemynts' "Press H" wishlist screen) without mutating anything.
+     */
+    public static QuestGiverPreview previewQuestGiver(ServerPlayer player, UUID plotId, String zoneTypeId) {
+        return QuestTurnIn.preview(player, plotId, zoneTypeId);
+    }
+
+    /** Runs the real accept-new-quest-or-turn-in-current-one action -- same mutation a shift+right-click on the quest giver itself triggers. */
+    public static void interactWithQuestGiver(ServerPlayer player, UUID plotId, String zoneTypeId) {
+        QuestTurnIn.interact(player, plotId, zoneTypeId);
+    }
+
+    /**
+     * Player-independent check: does this plot's board currently have an unclaimed quest offer
+     * sitting on it. Used for a global "!" nameplate (visible to every player, not just whoever's
+     * asking) -- unlike {@link #previewQuestGiver}, which is per-player (an in-progress/ready-to-
+     * deliver quest only means something to the specific player who accepted it).
+     */
+    public static boolean hasPendingBoardOffer(MinecraftServer server, UUID plotId) {
+        return IssuerQuestBoard.get(server).get(plotId).isPresent();
     }
 }
