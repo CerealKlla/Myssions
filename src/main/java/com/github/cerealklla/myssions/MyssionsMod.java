@@ -54,6 +54,11 @@ public class MyssionsMod {
             NeoForge.EVENT_BUS.register(new com.github.cerealklla.myssions.bridge.QuestNpcInteractListener());
             NeoForge.EVENT_BUS.register(new com.github.cerealklla.myssions.bridge.QuestSignInteractListener());
         }
+        // Same reasoning -- only registered when Lyfe is loaded, since this ticker only ever does
+        // anything through bridge.LyfeWaypointBridge (design doc item 2).
+        if (net.neoforged.fml.ModList.get().isLoaded("lyfe")) {
+            NeoForge.EVENT_BUS.register(new com.github.cerealklla.myssions.quest.QuestWaypointTicker());
+        }
     }
 
     private void registerAttributes(net.neoforged.neoforge.event.entity.EntityAttributeCreationEvent event) {

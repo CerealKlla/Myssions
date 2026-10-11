@@ -51,6 +51,15 @@ public final class QuestEngine {
         return true;
     }
 
+    /** Sets an in-progress quest instance's hidden true hint position -- see {@link QuestInstance#hintPos()}'s own doc. */
+    public static void setHint(ServerPlayer player, Identifier definitionId, net.minecraft.core.BlockPos pos, String dimensionId) {
+        PlayerQuestData data = player.getData(ModAttachments.QUEST_DATA);
+        QuestInstance instance = data.quests().get(definitionId);
+        if (instance != null) {
+            player.setData(ModAttachments.QUEST_DATA, data.withQuest(instance.withHint(pos, dimensionId)));
+        }
+    }
+
     public static void setActiveQuest(ServerPlayer player, Identifier definitionId) {
         PlayerQuestData data = player.getData(ModAttachments.QUEST_DATA);
         if (!data.quests().containsKey(definitionId)) {

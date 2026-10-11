@@ -286,11 +286,26 @@ public final class NpcQuests {
                 QuestTimeLimit.NONE));
         QuestAssignmentHooks.register(questId, (player, assignedId) -> {
             if (player.level() instanceof net.minecraft.server.level.ServerLevel level) {
-                net.minecraft.core.BlockPos spawnPos = player.blockPosition().offset(
-                        player.getRandom().nextInt(5) - 2, 0, player.getRandom().nextInt(5) - 2);
-                QuestNpcSpawner.spawn(level, spawnPos, player.getUUID(), assignedId, true, "Old Harlen");
+                // A real target somewhere out past the player, not right at their feet -- the whole
+                // point of the waypoint hint (design doc item 2) is having to go find it.
+                double angle = player.getRandom().nextDouble() * Math.PI * 2;
+                double distance = 80 + player.getRandom().nextDouble() * 120;
+                net.minecraft.core.BlockPos roughSpot = player.blockPosition().offset(
+                        (int) Math.round(Math.cos(angle) * distance), 0, (int) Math.round(Math.sin(angle) * distance));
+                int groundY = level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, roughSpot.getX(), roughSpot.getZ());
+                net.minecraft.core.BlockPos truePos = new net.minecraft.core.BlockPos(roughSpot.getX(), groundY, roughSpot.getZ());
+
+                QuestEngine.setHint(player, assignedId, truePos, level.dimension().identifier().toString());
+                QuestNpcSpawner.spawn(level, truePos, player.getUUID(), assignedId, true, "Old Harlen");
+
+                if (com.github.cerealklla.myssions.bridge.LyfeWaypointBridge.isLoaded()) {
+                    long placeId = QuestWaypointTicker.placeIdFor(assignedId, player);
+                    // Simulates "the Mayor gave you a rough description" -- a real bearing and
+                    // distance, but not the exact spot -- rather than starting from zero knowledge.
+                    com.github.cerealklla.myssions.bridge.LyfeWaypointBridge.grantKnowledge(player, placeId, true, true, false);
+                }
                 player.sendSystemMessage(net.minecraft.network.chat.Component.literal(
-                        "You spot an old man nearby -- might be Harlen."));
+                        "The Mayor gives you a rough idea where to look for Harlen -- check your map."));
             }
         });
         return questId;
