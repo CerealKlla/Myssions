@@ -62,4 +62,21 @@ all). Not yet wired into the real Production deploy scripts (`tools\update-and-r
 client** — only boot-smoke-tested; the Quest Log UI's actual layout/scrolling/click-handling is
 unverified in practice.
 
+**Item 7 built, 2026-10-10** (see [context/decisions.md](context/decisions.md),
+[context/classes/FetchQuestContent.md](context/classes/FetchQuestContent.md)) — the real "go kill N
+<enemy>, bring back a token as proof" fetch-quest type. One reusable `quest.QuestProofItem`
+(vanilla `item/rabbit_foot` icon, metadata-driven per quest, stack 128), `quest.QuestKillListener`
+(tracks kill milestones, grants proof per qualifying kill), `QuestEngine#tryDeliverProof` (turn-in),
+and ten real quest definitions (`quest.NpcQuests`) — four from the Lumberjack, four from the Farmer
+(Settlemynts' two confirmed real spawned NPC-staffed Tier 1 structure types), two "Mayor" quests
+issued via the Town Hall Plot Config Sign since no literal Mayor NPC exists anywhere in the suite
+(confirmed by direct investigation before building — "Mayor" is purely a player role). Interaction
+is shift+right-click, not plain right-click, since Settlemynts' own
+`resident.VillagerShopInteractListener` already claims plain right-click on these NPCs to open their
+Shop. Kill-tracking is deliberately not geo-fenced to each quest's own named location — that needs
+item 2's still-unbuilt waypoint/knowledge system, flagged as an honest simplification, not an
+oversight. `./gradlew build` green, boot-smoke-tested clean with all 8 suite mods together
+(Settlemynts-optional bridge listeners registering with no classloading issues). **Never played
+through end to end in a live client.**
+
 See [context/classes/](context/classes/) for per-class reference.
