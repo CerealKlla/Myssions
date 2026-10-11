@@ -6,9 +6,12 @@ import com.github.cerealklla.myssions.net.RetryQuestPayload;
 import com.github.cerealklla.myssions.net.SetActiveQuestPayload;
 import com.github.cerealklla.myssions.quest.QuestDeadlineTicker;
 import com.github.cerealklla.myssions.quest.QuestKillListener;
+import com.github.cerealklla.myssions.quest.QuestNpcEntity;
+import com.github.cerealklla.myssions.quest.QuestNpcTalkListener;
 import com.github.cerealklla.myssions.quest.NpcQuests;
 import com.github.cerealklla.myssions.quest.SampleQuests;
 import com.github.cerealklla.myssions.registration.ModAttachments;
+import com.github.cerealklla.myssions.registration.ModEntities;
 import com.github.cerealklla.myssions.registration.ModItems;
 
 import net.minecraft.server.level.ServerPlayer;
@@ -32,13 +35,16 @@ public class MyssionsMod {
     public MyssionsMod(IEventBus modEventBus, ModContainer modContainer) {
         ModItems.ITEMS.register(modEventBus);
         ModItems.DATA_COMPONENTS.register(modEventBus);
+        ModEntities.ENTITIES.register(modEventBus);
         ModAttachments.ATTACHMENT_TYPES.register(modEventBus);
 
         modEventBus.addListener(this::commonSetup);
         modEventBus.addListener(this::registerPayloads);
+        modEventBus.addListener(this::registerAttributes);
 
         NeoForge.EVENT_BUS.register(new QuestDeadlineTicker());
         NeoForge.EVENT_BUS.register(new QuestKillListener());
+        NeoForge.EVENT_BUS.register(new QuestNpcTalkListener());
         NeoForge.EVENT_BUS.addListener((RegisterCommandsEvent event) -> DebugCommands.register(event.getDispatcher()));
 
         // Optional soft dependency -- only ever constructed/registered when Settlemynts is actually
@@ -48,6 +54,10 @@ public class MyssionsMod {
             NeoForge.EVENT_BUS.register(new com.github.cerealklla.myssions.bridge.QuestNpcInteractListener());
             NeoForge.EVENT_BUS.register(new com.github.cerealklla.myssions.bridge.QuestSignInteractListener());
         }
+    }
+
+    private void registerAttributes(net.neoforged.neoforge.event.entity.EntityAttributeCreationEvent event) {
+        event.put(ModEntities.QUEST_NPC.get(), QuestNpcEntity.createAttributes().build());
     }
 
     private void commonSetup(FMLCommonSetupEvent event) {

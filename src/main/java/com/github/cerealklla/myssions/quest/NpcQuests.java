@@ -46,7 +46,7 @@ public final class NpcQuests {
         List<Identifier> farmerQuests = List.of(
                 nightRaiders(), skeletonScarecrows(), burrowingNuisance(), midnightHowlers());
         List<Identifier> mayorQuests = List.of(
-                warbandAtTheGates(), clearTheCaves());
+                warbandAtTheGates(), clearTheCaves(), findOldHarlen());
 
         IssuerQuestPools.register(LUMBERYARD_ZONE_TYPE, lumberjackQuests);
         IssuerQuestPools.register(FARM_ZONE_TYPE, farmerQuests);
@@ -262,6 +262,37 @@ public final class NpcQuests {
                 ),
                 List.of(QuestReward.gold(28), QuestReward.intangible("The trade road stays open")),
                 QuestTimeLimit.NONE));
+        return questId;
+    }
+
+    /**
+     * Design doc items 8/9's real demo -- "go talk to a named NPC who hides at night." Spawns a
+     * {@link QuestNpcEntity} right next to the player the moment they accept, via {@link
+     * QuestAssignmentHooks} (not geo-fenced to any particular location, same honest simplification
+     * as the kill quests above -- real "the NPC is actually somewhere specific" placement needs the
+     * still-unbuilt waypoint system). Visible only to the assignee ({@code ownerPlayerId}) and only
+     * during the day ({@code hidesAtNight = true}) -- see {@link QuestNpcEntity}'s own doc for
+     * exactly what that means mechanically.
+     */
+    private static Identifier findOldHarlen() {
+        Identifier questId = id("find_old_harlen");
+        QuestRegistry.register(new QuestDefinition(questId, "Find Old Harlen",
+                "There's an old hermit who knows these parts better than anyone -- goes by Harlen. "
+                        + "Skittish type, only ever seen during the day; word is he's been spotted nearby. "
+                        + "Track him down and see what he has to say.",
+                TOWN_HALL_ZONE_TYPE,
+                List.of(QuestMilestone.talk("talk_to_harlen", "Find and talk to Old Harlen")),
+                List.of(QuestReward.gold(8), QuestReward.intangible("Old Harlen's thanks")),
+                QuestTimeLimit.NONE));
+        QuestAssignmentHooks.register(questId, (player, assignedId) -> {
+            if (player.level() instanceof net.minecraft.server.level.ServerLevel level) {
+                net.minecraft.core.BlockPos spawnPos = player.blockPosition().offset(
+                        player.getRandom().nextInt(5) - 2, 0, player.getRandom().nextInt(5) - 2);
+                QuestNpcSpawner.spawn(level, spawnPos, player.getUUID(), assignedId, true, "Old Harlen");
+                player.sendSystemMessage(net.minecraft.network.chat.Component.literal(
+                        "You spot an old man nearby -- might be Harlen."));
+            }
+        });
         return questId;
     }
 }

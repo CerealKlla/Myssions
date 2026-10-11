@@ -61,6 +61,7 @@ public final class QuestTurnIn {
                 continue;
             }
             if (QuestEngine.assignQuest(player, questId)) {
+                QuestAssignmentHooks.fire(player, questId);
                 return;
             }
         }

@@ -14,6 +14,7 @@ import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
+import net.neoforged.neoforge.client.event.EntityRenderersEvent;
 import net.neoforged.neoforge.client.event.RegisterGuiLayersEvent;
 import net.neoforged.neoforge.client.event.RegisterKeyMappingsEvent;
 import org.lwjgl.glfw.GLFW;
@@ -34,6 +35,14 @@ public class MyssionsModClient {
     @SubscribeEvent
     static void onRegisterKeyMappings(RegisterKeyMappingsEvent event) {
         event.register(OPEN_QUEST_LOG);
+    }
+
+    @SubscribeEvent
+    static void onRegisterRenderers(EntityRenderersEvent.RegisterRenderers event) {
+        // Reuses vanilla's own VillagerRenderer directly -- a real Villager subclass needs no
+        // bespoke model, same precedent as Settlemynts' own plot worker NPCs.
+        event.registerEntityRenderer(com.github.cerealklla.myssions.registration.ModEntities.QUEST_NPC.get(),
+                net.minecraft.client.renderer.entity.VillagerRenderer::new);
     }
 
     @SubscribeEvent
