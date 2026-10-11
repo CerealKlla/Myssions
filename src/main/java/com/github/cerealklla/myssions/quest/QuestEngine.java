@@ -21,6 +21,9 @@ import net.minecraft.world.item.Items;
  */
 public final class QuestEngine {
 
+    /** "Players can only have 5 quests active [accepted] at once" -- explicit user spec, 2026-10-10. Counts only IN_PROGRESS instances; completed/failed ones don't count against the cap. */
+    public static final int MAX_ACCEPTED_QUESTS = 5;
+
     private QuestEngine() {
     }
 
@@ -33,6 +36,11 @@ public final class QuestEngine {
         if (data.quests().containsKey(definitionId) && data.quests().get(definitionId).status() == QuestStatus.IN_PROGRESS) {
             return false; // Already has this quest in progress -- assigning again would just reset it.
         }
+        long acceptedCount = data.quests().values().stream().filter(i -> i.status() == QuestStatus.IN_PROGRESS).count();
+        if (acceptedCount >= MAX_ACCEPTED_QUESTS) {
+            player.sendSystemMessage(Component.literal("You can't accept any more quests right now (max " + MAX_ACCEPTED_QUESTS + " at once)."));
+            return false;
+        }
         QuestInstance instance = QuestInstance.freshlyAssigned(definitionId, player.level().getGameTime());
         player.setData(ModAttachments.QUEST_DATA, data.withQuest(instance));
         player.sendSystemMessage(Component.literal("New quest: " + definition.get().name()));
@@ -44,6 +52,11 @@ public final class QuestEngine {
         PlayerQuestData data = player.getData(ModAttachments.QUEST_DATA);
         QuestInstance existing = data.quests().get(definitionId);
         if (existing == null || existing.status() != QuestStatus.FAILED) {
+            return false;
+        }
+        long acceptedCount = data.quests().values().stream().filter(i -> i.status() == QuestStatus.IN_PROGRESS).count();
+        if (acceptedCount >= MAX_ACCEPTED_QUESTS) {
+            player.sendSystemMessage(Component.literal("You can't accept any more quests right now (max " + MAX_ACCEPTED_QUESTS + " at once)."));
             return false;
         }
         QuestInstance fresh = QuestInstance.freshlyAssigned(definitionId, player.level().getGameTime());

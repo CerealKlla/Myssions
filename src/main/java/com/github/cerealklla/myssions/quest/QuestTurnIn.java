@@ -1,6 +1,7 @@
 package com.github.cerealklla.myssions.quest;
 
 import java.util.List;
+import java.util.UUID;
 
 import com.github.cerealklla.myssions.registration.ModAttachments;
 
@@ -10,17 +11,21 @@ import net.minecraft.server.level.ServerPlayer;
 
 /**
  * Shared "talk to the quest giver" logic, called from both the NPC interact listener ({@code
- * quest.QuestNpcInteractListener}, Lumberjack/Farmer) and the sign interact listener ({@code
- * quest.QuestSignInteractListener}, standing in for a Mayor NPC that doesn't exist -- see that
+ * bridge.QuestNpcInteractListener}, Lumberjack/Farmer) and the sign interact listener ({@code
+ * bridge.QuestSignInteractListener}, standing in for a Mayor NPC that doesn't exist -- see that
  * class's own doc). Two cases, checked in order:
  *
  * <ol>
- *   <li>The player already has an in-progress quest from this pool -- if it has a ready "deliver"
- *   milestone and they're holding enough proof, turn it in; otherwise just a flavor message
- *   (nothing silently happens).</li>
- *   <li>Otherwise, offer the first quest in the pool they don't already have any record of
- *   (in progress, completed, or failed) -- auto-assigns it directly, no confirmation dialog this
- *   pass (see {@code context/decisions.md} for this simplification).</li>
+ *   <li>The player already has an in-progress quest from this issuer's own pool -- if it has a
+ *   ready "deliver" milestone and they're holding enough proof, turn it in; otherwise just a
+ *   flavor message (nothing silently happens).</li>
+ *   <li>Otherwise, offer whatever's currently sitting on *this specific plot's* {@link
+ *   IssuerQuestBoard} slot (added 2026-10-10, explicit user spec: "at midnight, NPCs who do not
+ *   currently have a quest available will decide with a 50% chance to generate a quest. Upon a
+ *   player accepting a quest it will be removed from the NPC so other players can't take it.") --
+ *   an empty slot means nothing to offer at all; no fallback to "just pick anything from the
+ *   pool," since that would defeat the whole point of the board being a scarce, per-plot resource.
+ *   Accepting clears the board slot, same transaction.</li>
  * </ol>
  */
 public final class QuestTurnIn {
@@ -28,7 +33,7 @@ public final class QuestTurnIn {
     private QuestTurnIn() {
     }
 
-    public static void interact(ServerPlayer player, String zoneTypeId) {
+    public static void interact(ServerPlayer player, UUID plotId, String zoneTypeId) {
         List<Identifier> pool = IssuerQuestPools.poolFor(zoneTypeId);
         if (pool.isEmpty()) {
             return;
@@ -56,15 +61,21 @@ public final class QuestTurnIn {
             return;
         }
 
-        for (Identifier questId : pool) {
-            if (data.quests().containsKey(questId)) {
-                continue;
-            }
-            if (QuestEngine.assignQuest(player, questId)) {
-                QuestAssignmentHooks.fire(player, questId);
-                return;
-            }
+        IssuerQuestBoard board = IssuerQuestBoard.get(player.level().getServer());
+        Identifier offeredId = board.get(plotId).orElse(null);
+        if (offeredId == null) {
+            player.sendSystemMessage(Component.literal("I don't have anything for you right now."));
+            return;
         }
-        player.sendSystemMessage(Component.literal("I don't have anything for you right now."));
+        if (data.quests().containsKey(offeredId)) {
+            // Already has a record of it (completed/failed) -- the board slot is stale for this
+            // player specifically; leave it on the board for someone else rather than re-offering.
+            player.sendSystemMessage(Component.literal("I don't have anything new for you right now."));
+            return;
+        }
+        if (QuestEngine.assignQuest(player, offeredId)) {
+            board.clear(plotId);
+            QuestAssignmentHooks.fire(player, offeredId);
+        }
     }
 }

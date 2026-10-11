@@ -53,6 +53,7 @@ public class MyssionsMod {
         if (net.neoforged.fml.ModList.get().isLoaded("settlemynts")) {
             NeoForge.EVENT_BUS.register(new com.github.cerealklla.myssions.bridge.QuestNpcInteractListener());
             NeoForge.EVENT_BUS.register(new com.github.cerealklla.myssions.bridge.QuestSignInteractListener());
+            NeoForge.EVENT_BUS.register(new com.github.cerealklla.myssions.bridge.QuestBoardMidnightTicker());
         }
         // Same reasoning -- only registered when Lyfe is loaded, since this ticker only ever does
         // anything through bridge.LyfeWaypointBridge (design doc item 2).

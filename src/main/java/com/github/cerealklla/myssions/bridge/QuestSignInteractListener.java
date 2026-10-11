@@ -38,7 +38,7 @@ public final class QuestSignInteractListener {
             }
             event.setCanceled(true);
             event.setCancellationResult(InteractionResult.SUCCESS_SERVER);
-            QuestTurnIn.interact(player, plot.zoneTypeId().toString());
+            QuestTurnIn.interact(player, sign.plotId(), plot.zoneTypeId().toString());
         });
     }
 }
