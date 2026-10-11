@@ -1,6 +1,8 @@
 package com.github.cerealklla.myssions.quest;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 import com.github.cerealklla.myssions.registration.ModAttachments;
@@ -10,122 +12,129 @@ import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerPlayer;
 
 /**
- * Shared "talk to the quest giver" logic, called from both the NPC interact listener ({@code
- * bridge.QuestNpcInteractListener}, Lumberjack/Farmer) and the sign interact listener ({@code
- * bridge.QuestSignInteractListener}, standing in for a Mayor NPC that doesn't exist -- see that
- * class's own doc). Two cases, checked in order:
- *
- * <ol>
- *   <li>The player already has an in-progress quest from this issuer's own pool -- if it has a
- *   ready "deliver" milestone and they're holding enough proof, turn it in; otherwise just a
- *   flavor message (nothing silently happens).</li>
- *   <li>Otherwise, offer whatever's currently sitting on *this specific plot's* {@link
- *   IssuerQuestBoard} slot (added 2026-10-10, explicit user spec: "at midnight, NPCs who do not
- *   currently have a quest available will decide with a 50% chance to generate a quest. Upon a
- *   player accepting a quest it will be removed from the NPC so other players can't take it.") --
- *   an empty slot means nothing to offer at all; no fallback to "just pick anything from the
- *   pool," since that would defeat the whole point of the board being a scarce, per-plot resource.
- *   Accepting clears the board slot, same transaction.</li>
- * </ol>
+ * All server-side "talking to a quest giver" logic -- called from the always-registered NPC/sign
+ * interact listeners (shift+right-click, {@code bridge.QuestNpcInteractListener}/
+ * {@code QuestSignInteractListener}) and from Settlemynts' own "Press H" chat menu (via {@code
+ * api.Myssions}). Three real operations, kept separate rather than one ambiguous "interact" (the
+ * old shape, before the chat-menu rework): {@link #getMenu} (read-only), {@link #acceptBoardOffer}
+ * (mutating), {@link #completeQuest} (mutating). {@link #quickInteract} is the shift+right-click
+ * convenience that picks one of those for you.
  */
 public final class QuestTurnIn {
 
     private QuestTurnIn() {
     }
 
-    /**
-     * Read-only mirror of {@link #interact}'s own branching -- never mutates anything, so other
-     * mods' UI (e.g. Settlemynts' "Press H" wishlist screen, 2026-10-10) can show what interacting
-     * would currently do without actually doing it.
-     */
-    public static QuestGiverPreview preview(ServerPlayer player, UUID plotId, String zoneTypeId) {
+    /** Read-only snapshot of this plot's quest-giver menu for {@code player} right now -- see {@link QuestGiverMenu}'s own doc. */
+    public static QuestGiverMenu getMenu(ServerPlayer player, UUID plotId, String zoneTypeId) {
         List<Identifier> pool = IssuerQuestPools.poolFor(zoneTypeId);
         if (pool.isEmpty()) {
-            return QuestGiverPreview.NOTHING;
+            return QuestGiverMenu.EMPTY;
         }
         var data = player.getData(ModAttachments.QUEST_DATA);
 
-        for (Identifier questId : pool) {
-            QuestInstance instance = data.quests().get(questId);
-            if (instance == null || instance.status() != QuestStatus.IN_PROGRESS) {
+        List<QuestGiverMenu.ActiveEntry> activeEntries = new ArrayList<>();
+        for (QuestInstance instance : data.quests().values()) {
+            if (instance.status() != QuestStatus.IN_PROGRESS || !pool.contains(instance.definitionId())) {
                 continue;
             }
-            QuestDefinition definition = QuestRegistry.get(questId).orElse(null);
+            QuestDefinition definition = QuestRegistry.get(instance.definitionId()).orElse(null);
             if (definition == null) {
-                return QuestGiverPreview.NOTHING;
+                continue;
             }
-            for (QuestMilestone milestone : definition.milestones()) {
-                if (milestone.isDeliverMilestone() && !instance.isMilestoneComplete(milestone)) {
-                    boolean ready = milestone.proofId().isPresent()
-                            && QuestEngine.hasEnoughProof(player, milestone.proofId().get(), milestone.requiredCount());
-                    return new QuestGiverPreview(
-                            ready ? QuestGiverPreview.Kind.READY_TO_TURN_IN : QuestGiverPreview.Kind.WAITING_ON_PLAYER,
-                            questId, definition.name(),
-                            ready ? "Bring that back to me." : "Still working on that for me? Come back once you're done.");
-                }
-            }
-            return new QuestGiverPreview(QuestGiverPreview.Kind.WAITING_ON_PLAYER, questId, definition.name(),
-                    "Still working on that for me? Come back once you're done.");
+            activeEntries.add(new QuestGiverMenu.ActiveEntry(instance.instanceId(), definition.name(), isReadyToComplete(player, definition, instance)));
         }
 
+        Optional<QuestGiverMenu.NewOffer> newOffer = Optional.empty();
         IssuerQuestBoard board = IssuerQuestBoard.get(player.level().getServer());
         Identifier offeredId = board.get(plotId).orElse(null);
-        if (offeredId == null) {
-            return QuestGiverPreview.NOTHING;
+        if (offeredId != null && data.quests().values().stream().noneMatch(i -> i.definitionId().equals(offeredId))) {
+            QuestDefinition definition = QuestRegistry.get(offeredId).orElse(null);
+            if (definition != null) {
+                newOffer = Optional.of(new QuestGiverMenu.NewOffer(offeredId, definition.name(), definition.description()));
+            }
         }
-        if (data.quests().containsKey(offeredId)) {
-            return QuestGiverPreview.NOTHING;
-        }
-        QuestDefinition def = QuestRegistry.get(offeredId).orElse(null);
-        if (def == null) {
-            return QuestGiverPreview.NOTHING;
-        }
-        return new QuestGiverPreview(QuestGiverPreview.Kind.NEW_OFFER, offeredId, def.name(), def.description());
+        return new QuestGiverMenu(activeEntries, newOffer);
     }
 
-    public static void interact(ServerPlayer player, UUID plotId, String zoneTypeId) {
-        List<Identifier> pool = IssuerQuestPools.poolFor(zoneTypeId);
-        if (pool.isEmpty()) {
-            return;
-        }
-        var data = player.getData(ModAttachments.QUEST_DATA);
-
-        for (Identifier questId : pool) {
-            QuestInstance instance = data.quests().get(questId);
-            if (instance == null || instance.status() != QuestStatus.IN_PROGRESS) {
+    /** True if every non-optional milestone is already done, or would be done by a deliver milestone consuming proof the player is currently holding -- i.e. what {@link #completeQuest} would actually achieve right now. */
+    private static boolean isReadyToComplete(ServerPlayer player, QuestDefinition definition, QuestInstance instance) {
+        for (QuestMilestone milestone : definition.milestones()) {
+            if (milestone.optional() || instance.isMilestoneComplete(milestone)) {
                 continue;
             }
-            QuestDefinition definition = QuestRegistry.get(questId).orElse(null);
-            if (definition == null) {
-                return;
+            if (milestone.isDeliverMilestone() && milestone.proofId().isPresent()
+                    && QuestEngine.hasEnoughProof(player, milestone.proofId().get(), milestone.requiredCount())) {
+                continue;
             }
-            for (QuestMilestone milestone : definition.milestones()) {
-                if (milestone.isDeliverMilestone() && !instance.isMilestoneComplete(milestone)) {
-                    if (!QuestEngine.tryDeliverProof(player, questId, milestone.id())) {
-                        player.sendSystemMessage(Component.literal("You don't have what I asked for yet."));
-                    }
-                    return;
-                }
-            }
-            player.sendSystemMessage(Component.literal("Still working on that for me? Come back once you're done."));
-            return;
+            return false;
         }
+        return true;
+    }
 
+    /**
+     * Accepts the plot's current board offer -- "I've got a job that needs doing" -> "Accept" (or
+     * the board-offer branch of {@link #quickInteract}). Clears the board slot and fires the
+     * quest's own assignment hook (see {@code QuestAssignmentHooks}' own doc) on success.
+     */
+    public static Optional<UUID> acceptBoardOffer(ServerPlayer player, UUID plotId) {
         IssuerQuestBoard board = IssuerQuestBoard.get(player.level().getServer());
         Identifier offeredId = board.get(plotId).orElse(null);
         if (offeredId == null) {
             player.sendSystemMessage(Component.literal("I don't have anything for you right now."));
-            return;
+            return Optional.empty();
         }
-        if (data.quests().containsKey(offeredId)) {
-            // Already has a record of it (completed/failed) -- the board slot is stale for this
-            // player specifically; leave it on the board for someone else rather than re-offering.
+        var data = player.getData(ModAttachments.QUEST_DATA);
+        if (data.quests().values().stream().anyMatch(i -> i.definitionId().equals(offeredId))) {
+            // Already has a record of it (in progress/completed/failed) -- the board slot is stale
+            // for this player specifically; leave it on the board for someone else.
             player.sendSystemMessage(Component.literal("I don't have anything new for you right now."));
-            return;
+            return Optional.empty();
         }
-        if (QuestEngine.assignQuest(player, offeredId)) {
+        Optional<UUID> instanceId = QuestEngine.assignQuest(player, offeredId);
+        instanceId.ifPresent(id -> {
             board.clear(plotId);
-            QuestAssignmentHooks.fire(player, offeredId, plotId);
+            QuestAssignmentHooks.fire(player, id, offeredId, plotId);
+        });
+        return instanceId;
+    }
+
+    /**
+     * "Complete Quest" on the chat menu's active-quest sub-screen -- see {@code
+     * QuestEngine#tryCompleteQuest}'s own doc for exactly what "complete" means (best-effort deliver,
+     * then check every milestone is actually done). Sends a real message either way.
+     */
+    public static boolean completeQuest(ServerPlayer player, UUID instanceId) {
+        boolean completed = QuestEngine.tryCompleteQuest(player, instanceId);
+        if (!completed) {
+            player.sendSystemMessage(Component.literal("You still have more to do before this is finished."));
         }
+        return completed;
+    }
+
+    /**
+     * Shift+right-click convenience (unchanged UX from before the chat-menu rework): try to
+     * complete the first ready in-progress quest from this issuer's pool; if none are ready but at
+     * least one is in progress, just say so; otherwise fall through to offering/accepting whatever's
+     * on the board.
+     */
+    public static void quickInteract(ServerPlayer player, UUID plotId, String zoneTypeId) {
+        List<Identifier> pool = IssuerQuestPools.poolFor(zoneTypeId);
+        if (!pool.isEmpty()) {
+            var data = player.getData(ModAttachments.QUEST_DATA);
+            List<QuestInstance> inProgress = data.quests().values().stream()
+                    .filter(i -> i.status() == QuestStatus.IN_PROGRESS && pool.contains(i.definitionId()))
+                    .toList();
+            for (QuestInstance instance : inProgress) {
+                if (QuestEngine.tryCompleteQuest(player, instance.instanceId())) {
+                    return;
+                }
+            }
+            if (!inProgress.isEmpty()) {
+                player.sendSystemMessage(Component.literal("Still working on that for me? Come back once you're done."));
+                return;
+            }
+        }
+        acceptBoardOffer(player, plotId);
     }
 }

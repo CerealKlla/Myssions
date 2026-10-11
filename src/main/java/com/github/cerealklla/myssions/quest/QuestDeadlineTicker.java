@@ -1,10 +1,10 @@
 package com.github.cerealklla.myssions.quest;
 
 import java.util.Map;
+import java.util.UUID;
 
 import com.github.cerealklla.myssions.registration.ModAttachments;
 
-import net.minecraft.resources.Identifier;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.bus.api.SubscribeEvent;
@@ -33,7 +33,7 @@ public final class QuestDeadlineTicker {
         long nowEpochMillis = System.currentTimeMillis();
 
         for (ServerPlayer player : server.getPlayerList().getPlayers()) {
-            Map<Identifier, QuestInstance> quests = player.getData(ModAttachments.QUEST_DATA).quests();
+            Map<UUID, QuestInstance> quests = player.getData(ModAttachments.QUEST_DATA).quests();
             for (QuestInstance instance : quests.values()) {
                 if (instance.status() != QuestStatus.IN_PROGRESS) {
                     continue;
@@ -43,7 +43,7 @@ public final class QuestDeadlineTicker {
                     if (!limit.hasLimit() || !isExpired(limit, instance, nowGameTime, nowEpochMillis)) {
                         return;
                     }
-                    QuestEngine.failQuest(player, instance.definitionId());
+                    QuestEngine.failQuest(player, instance.instanceId());
                 });
             }
         }

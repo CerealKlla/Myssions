@@ -3,6 +3,7 @@ package com.github.cerealklla.myssions.client;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 import com.github.cerealklla.myssions.net.RetryQuestPayload;
 import com.github.cerealklla.myssions.net.SetActiveQuestPayload;
@@ -20,7 +21,6 @@ import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.protocol.common.ServerboundCustomPayloadPacket;
-import net.minecraft.resources.Identifier;
 
 /**
  * The Quest Log (design doc item 1) -- opened via {@code MyssionsModClient#OPEN_QUEST_LOG}. Two
@@ -48,11 +48,11 @@ public final class QuestLogScreen extends Screen {
     private static final int ACTIVE_TEXT_COLOR = 0xFFFFD700;
     private static final int HEADER_COLOR = 0xFFFFFFFF;
 
-    private record ListRow(Identifier definitionId, String label, int color, boolean isHeader) {
+    private record ListRow(UUID instanceId, String label, int color, boolean isHeader) {
     }
 
     private List<ListRow> listRows = List.of();
-    private Identifier selectedId;
+    private UUID selectedId;
     private int listScroll;
     private int detailsScroll;
     private Button actionButton;
@@ -65,7 +65,7 @@ public final class QuestLogScreen extends Screen {
     protected void init() {
         rebuildListRows();
         if (selectedId == null && !listRows.isEmpty()) {
-            listRows.stream().filter(r -> !r.isHeader()).findFirst().ifPresent(r -> selectedId = r.definitionId());
+            listRows.stream().filter(r -> !r.isHeader()).findFirst().ifPresent(r -> selectedId = r.instanceId());
         }
         rebuildActionButton();
     }
@@ -84,17 +84,17 @@ public final class QuestLogScreen extends Screen {
         }
         for (QuestInstance instance : active) {
             QuestRegistry.get(instance.definitionId()).ifPresent(def -> {
-                boolean isActiveQuest = data.activeQuestId().map(id -> id.equals(instance.definitionId())).orElse(false);
+                boolean isActiveQuest = data.activeQuestId().map(id -> id.equals(instance.instanceId())).orElse(false);
                 int color = instance.status() == QuestStatus.COMPLETED ? DIM_TEXT_COLOR : (isActiveQuest ? ACTIVE_TEXT_COLOR : TEXT_COLOR);
                 String prefix = instance.status() == QuestStatus.COMPLETED ? "[Done] " : (isActiveQuest ? "* " : "");
-                rows.add(new ListRow(instance.definitionId(), prefix + def.name(), color, false));
+                rows.add(new ListRow(instance.instanceId(), prefix + def.name(), color, false));
             });
         }
         if (!failed.isEmpty()) {
             rows.add(new ListRow(null, "-- Failed Quests --", HEADER_COLOR, true));
             for (QuestInstance instance : failed) {
                 QuestRegistry.get(instance.definitionId())
-                        .ifPresent(def -> rows.add(new ListRow(instance.definitionId(), def.name(), FAILED_TEXT_COLOR, false)));
+                        .ifPresent(def -> rows.add(new ListRow(instance.instanceId(), def.name(), FAILED_TEXT_COLOR, false)));
             }
         }
         listRows = rows;
@@ -161,7 +161,7 @@ public final class QuestLogScreen extends Screen {
             if (clickedIndex >= 0 && clickedIndex < listRows.size()) {
                 ListRow row = listRows.get(clickedIndex);
                 if (!row.isHeader()) {
-                    selectedId = row.definitionId();
+                    selectedId = row.instanceId();
                     detailsScroll = 0;
                     rebuildActionButton();
                 }
@@ -209,7 +209,7 @@ public final class QuestLogScreen extends Screen {
         int y = top - listScroll;
         for (ListRow row : listRows) {
             if (y + ROW_HEIGHT >= top && y <= bottom) {
-                boolean selected = !row.isHeader() && row.definitionId().equals(selectedId);
+                boolean selected = !row.isHeader() && row.instanceId().equals(selectedId);
                 if (selected) {
                     graphics.fill(listLeft, y, listRight, y + ROW_HEIGHT, 0x60FFFFFF);
                 }
@@ -227,7 +227,7 @@ public final class QuestLogScreen extends Screen {
     private void renderDetails(GuiGraphicsExtractor graphics, int left, int right, int topBound, int bottom) {
         var data = Minecraft.getInstance().player.getData(ModAttachments.QUEST_DATA);
         QuestInstance instance = data.quests().get(selectedId);
-        Optional<QuestDefinition> definitionOpt = QuestRegistry.get(selectedId);
+        Optional<QuestDefinition> definitionOpt = instance == null ? Optional.empty() : QuestRegistry.get(instance.definitionId());
         if (instance == null || definitionOpt.isEmpty()) {
             return;
         }
@@ -239,7 +239,9 @@ public final class QuestLogScreen extends Screen {
         int lineHeight = font.lineHeight + 2;
         int wrapWidth = right - left - 6;
 
-        y = drawWrapped(graphics, "ID: " + definition.id(), left, y, wrapWidth, DIM_TEXT_COLOR, lineHeight);
+        // No id line here on purpose -- both the definition id and the real per-instance UUID are
+        // internal plumbing, never shown to the player (explicit user correction, 2026-10-10: "The
+        // Unique ID was meant to be ... hidden from the user").
         y = drawWrapped(graphics, definition.name(), left, y, wrapWidth, HEADER_COLOR, lineHeight);
         y += 2;
         y = drawWrapped(graphics, definition.description(), left, y, wrapWidth, TEXT_COLOR, lineHeight);

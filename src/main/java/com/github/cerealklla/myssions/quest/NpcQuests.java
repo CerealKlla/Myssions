@@ -295,7 +295,7 @@ public final class NpcQuests {
      * {location}} token then just falls back to a generic phrase.
      */
     private static void registerOnSiteHook(Identifier questId) {
-        QuestAssignmentHooks.register(questId, (player, assignedId, plotId) -> {
+        QuestAssignmentHooks.register(questId, (player, instanceId, assignedId, plotId) -> {
             if (!(player.level() instanceof net.minecraft.server.level.ServerLevel level)
                     || !com.github.cerealklla.myssions.bridge.SettlemyntsPlotLocationBridge.isLoaded()) {
                 return;
@@ -307,10 +307,10 @@ public final class NpcQuests {
                 }
                 java.util.Optional<String> settlementName = loc.settlementName().isBlank()
                         ? java.util.Optional.empty() : java.util.Optional.of(loc.settlementName());
-                QuestEngine.setHint(player, assignedId, loc.pos(), loc.dimension().identifier().toString(), settlementName);
+                QuestEngine.setHint(player, instanceId, loc.pos(), loc.dimension().identifier().toString(), settlementName);
 
                 if (com.github.cerealklla.myssions.bridge.LyfeWaypointBridge.isLoaded()) {
-                    long placeId = QuestWaypointTicker.placeIdFor(assignedId, player);
+                    long placeId = QuestWaypointTicker.placeIdFor(instanceId);
                     com.github.cerealklla.myssions.bridge.LyfeWaypointBridge.grantKnowledge(player, placeId, true, true, true);
                 }
             });
@@ -336,7 +336,7 @@ public final class NpcQuests {
                 List.of(QuestMilestone.talk("talk_to_harlen", "Find and talk to Old Harlen")),
                 List.of(QuestReward.gold(8), QuestReward.intangible("Old Harlen's thanks")),
                 QuestTimeLimit.NONE));
-        QuestAssignmentHooks.register(questId, (player, assignedId, plotId) -> {
+        QuestAssignmentHooks.register(questId, (player, instanceId, assignedId, plotId) -> {
             if (player.level() instanceof net.minecraft.server.level.ServerLevel level) {
                 // A real target somewhere out past the player, not right at their feet -- the whole
                 // point of the waypoint hint (design doc item 2) is having to go find it.
@@ -347,11 +347,11 @@ public final class NpcQuests {
                 int groundY = level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, roughSpot.getX(), roughSpot.getZ());
                 net.minecraft.core.BlockPos truePos = new net.minecraft.core.BlockPos(roughSpot.getX(), groundY, roughSpot.getZ());
 
-                QuestEngine.setHint(player, assignedId, truePos, level.dimension().identifier().toString());
-                QuestNpcSpawner.spawn(level, truePos, player.getUUID(), assignedId, true, "Old Harlen");
+                QuestEngine.setHint(player, instanceId, truePos, level.dimension().identifier().toString());
+                QuestNpcSpawner.spawn(level, truePos, player.getUUID(), instanceId, true, "Old Harlen");
 
                 if (com.github.cerealklla.myssions.bridge.LyfeWaypointBridge.isLoaded()) {
-                    long placeId = QuestWaypointTicker.placeIdFor(assignedId, player);
+                    long placeId = QuestWaypointTicker.placeIdFor(instanceId);
                     // Simulates "the Mayor gave you a rough description" -- a real bearing and
                     // distance, but not the exact spot -- rather than starting from zero knowledge.
                     com.github.cerealklla.myssions.bridge.LyfeWaypointBridge.grantKnowledge(player, placeId, true, true, false);

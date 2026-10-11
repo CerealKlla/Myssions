@@ -41,7 +41,7 @@ public final class QuestNpcInteractListener {
         }
         Settlemynts.findPlotRecord(level, npc.plotId()).ifPresent(plot -> {
             event.setCanceled(true);
-            QuestTurnIn.interact(player, npc.plotId(), plot.zoneTypeId().toString());
+            QuestTurnIn.quickInteract(player, npc.plotId(), plot.zoneTypeId().toString());
         });
     }
 }

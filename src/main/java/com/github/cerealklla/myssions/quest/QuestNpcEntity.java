@@ -5,7 +5,6 @@ import java.util.UUID;
 
 import net.minecraft.core.UUIDUtil;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.EntityType;
@@ -45,7 +44,7 @@ import net.minecraft.world.level.storage.ValueOutput;
 public class QuestNpcEntity extends Villager {
 
     private UUID ownerPlayerId;
-    private Identifier linkedQuestId;
+    private UUID linkedInstanceId;
     private boolean hidesAtNight;
     private String npcName = "";
 
@@ -54,17 +53,17 @@ public class QuestNpcEntity extends Villager {
         skipDropExperience();
     }
 
-    public void configure(UUID ownerPlayerId, Identifier linkedQuestId, boolean hidesAtNight, String npcName) {
+    public void configure(UUID ownerPlayerId, UUID linkedInstanceId, boolean hidesAtNight, String npcName) {
         this.ownerPlayerId = ownerPlayerId;
-        this.linkedQuestId = linkedQuestId;
+        this.linkedInstanceId = linkedInstanceId;
         this.hidesAtNight = hidesAtNight;
         this.npcName = npcName;
         setCustomName(Component.literal(npcName));
         setCustomNameVisible(true);
     }
 
-    public Optional<Identifier> linkedQuestId() {
-        return Optional.ofNullable(linkedQuestId);
+    public Optional<UUID> linkedInstanceId() {
+        return Optional.ofNullable(linkedInstanceId);
     }
 
     public static AttributeSupplier.Builder createAttributes() {
@@ -88,18 +87,17 @@ public class QuestNpcEntity extends Villager {
 
     /** Called by {@code quest.QuestNpcTalkListener} on a real interaction -- false if this player can't currently see/talk to this NPC at all. */
     public boolean talkTo(ServerPlayer player) {
-        if (!broadcastToPlayer(player) || linkedQuestId == null) {
+        if (!broadcastToPlayer(player) || linkedInstanceId == null) {
             return false;
         }
         boolean completedAnything = false;
-        QuestDefinition definition = QuestRegistry.get(linkedQuestId).orElse(null);
+        QuestInstance instance = QuestEngine.getInstance(player, linkedInstanceId).orElse(null);
+        QuestDefinition definition = instance == null ? null : QuestRegistry.get(instance.definitionId()).orElse(null);
         if (definition != null) {
             for (QuestMilestone milestone : definition.milestones()) {
                 if (milestone.isTalkMilestone()
-                        && QuestEngine.getInstance(player, linkedQuestId)
-                        .map(instance -> instance.status() == QuestStatus.IN_PROGRESS && !instance.isMilestoneComplete(milestone))
-                        .orElse(false)) {
-                    QuestEngine.reportMilestoneProgress(player, linkedQuestId, milestone.id(), 1);
+                        && instance.status() == QuestStatus.IN_PROGRESS && !instance.isMilestoneComplete(milestone)) {
+                    QuestEngine.reportMilestoneProgress(player, linkedInstanceId, milestone.id(), 1);
                     completedAnything = true;
                 }
             }
@@ -121,7 +119,7 @@ public class QuestNpcEntity extends Villager {
     protected void addAdditionalSaveData(ValueOutput output) {
         super.addAdditionalSaveData(output);
         output.storeNullable("OwnerPlayerId", UUIDUtil.CODEC, ownerPlayerId);
-        output.storeNullable("LinkedQuestId", Identifier.CODEC, linkedQuestId);
+        output.storeNullable("LinkedInstanceId", UUIDUtil.CODEC, linkedInstanceId);
         output.putBoolean("HidesAtNight", hidesAtNight);
         output.putString("NpcName", npcName);
     }
@@ -130,7 +128,7 @@ public class QuestNpcEntity extends Villager {
     protected void readAdditionalSaveData(ValueInput input) {
         super.readAdditionalSaveData(input);
         ownerPlayerId = input.read("OwnerPlayerId", UUIDUtil.CODEC).orElse(null);
-        linkedQuestId = input.read("LinkedQuestId", Identifier.CODEC).orElse(null);
+        linkedInstanceId = input.read("LinkedInstanceId", UUIDUtil.CODEC).orElse(null);
         hidesAtNight = input.getBooleanOr("HidesAtNight", false);
         npcName = input.getStringOr("NpcName", "");
     }

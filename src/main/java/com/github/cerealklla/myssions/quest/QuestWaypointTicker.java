@@ -62,7 +62,7 @@ public final class QuestWaypointTicker {
                 continue;
             }
             BlockPos truePos = instance.hintPos().get();
-            long placeId = placeIdFor(instance.definitionId(), player);
+            long placeId = placeIdFor(instance.instanceId());
 
             double distance = Math.sqrt(player.distanceToSqr(truePos.getX() + 0.5, truePos.getY(), truePos.getZ() + 0.5));
             if (distance <= DISCOVERY_RADIUS_BLOCKS) {
@@ -84,12 +84,16 @@ public final class QuestWaypointTicker {
     }
 
     /**
-     * Stable per (quest definition, player) so repeated calls (every tick interval) don't jitter the
-     * circle around -- public so a quest's own assignment hook (e.g. {@code NpcQuests#findOldHarlen})
-     * can grant initial knowledge factors against the exact same key this ticker will later read.
+     * Stable per quest *instance* (2026-10-10, switched from a (definition, player) hash once
+     * instances gained their own real {@code UUID} -- see {@link QuestInstance}'s own doc) so
+     * repeated calls (every tick interval) don't jitter the circle around, and so a retried quest
+     * (a brand-new instanceId) never reuses a previous attempt's stale knowledge, closing a
+     * previously-flagged edge case. Public so a quest's own assignment hook (e.g. {@code
+     * NpcQuests#findOldHarlen}/{@code #registerOnSiteHook}) can grant initial knowledge factors
+     * against the exact same key this ticker will later read.
      */
-    public static long placeIdFor(Identifier definitionId, ServerPlayer player) {
-        return ((long) definitionId.hashCode() << 32) ^ player.getUUID().hashCode();
+    public static long placeIdFor(java.util.UUID instanceId) {
+        return instanceId.getMostSignificantBits() ^ instanceId.getLeastSignificantBits();
     }
 
     /** A deterministic point within {@code radius} blocks of {@code truePos}, seeded so it's identical every call for the same inputs -- recomputed (and so changes) only when {@code radius} itself changes. */

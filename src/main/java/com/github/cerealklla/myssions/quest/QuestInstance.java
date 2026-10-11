@@ -2,39 +2,48 @@ package com.github.cerealklla.myssions.quest;
 
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.UUIDUtil;
 import net.minecraft.resources.Identifier;
 
 /**
- * One player's own progress against a {@link QuestDefinition} -- created the moment a quest is
- * assigned to them (see {@code api.Myssions#assignQuest}), stored in their own {@code
- * quest.PlayerQuestData} attachment. {@code milestoneProgress} maps a {@link QuestMilestone#id()}
- * to how many units of it this player has completed so far (compared against that milestone's own
- * {@link QuestMilestone#requiredCount()} to decide "done"); a milestone absent from the map simply
- * means zero progress, not an error.
+ * One single acceptance of a {@link QuestDefinition} -- created the moment a quest is assigned
+ * (see {@code api.Myssions#assignQuest}), stored keyed by its own {@link #instanceId()} in {@code
+ * quest.PlayerQuestData}. {@code milestoneProgress} maps a {@link QuestMilestone#id()} to how many
+ * units of it this instance has completed so far; a milestone absent from the map simply means
+ * zero progress, not an error.
  *
- * <p>{@code hintPos}/{@code hintDimension} (added 2026-10-10, design doc item 2) are an optional
- * *true*, hidden target position this specific instance cares about -- never shown directly to the
- * player. {@code quest.QuestWaypointTicker} uses it (plus the player's own knowledge quality, via
- * {@code bridge.LyfeWaypointBridge}) to compute and push the actual vague-circle hint they see.
- * Per-instance, not per-definition, since where the hint points can genuinely vary by who got the
- * quest and when (e.g. "Find Old Harlen" picks a fresh nearby spot for each player).
+ * <p>{@code instanceId} (added 2026-10-10, real user correction: "The Unique ID was meant to be a
+ * UUID and hidden from the user, that way two players can't be on the exact same quest as the
+ * rewards may be different, location details, etc") is a real, randomly-generated, per-acceptance
+ * identity -- never shown in any UI. {@link #definitionId()} still names which static {@link
+ * QuestDefinition} this instance is of, but is no longer the instance's own key: the same player
+ * can hold two completely independent instances of the same definition at once (e.g. "Night
+ * Raiders" offered by two different Farmers in two different settlements), each with its own
+ * progress, hint location, and eventual rewards -- a single shared `definitionId` key could never
+ * represent that.
+ *
+ * <p>{@code hintPos}/{@code hintDimensionId} (design doc item 2) are an optional *true*, hidden
+ * target position this specific instance cares about -- never shown directly to the player. {@code
+ * quest.QuestWaypointTicker} uses it (plus the player's own knowledge quality, via {@code
+ * bridge.LyfeWaypointBridge}) to compute and push the actual vague-circle hint they see.
  *
  * <p>{@code locationName} (added 2026-10-10, same day's on-site-quest retrofit) is a real place
  * name -- e.g. a settlement's own name -- to substitute into a quest's {@code {location}}-tokened
- * flavor text (see {@code quest.QuestText#resolve}), so a player who's left the area still knows
- * where "near the fields" actually means. Empty for quests with no resolvable real location (the
- * "{location}" token then falls back to a generic phrase).
+ * flavor text (see {@code quest.QuestText#resolve}). Empty for a quest with no resolvable real
+ * location (the token then falls back to a generic phrase).
  */
-public record QuestInstance(Identifier definitionId, QuestStatus status, Map<String, Integer> milestoneProgress,
+public record QuestInstance(UUID instanceId, Identifier definitionId, QuestStatus status, Map<String, Integer> milestoneProgress,
                              long assignedAtGameTime, Optional<BlockPos> hintPos, Optional<String> hintDimensionId,
                              Optional<String> locationName) {
 
     public static final Codec<QuestInstance> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+            UUIDUtil.CODEC.fieldOf("instance_id").forGetter(QuestInstance::instanceId),
             Identifier.CODEC.fieldOf("definition_id").forGetter(QuestInstance::definitionId),
             Codec.STRING.xmap(QuestStatus::valueOf, QuestStatus::name).fieldOf("status").forGetter(QuestInstance::status),
             Codec.unboundedMap(Codec.STRING, Codec.INT).optionalFieldOf("milestone_progress", Map.of()).forGetter(QuestInstance::milestoneProgress),
@@ -45,21 +54,21 @@ public record QuestInstance(Identifier definitionId, QuestStatus status, Map<Str
     ).apply(instance, QuestInstance::new));
 
     public static QuestInstance freshlyAssigned(Identifier definitionId, long gameTime) {
-        return new QuestInstance(definitionId, QuestStatus.IN_PROGRESS, Map.of(), gameTime, Optional.empty(), Optional.empty(), Optional.empty());
+        return new QuestInstance(UUID.randomUUID(), definitionId, QuestStatus.IN_PROGRESS, Map.of(), gameTime, Optional.empty(), Optional.empty(), Optional.empty());
     }
 
     public QuestInstance withStatus(QuestStatus newStatus) {
-        return new QuestInstance(definitionId, newStatus, milestoneProgress, assignedAtGameTime, hintPos, hintDimensionId, locationName);
+        return new QuestInstance(instanceId, definitionId, newStatus, milestoneProgress, assignedAtGameTime, hintPos, hintDimensionId, locationName);
     }
 
     public QuestInstance withProgress(String milestoneId, int amount) {
         Map<String, Integer> updated = new java.util.HashMap<>(milestoneProgress);
         updated.put(milestoneId, amount);
-        return new QuestInstance(definitionId, status, Map.copyOf(updated), assignedAtGameTime, hintPos, hintDimensionId, locationName);
+        return new QuestInstance(instanceId, definitionId, status, Map.copyOf(updated), assignedAtGameTime, hintPos, hintDimensionId, locationName);
     }
 
     public QuestInstance withHint(BlockPos pos, String dimensionId, Optional<String> newLocationName) {
-        return new QuestInstance(definitionId, status, milestoneProgress, assignedAtGameTime, Optional.of(pos), Optional.of(dimensionId), newLocationName);
+        return new QuestInstance(instanceId, definitionId, status, milestoneProgress, assignedAtGameTime, Optional.of(pos), Optional.of(dimensionId), newLocationName);
     }
 
     public boolean isMilestoneComplete(QuestMilestone milestone) {

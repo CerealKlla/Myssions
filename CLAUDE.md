@@ -142,4 +142,14 @@ a real hint, and grants full knowledge immediately (not a rough bearing). The ot
 `quest.QuestAssignmentHooks` widened to also carry the issuing `plotId`. `./gradlew build` green in
 both repos, whole-suite boot-smoke-tested clean. **Not yet live-tested or deployed.**
 
+**Real per-instance UUID identity; "Complete Quest" menu, same day** (see
+[context/decisions.md](context/decisions.md)) — two more real corrections from live testing. Quest
+instances now carry a hidden, random `instanceId` (a `UUID`, never shown in any UI) instead of being
+keyed by their bare definition id, so two separate acceptances of the same quest definition (e.g.
+from two different NPCs) no longer collide — every per-instance API/payload now takes this id.
+`quest.QuestTurnIn` rebuilt around three real operations (`getMenu`/`acceptBoardOffer`/
+`completeQuest`) instead of one ambiguous `interact`, backing a real "pick your active quest by name,
+then Complete Quest" flow on Settlemynts' own chat menu (see its own CLAUDE.md). `./gradlew build`
+green in both repos, whole-suite boot-smoke-tested clean. **Not yet live-tested or deployed.**
+
 See [context/classes/](context/classes/) for per-class reference.

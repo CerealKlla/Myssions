@@ -40,7 +40,7 @@ public final class QuestKillListener {
                     if (current >= milestone.requiredCount()) {
                         continue; // Already fully progressed -- no further proof to grant.
                     }
-                    QuestEngine.reportMilestoneProgress(player, instance.definitionId(), milestone.id(), 1);
+                    QuestEngine.reportMilestoneProgress(player, instance.instanceId(), milestone.id(), 1);
                     milestone.proofId().ifPresent(proofId -> {
                         ItemStack proof = ProofItemCatalog.create(proofId);
                         if (!player.getInventory().add(proof)) {

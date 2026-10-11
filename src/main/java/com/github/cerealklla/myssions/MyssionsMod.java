@@ -82,14 +82,14 @@ public class MyssionsMod {
         registrar.playToServer(SetActiveQuestPayload.TYPE, SetActiveQuestPayload.STREAM_CODEC,
                 (payload, context) -> {
                     if (context.player() instanceof ServerPlayer player) {
-                        Myssions.setActiveQuest(player, payload.definitionId());
+                        Myssions.setActiveQuest(player, payload.instanceId());
                     }
                 });
 
         registrar.playToServer(RetryQuestPayload.TYPE, RetryQuestPayload.STREAM_CODEC,
                 (payload, context) -> {
                     if (context.player() instanceof ServerPlayer player) {
-                        Myssions.retryQuest(player, payload.definitionId());
+                        Myssions.retryQuest(player, payload.instanceId());
                     }
                 });
     }

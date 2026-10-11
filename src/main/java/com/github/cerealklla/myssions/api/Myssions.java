@@ -6,7 +6,7 @@ import java.util.UUID;
 import com.github.cerealklla.myssions.quest.IssuerQuestBoard;
 import com.github.cerealklla.myssions.quest.QuestDefinition;
 import com.github.cerealklla.myssions.quest.QuestEngine;
-import com.github.cerealklla.myssions.quest.QuestGiverPreview;
+import com.github.cerealklla.myssions.quest.QuestGiverMenu;
 import com.github.cerealklla.myssions.quest.QuestInstance;
 import com.github.cerealklla.myssions.quest.QuestRegistry;
 import com.github.cerealklla.myssions.quest.QuestTurnIn;
@@ -21,6 +21,13 @@ import net.minecraft.server.level.ServerPlayer;
  * Blueprynts, Kyt, Lyfe). Reference this class via a {@code compileOnly} dependency guarded behind
  * {@code ModList.get().isLoaded("myssions")} at the actual call site -- same optional-dependency
  * convention as every cross-mod integration in this suite.
+ *
+ * <p>Every per-instance method here takes a real {@link QuestInstance#instanceId()} (a hidden
+ * {@code UUID}, added 2026-10-10), not a bare quest {@code Identifier} -- a player can hold two
+ * independent instances of the same quest definition at once (e.g. the same quest offered by two
+ * different NPCs), so the definition id alone can't name a specific one. {@link #assignQuest}
+ * still takes the definition id (there's nothing to disambiguate when creating a new instance) and
+ * hands back the new instance's id.
  */
 public final class Myssions {
 
@@ -36,42 +43,47 @@ public final class Myssions {
         return QuestRegistry.get(definitionId);
     }
 
-    /** Assigns a registered quest to a player. False if the definition doesn't exist or they already have it in progress. */
-    public static boolean assignQuest(ServerPlayer player, Identifier definitionId) {
+    /** Assigns a fresh instance of this definition to a player, returning its new instanceId -- empty if the definition doesn't exist, they already have it in progress, or they're at the quest cap. */
+    public static Optional<UUID> assignQuest(ServerPlayer player, Identifier definitionId) {
         return QuestEngine.assignQuest(player, definitionId);
     }
 
-    /** Re-assigns a previously-failed quest fresh. False if they don't have a failed instance of it. */
-    public static boolean retryQuest(ServerPlayer player, Identifier definitionId) {
-        return QuestEngine.retryQuest(player, definitionId);
+    /** Re-assigns a previously-failed instance fresh, returning its new instanceId. Empty if {@code instanceId} isn't a failed instance they actually have. */
+    public static Optional<UUID> retryQuest(ServerPlayer player, UUID instanceId) {
+        return QuestEngine.retryQuest(player, instanceId);
     }
 
-    public static Optional<QuestInstance> getQuestInstance(ServerPlayer player, Identifier definitionId) {
-        return QuestEngine.getInstance(player, definitionId);
+    public static Optional<QuestInstance> getQuestInstance(ServerPlayer player, UUID instanceId) {
+        return QuestEngine.getInstance(player, instanceId);
     }
 
     /**
-     * Adds {@code amount} progress toward one milestone of a quest the player already has
+     * Adds {@code amount} progress toward one milestone of an instance the player already has
      * in-progress -- automatically completes (and applies the rewards of) the quest once every
      * non-optional milestone is done. The real entry point for any mod wiring up a quest's actual
      * trigger logic (a mob-death listener, a region-enter check, an NPC dialogue, etc.).
      */
-    public static void reportMilestoneProgress(ServerPlayer player, Identifier definitionId, String milestoneId, int amount) {
-        QuestEngine.reportMilestoneProgress(player, definitionId, milestoneId, amount);
+    public static void reportMilestoneProgress(ServerPlayer player, UUID instanceId, String milestoneId, int amount) {
+        QuestEngine.reportMilestoneProgress(player, instanceId, milestoneId, amount);
     }
 
     /** Convenience for a milestone that's simply done/not-done (e.g. "talk to the NPC"), rather than a count. */
-    public static void completeMilestone(ServerPlayer player, Identifier definitionId, String milestoneId) {
-        QuestEngine.reportMilestoneProgress(player, definitionId, milestoneId, Integer.MAX_VALUE / 2);
+    public static void completeMilestone(ServerPlayer player, UUID instanceId, String milestoneId) {
+        QuestEngine.reportMilestoneProgress(player, instanceId, milestoneId, Integer.MAX_VALUE / 2);
     }
 
     /** Attempts to complete a "deliver proof" milestone from the player's own held/inventory items. See {@code QuestEngine#tryDeliverProof}'s own doc. */
-    public static boolean tryDeliverProof(ServerPlayer player, Identifier definitionId, String milestoneId) {
-        return QuestEngine.tryDeliverProof(player, definitionId, milestoneId);
+    public static boolean tryDeliverProof(ServerPlayer player, UUID instanceId, String milestoneId) {
+        return QuestEngine.tryDeliverProof(player, instanceId, milestoneId);
     }
 
-    public static void setActiveQuest(ServerPlayer player, Identifier definitionId) {
-        QuestEngine.setActiveQuest(player, definitionId);
+    /** Attempts to fully complete an in-progress instance right now -- see {@code QuestEngine#tryCompleteQuest}'s own doc. */
+    public static boolean tryCompleteQuest(ServerPlayer player, UUID instanceId) {
+        return QuestEngine.tryCompleteQuest(player, instanceId);
+    }
+
+    public static void setActiveQuest(ServerPlayer player, UUID instanceId) {
+        QuestEngine.setActiveQuest(player, instanceId);
     }
 
     /** Running total of quests completed for a given Issuer id -- groundwork for a future karma/reputation system. */
@@ -80,25 +92,30 @@ public final class Myssions {
     }
 
     /**
-     * Read-only preview of what talking to the quest giver on plot {@code plotId} (zone type {@code
-     * zoneTypeId}, matching {@code IssuerQuestPools}' own plain-string-literal convention) would do
-     * right now -- for another mod's own UI to show quest availability (2026-10-10, built for
-     * Settlemynts' "Press H" wishlist screen) without mutating anything.
+     * Read-only snapshot of plot {@code plotId}'s (zone type {@code zoneTypeId}, matching {@code
+     * IssuerQuestPools}' own plain-string-literal convention) quest-giver menu for {@code player}
+     * right now -- their own active quests from this issuer's pool plus any unclaimed board offer.
+     * Built for Settlemynts' "Press H" chat menu (2026-10-10, explicit user spec: "select your
+     * active quest by name, and then in a sub-menu have the option to complete the quest").
      */
-    public static QuestGiverPreview previewQuestGiver(ServerPlayer player, UUID plotId, String zoneTypeId) {
-        return QuestTurnIn.preview(player, plotId, zoneTypeId);
+    public static QuestGiverMenu getQuestGiverMenu(ServerPlayer player, UUID plotId, String zoneTypeId) {
+        return QuestTurnIn.getMenu(player, plotId, zoneTypeId);
     }
 
-    /** Runs the real accept-new-quest-or-turn-in-current-one action -- same mutation a shift+right-click on the quest giver itself triggers. */
-    public static void interactWithQuestGiver(ServerPlayer player, UUID plotId, String zoneTypeId) {
-        QuestTurnIn.interact(player, plotId, zoneTypeId);
+    /** Accepts plot {@code plotId}'s current board offer, returning the new instanceId. See {@code QuestTurnIn#acceptBoardOffer}'s own doc. */
+    public static Optional<UUID> acceptBoardOffer(ServerPlayer player, UUID plotId) {
+        return QuestTurnIn.acceptBoardOffer(player, plotId);
+    }
+
+    /** The real accept-new-quest-or-complete-current-one shift+right-click action. See {@code QuestTurnIn#quickInteract}'s own doc. */
+    public static void quickInteractWithQuestGiver(ServerPlayer player, UUID plotId, String zoneTypeId) {
+        QuestTurnIn.quickInteract(player, plotId, zoneTypeId);
     }
 
     /**
      * Player-independent check: does this plot's board currently have an unclaimed quest offer
      * sitting on it. Used for a global "!" nameplate (visible to every player, not just whoever's
-     * asking) -- unlike {@link #previewQuestGiver}, which is per-player (an in-progress/ready-to-
-     * deliver quest only means something to the specific player who accepted it).
+     * asking) -- unlike {@link #getQuestGiverMenu}, which is per-player.
      */
     public static boolean hasPendingBoardOffer(MinecraftServer server, UUID plotId) {
         return IssuerQuestBoard.get(server).get(plotId).isPresent();

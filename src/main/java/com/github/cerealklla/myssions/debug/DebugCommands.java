@@ -28,7 +28,7 @@ public final class DebugCommands {
             source.sendFailure(Component.literal("Only a player can run this."));
             return 0;
         }
-        boolean assigned = Myssions.assignQuest(player, SampleQuests.WIRING_TEST_ID);
+        boolean assigned = Myssions.assignQuest(player, SampleQuests.WIRING_TEST_ID).isPresent();
         if (assigned) {
             source.sendSuccess(() -> Component.literal("Assigned the wiring-test quest."), false);
             return 1;
