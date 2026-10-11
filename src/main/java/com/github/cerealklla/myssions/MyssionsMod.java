@@ -79,6 +79,13 @@ public class MyssionsMod {
         // synced, via the QUEST_DATA attachment's own .sync() -- see PlayerQuestData's own doc.
         SampleQuests.registerAll();
         NpcQuests.registerAll();
+        com.github.cerealklla.myssions.quest.GrocerQuests.registerAll();
+        com.github.cerealklla.myssions.quest.BlacksmithQuests.registerAll();
+        com.github.cerealklla.myssions.quest.ArmorerQuests.registerAll();
+        com.github.cerealklla.myssions.quest.RestaurantQuests.registerAll();
+        com.github.cerealklla.myssions.quest.BuildingSupplierQuests.registerAll();
+        com.github.cerealklla.myssions.quest.StonemasonQuests.registerAll();
+        com.github.cerealklla.myssions.quest.TavernQuests.registerAll();
         com.github.cerealklla.myssions.quest.RoadQuestDefinitions.registerAll();
         LOGGER.info("Myssions common setup");
     }

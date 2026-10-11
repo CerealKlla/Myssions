@@ -50,16 +50,18 @@ public final class QuestTurnIn {
             activeEntries.add(new QuestGiverMenu.ActiveEntry(instance.instanceId(), definition.name(), ready, needsTalk));
         }
 
-        Optional<QuestGiverMenu.NewOffer> newOffer = Optional.empty();
+        List<QuestGiverMenu.NewOffer> newOffers = new ArrayList<>();
         IssuerQuestBoard board = IssuerQuestBoard.get(player.level().getServer());
-        Identifier offeredId = board.get(plotId).orElse(null);
-        if (offeredId != null && data.quests().values().stream().noneMatch(i -> i.definitionId().equals(offeredId))) {
+        for (Identifier offeredId : board.get(plotId)) {
+            if (data.quests().values().stream().anyMatch(i -> i.definitionId().equals(offeredId))) {
+                continue; // Already has a record of this one -- stale for this player, leave it for someone else.
+            }
             QuestDefinition definition = QuestRegistry.get(offeredId).orElse(null);
             if (definition != null) {
-                newOffer = Optional.of(new QuestGiverMenu.NewOffer(offeredId, definition.name(), definition.description()));
+                newOffers.add(new QuestGiverMenu.NewOffer(offeredId, definition.name(), definition.description()));
             }
         }
-        return new QuestGiverMenu(activeEntries, newOffer);
+        return new QuestGiverMenu(activeEntries, newOffers);
     }
 
     /** True if every non-optional milestone is already done, or would be done by a deliver milestone consuming proof the player is currently holding -- i.e. what {@link #completeQuest} would actually achieve right now. */
@@ -67,6 +69,21 @@ public final class QuestTurnIn {
         for (QuestMilestone milestone : definition.milestones()) {
             if (milestone.optional() || instance.isMilestoneComplete(milestone)) {
                 continue;
+            }
+            if (milestone.isBuyMilestone()) {
+                Optional<Identifier> itemId = BuyItemTargets.get(player.level().getServer()).get(instance.instanceId())
+                        .map(BuyItemTargets.Target::itemId);
+                if (itemId.isPresent() && QuestEngine.hasEnoughRealItem(player, itemId.get(), milestone.requiredCount())) {
+                    continue;
+                }
+                return false;
+            }
+            if (milestone.isGatherMilestone()) {
+                Optional<Identifier> itemId = milestone.proofId().flatMap(s -> Optional.ofNullable(Identifier.tryParse(s)));
+                if (itemId.isPresent() && QuestEngine.hasEnoughRealItem(player, itemId.get(), milestone.requiredCount())) {
+                    continue;
+                }
+                return false;
             }
             if (milestone.isDeliverMilestone() && milestone.proofId().isPresent()
                     && QuestEngine.hasEnoughProof(player, milestone.proofId().get(), milestone.requiredCount())) {
@@ -88,28 +105,30 @@ public final class QuestTurnIn {
     }
 
     /**
-     * Accepts the plot's current board offer -- "I've got a job that needs doing" -> "Accept" (or
-     * the board-offer branch of {@link #quickInteract}). Clears the board slot and fires the
-     * quest's own assignment hook (see {@code QuestAssignmentHooks}' own doc) on success.
+     * Accepts one specific offer (by definition id) sitting on the plot's board -- "I've got a job
+     * that needs doing" -> pick one -> "Accept" (or the board-offer branch of {@link
+     * #quickInteract}). Removes just that one offer (the board's other offers, if any, are
+     * untouched -- see {@code IssuerQuestBoard}'s own doc, widened 2026-10-11 from a single-slot
+     * board) and fires the quest's own assignment hook (see {@code QuestAssignmentHooks}' own doc)
+     * on success.
      */
-    public static Optional<UUID> acceptBoardOffer(ServerPlayer player, UUID plotId) {
+    public static Optional<UUID> acceptBoardOffer(ServerPlayer player, UUID plotId, Identifier questId) {
         IssuerQuestBoard board = IssuerQuestBoard.get(player.level().getServer());
-        Identifier offeredId = board.get(plotId).orElse(null);
-        if (offeredId == null) {
+        if (!board.get(plotId).contains(questId)) {
             player.sendSystemMessage(Component.literal("I don't have anything for you right now."));
             return Optional.empty();
         }
         var data = player.getData(ModAttachments.QUEST_DATA);
-        if (data.quests().values().stream().anyMatch(i -> i.definitionId().equals(offeredId))) {
-            // Already has a record of it (in progress/completed/failed) -- the board slot is stale
+        if (data.quests().values().stream().anyMatch(i -> i.definitionId().equals(questId))) {
+            // Already has a record of it (in progress/completed/failed) -- the board offer is stale
             // for this player specifically; leave it on the board for someone else.
             player.sendSystemMessage(Component.literal("I don't have anything new for you right now."));
             return Optional.empty();
         }
-        Optional<UUID> instanceId = QuestEngine.assignQuest(player, offeredId);
+        Optional<UUID> instanceId = QuestEngine.assignQuest(player, questId);
         instanceId.ifPresent(id -> {
-            board.clear(plotId);
-            QuestAssignmentHooks.fire(player, id, offeredId, plotId);
+            board.remove(plotId, questId);
+            QuestAssignmentHooks.fire(player, id, questId, plotId);
         });
         return instanceId;
     }
@@ -131,7 +150,8 @@ public final class QuestTurnIn {
      * Shift+right-click convenience (unchanged UX from before the chat-menu rework): try to
      * complete (or reopen the reward GUI for) the first active quest from this issuer's pool; if
      * none are ready but at least one is in progress, just say so; otherwise fall through to
-     * offering/accepting whatever's on the board.
+     * offering/accepting whatever's on the board (now possibly several -- picks the first one not
+     * already held, same "just grab something" convenience this shortcut has always been).
      */
     public static void quickInteract(ServerPlayer player, UUID plotId, String zoneTypeId) {
         List<Identifier> pool = IssuerQuestPools.poolFor(zoneTypeId);
@@ -151,6 +171,11 @@ public final class QuestTurnIn {
                 return;
             }
         }
-        acceptBoardOffer(player, plotId);
+        List<Identifier> offers = IssuerQuestBoard.get(player.level().getServer()).get(plotId);
+        if (offers.isEmpty()) {
+            player.sendSystemMessage(Component.literal("I don't have anything for you right now."));
+            return;
+        }
+        acceptBoardOffer(player, plotId, offers.get(0));
     }
 }

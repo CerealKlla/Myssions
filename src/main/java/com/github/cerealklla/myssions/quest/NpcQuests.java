@@ -1,39 +1,31 @@
 package com.github.cerealklla.myssions.quest;
 
 import java.util.List;
+import java.util.Optional;
 
 import net.minecraft.resources.Identifier;
 
 import com.github.cerealklla.myssions.MyssionsMod;
 
 /**
- * Ten real fetch-quest definitions (design doc item 7) given out by a settlement's Tier 1 economy
- * workers -- Lumberjack and Farmer (the two confirmed NPC-staffed Tier 1 structure types, see
- * {@code zone.PlotNpc}'s own subclasses in Settlemynts), plus two "Mayor" quests. There is no
- * literal Mayor NPC anywhere in the suite (confirmed before writing this -- "Mayor" is a player
- * role only), so those two are issued via a shift+right-click on the settlement's Town Hall Plot
- * Config Sign instead (see {@code bridge.QuestSignInteractListener}), a deliberate stand-in flagged
- * here and in context/decisions.md for whenever a real Mayor NPC exists.
+ * Lumberjack, Farmer, Mayor (issued via the Town Hall Plot Config Sign -- no literal Mayor NPC
+ * exists, see below), and Traveling Merchant quest content -- the original four professions, each
+ * now topped up to 10 real quests (2026-10-11 content-expansion pass). The other seven professions
+ * (Grocer, Blacksmith, Armorer, Restaurant, Building Supplier, Stonemason, Tavern) have their own
+ * sibling classes (`GrocerQuests`, etc., same package) for the same reason this class doesn't just
+ * keep growing forever -- 90+ quest methods in one file stops being readable.
  *
- * <p><b>Kill-tracking is now geo-fenced for the six on-site quests</b> (fixed 2026-10-11, explicit
- * user correction: "if I kill zombies somewhere else will not count toward the quest Milestones ...
- * that is how it SHOULD behave") -- {@code quest.QuestKillListener} only counts a kill within a
- * radius of the instance's own real {@code hintPos}, which only the six on-site quests below ever
- * have set. The other four quests (two Lumberjack wilderness quests, both Mayor quests) have no
- * real hint at all, so kill-tracking for those stays deliberately "anywhere" -- there's no real
- * location to fence against, not an oversight.
+ * <p><b>The "on-site" plot-anchored kill-quest category was removed entirely, 2026-10-11</b>
+ * (explicit user correction) -- all 6 original on-site quests (two Lumberjack, four Farmer) spawned
+ * their target mobs right at the issuing plot, inside a settlement, where Settlemynts' own town
+ * guards reliably killed them before the player could, making the quest unfinishable by design. See
+ * {@code context/decisions.md} for the removal entry and a deferred idea for a future
+ * global-kill-count variant of this same shape. No quest registered by this class (or any sibling
+ * profession class) spawns combat inside a settlement plot.
  *
- * <p><b>Six on-site quests now DO point a real waypoint at their issuing plot</b> (added
- * 2026-10-10, real user feedback -- a milestone saying "near the fields" meant nothing once the
- * player left and forgot where that was, and since they accepted the quest standing right there,
- * they should already know exactly where it is): the four Farmer quests and two of the four
- * Lumberjack quests ({@link #fuseHappyNuisance}/{@link #nightThieves}) register {@link
- * #registerOnSiteHook}, which sets a real hint position + {@link QuestInstance#locationName()} via
- * {@code bridge.SettlemyntsPlotLocationBridge}, with full knowledge granted immediately (not a
- * rough bearing) since the player was standing right there. The other two Lumberjack quests ({@link
- * #timberWolves}/{@link #webChokedGrove}) and both Mayor quests are deliberately left as genuinely
- * vague, distant wilderness threats ("the Whispering Pines," "a cave system near the trade road")
- * -- not retrofitted, a different category of quest on purpose.
+ * <p>The actual hook/eligibility wiring for every real quest shape (region-kill, buy-item, escort,
+ * talk-npc) now lives in the shared {@link QuestHooks} library, extracted from this class the same
+ * day once seven more profession classes needed the same four shapes.
  *
  * <p>IDs/zone-type strings are plain string literals here on purpose, not references to
  * Settlemynts' own constants (e.g. {@code GhostTownHallCoreEntity.TOWN_HALL_ZONE_TYPE_ID}) --
@@ -43,26 +35,37 @@ import com.github.cerealklla.myssions.MyssionsMod;
  */
 public final class NpcQuests {
 
-    private static final String LUMBERYARD_ZONE_TYPE = "blueprynts:lumberyard";
-    private static final String FARM_ZONE_TYPE = "blueprynts:farm";
-    private static final String TOWN_HALL_ZONE_TYPE = "settlemynts:town_hall";
-    private static final String TRAVELING_MERCHANT_ZONE_TYPE = "blueprynts:traveling_merchant_stall";
+    static final String LUMBERYARD_ZONE_TYPE = "blueprynts:lumberyard";
+    static final String FARM_ZONE_TYPE = "blueprynts:farm";
+    static final String TOWN_HALL_ZONE_TYPE = "settlemynts:town_hall";
+    static final String TRAVELING_MERCHANT_ZONE_TYPE = "blueprynts:traveling_merchant_stall";
+
+    private static Identifier MINECRAFT(String path) {
+        return Identifier.fromNamespaceAndPath("minecraft", path);
+    }
 
     private NpcQuests() {
     }
 
-    private static Identifier id(String path) {
+    static Identifier id(String path) {
         return Identifier.fromNamespaceAndPath(MyssionsMod.MODID, path);
     }
 
     public static void registerAll() {
+        Identifier usefulErrand = aUsefulErrand();
         List<Identifier> lumberjackQuests = List.of(
-                timberWolves(), webChokedGrove(), fuseHappyNuisance(), nightThieves());
+                timberWolves(), webChokedGrove(), usefulErrand, silverfishInTheSawdust(), creepersInTheCoppice(),
+                honeyForTheSaws(), freshSuppliesLumberjack(), sticksForKindling(), theGrovesOldGuardian(), applesForTheRoad());
         List<Identifier> farmerQuests = List.of(
-                nightRaiders(), skeletonScarecrows(), burrowingNuisance(), midnightHowlers());
+                usefulErrand, aBiggerHarvest(), eggsForTheMarket(), rootVegetables(), woolForWinter(),
+                pumpkinsForTheFair(), foxesInTheCornfield(), wolvesAtTheFenceLine(), milkForTheCellar(), aSecondOpinionFarmer());
         List<Identifier> mayorQuests = List.of(
-                warbandAtTheGates(), clearTheCaves(), findOldHarlen(), scoutTheFrontier());
-        List<Identifier> travelingMerchantQuests = List.of(merchantCaravanEscort());
+                warbandAtTheGates(), clearTheCaves(), findOldHarlen(), scoutTheFrontier(),
+                raidersOnTheOldRoad(), theWitchInTheSwamp(), beyondTheKnownMap(), theHermitsApprentice(),
+                phantomsOverTheWalls(), drownedAtTheFord());
+        List<Identifier> travelingMerchantQuests = List.of(
+                merchantCaravanEscort(), aShortSupplyRun(), theLongHaul(), theBackRoads(), stockBeforeTheRun(),
+                aTradeGoodRequest(), escortToTheCrossroads(), sparePartsForTheCart(), aRiskyShortcut(), restockingSilver());
 
         IssuerQuestPools.register(LUMBERYARD_ZONE_TYPE, lumberjackQuests);
         IssuerQuestPools.register(FARM_ZONE_TYPE, farmerQuests);
@@ -74,449 +77,318 @@ public final class NpcQuests {
 
     private static Identifier timberWolves() {
         Identifier questId = id("timber_wolves");
-        String proofId = "wolf_pelt_scraps";
-        ProofItemCatalog.register(proofId, "Wolf Pelt Scraps",
-                "Torn from a pelt, still smells like pine sap and old blood.");
-        QuestRegistry.register(new QuestDefinition(questId, "Timber Wolves",
+        return QuestHooks.registerRegionKillQuest(questId, "Timber Wolves",
                 "A pack of wolves has taken to stalking the tree line out past the north clearing. "
                         + "They've already spooked off two work crews -- thin the pack and I'll make it worth "
                         + "your while.",
-                LUMBERYARD_ZONE_TYPE,
-                List.of(
-                        QuestMilestone.kill("kill_wolves", "Kill 4 Wolves near {location}",
-                                Identifier.fromNamespaceAndPath("minecraft", "wolf"), 4, proofId),
-                        QuestMilestone.optionalDeliverWithBonus("deliver_pelts", "Bring back up to 4 Wolf Pelt Scraps for bonus gold", proofId, 4, 2)
-                ),
-                List.of(QuestReward.gold(12), QuestReward.item(Identifier.fromNamespaceAndPath("minecraft", "oak_log"), 16),
-                        QuestReward.intangible("The crews can work the north clearing again")),
-                QuestTimeLimit.NONE));
-        registerRegionHook(questId);
-        return questId;
+                LUMBERYARD_ZONE_TYPE, "Kill 4 Wolves near {location}", MINECRAFT("wolf"), 4,
+                "wolf_pelt_scraps", "Wolf Pelt Scraps", "Torn from a pelt, still smells like pine sap and old blood.",
+                false, 2,
+                List.of(QuestReward.gold(12), QuestReward.item(MINECRAFT("oak_log"), 16),
+                        QuestReward.intangible("The crews can work the north clearing again")));
     }
 
     private static Identifier webChokedGrove() {
         Identifier questId = id("web_choked_grove");
-        String proofId = "bundled_spider_silk";
-        ProofItemCatalog.register(proofId, "Bundled Spider Silk",
-                "A thick, sticky knot of webbing, still twitching faintly.");
-        QuestRegistry.register(new QuestDefinition(questId, "Web-Choked Grove",
+        return QuestHooks.registerRegionKillQuest(questId, "Web-Choked Grove",
                 "There's a dense grove, thick with spiders, that's completely fouled with webbing -- we "
                         + "can't get a saw line through it. Clear enough of them out and bring back proof so I "
                         + "know it's safe to send a crew in.",
-                LUMBERYARD_ZONE_TYPE,
-                List.of(
-                        QuestMilestone.kill("kill_spiders", "Kill 5 Spiders near {location}",
-                                Identifier.fromNamespaceAndPath("minecraft", "spider"), 5, proofId),
-                        QuestMilestone.optionalDeliverWithBonus("deliver_silk", "Bring back up to 5 bundles of Spider Silk for bonus gold", proofId, 5, 2)
-                ),
-                List.of(QuestReward.gold(14), QuestReward.item(Identifier.fromNamespaceAndPath("minecraft", "string"), 8),
-                        QuestReward.intangible("The grove is safe to fell again")),
-                QuestTimeLimit.NONE));
-        registerRegionHook(questId);
-        return questId;
+                LUMBERYARD_ZONE_TYPE, "Kill 5 Spiders near {location}", MINECRAFT("spider"), 5,
+                "bundled_spider_silk", "Bundled Spider Silk", "A thick, sticky knot of webbing, still twitching faintly.",
+                false, 2,
+                List.of(QuestReward.gold(14), QuestReward.item(MINECRAFT("string"), 8),
+                        QuestReward.intangible("The grove is safe to fell again")));
     }
 
-    private static Identifier fuseHappyNuisance() {
-        Identifier questId = id("fuse_happy_nuisance");
-        String proofId = "scorched_fuse_casings";
-        ProofItemCatalog.register(proofId, "Scorched Fuse Casings",
-                "Blackened and still warm. Whatever this came from, it isn't walking away.");
-        QuestRegistry.register(new QuestDefinition(questId, "Fuse-Happy Nuisance",
-                "We've lost two whole stacks of cut logs to creepers wandering into the yard and going "
-                        + "off. I don't care how you deal with them, just thin them out before they cost us a "
-                        + "third stack.",
-                LUMBERYARD_ZONE_TYPE,
-                List.of(
-                        QuestMilestone.kill("kill_creepers", "Kill 3 Creepers near my lumberyard in {location}",
-                                Identifier.fromNamespaceAndPath("minecraft", "creeper"), 3, proofId),
-                        QuestMilestone.optionalDeliverWithBonus("deliver_fuses", "Bring back up to 3 Scorched Fuse Casings for bonus gold", proofId, 3, 2)
-                ),
-                List.of(QuestReward.gold(10), QuestReward.item(Identifier.fromNamespaceAndPath("minecraft", "gunpowder"), 4),
-                        QuestReward.intangible("No more log stacks lost to green nuisances")),
-                QuestTimeLimit.NONE));
-        registerOnSiteHook(questId);
-        return questId;
+    private static Identifier silverfishInTheSawdust() {
+        Identifier questId = id("silverfish_in_the_sawdust");
+        return QuestHooks.registerRegionKillQuest(questId, "Silverfish in the Sawdust",
+                "Something's been getting into the log stacks and hollowing them out from the inside -- "
+                        + "silverfish, by the look of the tunnels. Clear the infestation before it spreads to the "
+                        + "whole yard.",
+                LUMBERYARD_ZONE_TYPE, "Kill 6 Silverfish near {location}", MINECRAFT("silverfish"), 6,
+                "silverfish_mandibles", "Silverfish Mandibles", "Small, sharp, and still twitching.",
+                false, 1,
+                List.of(QuestReward.gold(13), QuestReward.intangible("The log stacks are sound again")));
     }
 
-    private static Identifier nightThieves() {
-        Identifier questId = id("night_thieves");
-        String proofId = "teleport_residue_vials";
-        ProofItemCatalog.register(proofId, "Teleport Residue Vials",
-                "A faint violet shimmer still clings to whatever's bottled in here.");
-        QuestRegistry.register(new QuestDefinition(questId, "Night Thieves",
-                "Something's been moving stacked logs around in the dead of night -- turns out it's "
-                        + "endermen, carrying off whatever isn't nailed down. Deal with a few of them and "
-                        + "collect proof so I believe you actually did it.",
+    private static Identifier creepersInTheCoppice() {
+        Identifier questId = id("creepers_in_the_coppice");
+        return QuestHooks.registerRegionKillQuest(questId, "Creepers in the Coppice",
+                "A work crew nearly lost a whole wagon of timber to a creeper that wandered right into "
+                        + "the loading area. Clear a few out of the coppice before someone gets hurt.",
+                LUMBERYARD_ZONE_TYPE, "Kill 4 Creepers near {location}", MINECRAFT("creeper"), 4,
+                "creeper_fuse_caps", "Creeper Fuse Caps", "Still smells faintly of gunpowder.",
+                false, 2,
+                List.of(QuestReward.gold(16), QuestReward.intangible("The loading area is safe again")));
+    }
+
+    private static Identifier honeyForTheSaws() {
+        Identifier questId = id("honey_for_the_saws");
+        return QuestHooks.registerGatherQuest(questId, "Honey for the Saws",
+                "The crew swears a bit of honey keeps the saw blades from binding up in sap. I don't "
+                        + "fully buy it, but they won't shut up about it -- bring me some and we'll see.",
+                LUMBERYARD_ZONE_TYPE, "Bring 6 Honey Bottles", MINECRAFT("honey_bottle"), 6, 3,
+                List.of(QuestReward.intangible("The crew finally stops complaining about the saws")));
+    }
+
+    private static Identifier freshSuppliesLumberjack() {
+        Identifier questId = id("fresh_supplies_lumberjack");
+        return QuestHooks.registerBuyItemQuest(questId, "Fresh Supplies",
+                "Running low on something I'd rather not walk into town for myself -- fetch it for me "
+                        + "and I'll make it worth your while.",
                 LUMBERYARD_ZONE_TYPE,
-                List.of(
-                        QuestMilestone.kill("kill_endermen", "Kill 3 Endermen disturbing my log stacks in {location}",
-                                Identifier.fromNamespaceAndPath("minecraft", "enderman"), 3, proofId),
-                        QuestMilestone.optionalDeliverWithBonus("deliver_residue", "Bring back up to 3 Teleport Residue Vials for bonus gold", proofId, 3, 2)
-                ),
-                List.of(QuestReward.gold(18), QuestReward.intangible("The log stacks stop moving themselves at night")),
-                QuestTimeLimit.NONE));
-        registerOnSiteHook(questId);
-        return questId;
+                List.of(QuestReward.intangible("One less thing to go fetch myself")));
+    }
+
+    private static Identifier sticksForKindling() {
+        Identifier questId = id("sticks_for_kindling");
+        return QuestHooks.registerGatherQuest(questId, "Sticks for Kindling",
+                "Simple enough -- bring me a bundle of sticks for kindling the yard's fire pit. Doesn't "
+                        + "matter where they came from.",
+                LUMBERYARD_ZONE_TYPE, "Bring 32 Sticks", MINECRAFT("stick"), 32, 1,
+                List.of(QuestReward.intangible("The fire pit stays lit through the night")));
+    }
+
+    private static Identifier theGrovesOldGuardian() {
+        Identifier questId = id("the_groves_old_guardian");
+        return QuestHooks.registerRegionKillQuest(questId, "The Grove's Old Guardian",
+                "There's a stretch of grove the crew refuses to work past dark -- something tall and "
+                        + "quiet watches from the tree line at night, and it's not a person. It only stirs after "
+                        + "dark, so you'll need to go looking once the sun's down.",
+                LUMBERYARD_ZONE_TYPE, "Kill 3 Endermen near {location} at night", MINECRAFT("enderman"), 3,
+                "warped_tree_bark", "Warped Tree Bark", "Bark that's been teleported through more times than wood should be.",
+                true, 3,
+                List.of(QuestReward.gold(22), QuestReward.intangible("The night crew finally stops refusing that stretch of grove")));
+    }
+
+    private static Identifier applesForTheRoad() {
+        Identifier questId = id("apples_for_the_road");
+        return QuestHooks.registerGatherQuest(questId, "Apples for the Road",
+                "The crew goes through a lot of apples on a long haul out to the tree line. Bring me a "
+                        + "basket's worth and I'll see you're paid for the trouble.",
+                LUMBERYARD_ZONE_TYPE, "Bring 10 Apples", MINECRAFT("apple"), 10, 2,
+                List.of(QuestReward.intangible("The crew has something to eat on the long hauls")));
+    }
+
+    /**
+     * "Buy an item from a local shop" -- resolved dynamically from the issuing settlement's real
+     * shop listings, never a static named item. See {@link QuestHooks#registerBuyItemHook}'s own doc
+     * for the full design; shared by both the Lumberjack and Farmer pools since both lost their
+     * original on-site quests in the 2026-10-11 removal.
+     */
+    private static Identifier aUsefulErrand() {
+        Identifier questId = id("a_useful_errand");
+        return QuestHooks.registerBuyItemQuest(questId, "A Useful Errand",
+                "There's something I could use from one of the shops in town -- fetch it for me and "
+                        + "I'll make it worth your while.",
+                LUMBERYARD_ZONE_TYPE,
+                List.of(QuestReward.intangible("One less thing to go fetch myself")));
     }
 
     // ---- Farmer ----
 
-    private static Identifier nightRaiders() {
-        Identifier questId = id("night_raiders");
-        String proofId = "trampled_field_rags";
-        ProofItemCatalog.register(proofId, "Trampled Field Rags",
-                "Muddy, torn, and smells like a freshly ruined crop row.");
-        QuestRegistry.register(new QuestDefinition(questId, "Night Raiders",
-                "Zombies keep wandering in from the tree line after dark and trampling a night's worth "
-                        + "of growth flat. Thin them out before I lose another planting.",
+    private static Identifier aBiggerHarvest() {
+        Identifier questId = id("a_bigger_harvest");
+        return QuestHooks.registerGatherQuest(questId, "A Bigger Harvest",
+                "Got a buyer in town looking for more wheat than my own stores can spare this week. "
+                        + "Bring me a good haul and I'll split the difference with you.",
+                FARM_ZONE_TYPE, "Bring 24 Wheat", MINECRAFT("wheat"), 24, 1,
+                List.of(QuestReward.intangible("The buyer in town gets their order")));
+    }
+
+    private static Identifier eggsForTheMarket() {
+        Identifier questId = id("eggs_for_the_market");
+        return QuestHooks.registerGatherQuest(questId, "Eggs for the Market",
+                "My own hens can't keep up with what the market stall wants this week. Bring me a "
+                        + "basket of eggs from wherever you can find them.",
+                FARM_ZONE_TYPE, "Bring 16 Eggs", MINECRAFT("egg"), 16, 1,
+                List.of(QuestReward.intangible("The market stall stays stocked")));
+    }
+
+    private static Identifier rootVegetables() {
+        Identifier questId = id("root_vegetables");
+        QuestRegistry.register(new QuestDefinition(questId, "Root Vegetables",
+                "Need a good stock of carrots and potatoes before the week's out -- bring me both and "
+                        + "I'll pay fair for the lot.",
                 FARM_ZONE_TYPE,
                 List.of(
-                        QuestMilestone.kill("kill_zombies", "Kill 4 Zombies near my fields in {location}",
-                                Identifier.fromNamespaceAndPath("minecraft", "zombie"), 4, proofId),
-                        QuestMilestone.optionalDeliverWithBonus("deliver_rags", "Bring back up to 4 Trampled Field Rags for bonus gold", proofId, 4, 2)
+                        QuestMilestone.gather("gather_carrots", "Bring 12 Carrots", MINECRAFT("carrot"), 12, 1),
+                        QuestMilestone.gather("gather_potatoes", "Bring 12 Potatoes", MINECRAFT("potato"), 12, 1)
                 ),
-                List.of(QuestReward.gold(10), QuestReward.item(Identifier.fromNamespaceAndPath("minecraft", "bread"), 6),
-                        QuestReward.intangible("The fields can grow a night through undisturbed")),
+                List.of(QuestReward.intangible("The root cellar is stocked for the week")),
                 QuestTimeLimit.NONE));
-        registerOnSiteHook(questId);
         return questId;
     }
 
-    private static Identifier skeletonScarecrows() {
-        Identifier questId = id("skeleton_scarecrows");
-        String proofId = "snapped_bowstrings";
-        ProofItemCatalog.register(proofId, "Snapped Bowstrings",
-                "Still coiled tight from the shot that never got fired again.");
-        QuestRegistry.register(new QuestDefinition(questId, "Skeleton Scarecrows",
-                "Skeletons have taken to sniping at my farmhands from the edge of the field -- scared "
-                        + "off a whole shift yesterday. Drop a few of them and bring back their bowstrings so I "
-                        + "know they won't be shooting at anyone else.",
-                FARM_ZONE_TYPE,
-                List.of(
-                        QuestMilestone.kill("kill_skeletons", "Kill 4 Skeletons near my field's edge in {location}",
-                                Identifier.fromNamespaceAndPath("minecraft", "skeleton"), 4, proofId),
-                        QuestMilestone.optionalDeliverWithBonus("deliver_bowstrings", "Bring back up to 4 Snapped Bowstrings for bonus gold", proofId, 4, 2)
-                ),
-                List.of(QuestReward.gold(11), QuestReward.item(Identifier.fromNamespaceAndPath("minecraft", "wheat_seeds"), 12),
-                        QuestReward.intangible("The farmhands feel safe working the edge rows again")),
-                QuestTimeLimit.NONE));
-        registerOnSiteHook(questId);
-        return questId;
+    private static Identifier woolForWinter() {
+        Identifier questId = id("wool_for_winter");
+        return QuestHooks.registerGatherQuest(questId, "Wool for Winter",
+                "Winter's coming and the settlement's going to want blankets. Bring me a good stock of "
+                        + "wool and I'll see it's put to use.",
+                FARM_ZONE_TYPE, "Bring 10 Wool", MINECRAFT("white_wool"), 10, 2,
+                List.of(QuestReward.intangible("The settlement is ready for winter")));
     }
 
-    private static Identifier burrowingNuisance() {
-        Identifier questId = id("burrowing_nuisance");
-        String proofId = "carapace_shards";
-        ProofItemCatalog.register(proofId, "Carapace Shards",
-                "Hard, segmented, and still faintly twitching when you're not looking directly at it.");
-        QuestRegistry.register(new QuestDefinition(questId, "Burrowing Nuisance",
-                "The old stone irrigation ditch under the farm is infested with silverfish -- they keep "
-                        + "boring into the channel lining and we're losing water faster than we can dig it back "
-                        + "out. Clear them out and bring back proof.",
-                FARM_ZONE_TYPE,
-                List.of(
-                        QuestMilestone.kill("kill_silverfish", "Kill 6 Silverfish in my irrigation ditch in {location}",
-                                Identifier.fromNamespaceAndPath("minecraft", "silverfish"), 6, proofId),
-                        QuestMilestone.optionalDeliverWithBonus("deliver_carapace", "Bring back up to 6 Carapace Shards for bonus gold", proofId, 6, 2)
-                ),
-                List.of(QuestReward.gold(13), QuestReward.item(Identifier.fromNamespaceAndPath("minecraft", "carrot"), 10),
-                        QuestReward.intangible("The irrigation channel holds water properly again")),
-                QuestTimeLimit.NONE));
-        registerOnSiteHook(questId);
-        return questId;
+    private static Identifier pumpkinsForTheFair() {
+        Identifier questId = id("pumpkins_for_the_fair");
+        return QuestHooks.registerGatherQuest(questId, "Pumpkins for the Fall Fair",
+                "The settlement's putting on a fall fair and somebody's got to bring the pumpkins. "
+                        + "Might as well be you.",
+                FARM_ZONE_TYPE, "Bring 8 Pumpkins", MINECRAFT("pumpkin"), 8, 2,
+                List.of(QuestReward.intangible("The fall fair has its pumpkins")));
     }
 
-    private static Identifier midnightHowlers() {
-        Identifier questId = id("midnight_howlers");
-        String proofId = "coop_raider_fur";
-        ProofItemCatalog.register(proofId, "Coop-Raider Fur Tufts",
-                "Matted fur, still smells faintly of feathers.");
-        QuestRegistry.register(new QuestDefinition(questId, "Midnight Howlers",
-                "A pack of wolves has figured out where the chicken coop is and keeps raiding it after "
-                        + "midnight. I'm down to half my flock. Deal with them before there's nothing left to "
-                        + "raid.",
+    private static Identifier foxesInTheCornfield() {
+        Identifier questId = id("foxes_in_the_cornfield");
+        return QuestHooks.registerRegionKillQuest(questId, "Foxes in the Cornfield",
+                "Something's been getting into the corn at night and leaving a mess of torn-up stalks "
+                        + "behind. Thin out whatever's responsible before it costs me the whole field.",
+                FARM_ZONE_TYPE, "Kill 5 Foxes near {location}", MINECRAFT("fox"), 5,
+                "tufts_of_fox_fur", "Tufts of Fox Fur", "Soft, reddish, and covered in cornstalk dust.",
+                false, 1,
+                List.of(QuestReward.gold(10), QuestReward.intangible("The cornfield is finally left alone")));
+    }
+
+    private static Identifier wolvesAtTheFenceLine() {
+        Identifier questId = id("wolves_at_the_fence_line");
+        return QuestHooks.registerRegionKillQuest(questId, "Wolves at the Fence Line",
+                "A pack's been testing the fence line at the edge of the property, and I'm not keen on "
+                        + "finding out what happens if they get through. Drive them off.",
+                FARM_ZONE_TYPE, "Kill 4 Wolves near {location}", MINECRAFT("wolf"), 4,
+                "trampled_fence_rope", "Trampled Fence Rope", "Chewed through, not cut -- something with teeth did this.",
+                false, 2,
+                List.of(QuestReward.gold(12), QuestReward.intangible("The fence line holds again")));
+    }
+
+    private static Identifier milkForTheCellar() {
+        Identifier questId = id("milk_for_the_cellar");
+        return QuestHooks.registerGatherQuest(questId, "Milk for the Cellar",
+                "Could use a good stock of fresh milk down in the cellar before it turns. Bring me a "
+                        + "few buckets and I'll pay well for the trouble.",
+                FARM_ZONE_TYPE, "Bring 6 Milk Buckets", MINECRAFT("milk_bucket"), 6, 4,
+                List.of(QuestReward.intangible("The cellar stays stocked")));
+    }
+
+    private static Identifier aSecondOpinionFarmer() {
+        Identifier questId = id("a_second_opinion_farmer");
+        return QuestHooks.registerBuyItemQuest(questId, "A Second Opinion",
+                "There's something from one of the shops in town I keep meaning to pick up and never "
+                        + "do. Fetch it for me and I'll make it worth your while.",
                 FARM_ZONE_TYPE,
-                List.of(
-                        QuestMilestone.kill("kill_wolves", "Kill 3 Wolves near my coop in {location}",
-                                Identifier.fromNamespaceAndPath("minecraft", "wolf"), 3, proofId),
-                        QuestMilestone.optionalDeliverWithBonus("deliver_fur", "Bring back up to 3 Coop-Raider Fur Tufts for bonus gold", proofId, 3, 2)
-                ),
-                List.of(QuestReward.gold(10), QuestReward.item(Identifier.fromNamespaceAndPath("minecraft", "egg"), 8),
-                        QuestReward.intangible("The flock finally gets a quiet night")),
-                QuestTimeLimit.NONE));
-        registerOnSiteHook(questId);
-        return questId;
+                List.of(QuestReward.intangible("One less thing to go fetch myself")));
     }
 
     // ---- Mayor (issued via the Town Hall sign, no literal Mayor NPC exists -- see class doc) ----
 
     private static Identifier warbandAtTheGates() {
         Identifier questId = id("warband_at_the_gates");
-        String proofId = "warband_insignia_scraps";
-        ProofItemCatalog.register(proofId, "Warband Insignia Scraps",
-                "Crude, torn cloth -- whoever wore this won't be marching on the settlement.");
-        QuestRegistry.register(new QuestDefinition(questId, "A Warband at the Gates",
+        return QuestHooks.registerRegionKillQuest(questId, "A Warband at the Gates",
                 "Travelers coming up the main road report a band of the dead massing not far out -- "
                         + "could be nothing, could be trouble for every plot in this settlement. I'd rather "
                         + "not find out the hard way. Clear them out and bring back proof it's done.",
-                TOWN_HALL_ZONE_TYPE,
-                List.of(
-                        QuestMilestone.kill("kill_zombies", "Kill 6 Zombies massing near {location}",
-                                Identifier.fromNamespaceAndPath("minecraft", "zombie"), 6, proofId),
-                        QuestMilestone.optionalDeliverWithBonus("deliver_insignia", "Bring back up to 6 Warband Insignia Scraps for bonus gold", proofId, 6, 2)
-                ),
-                List.of(QuestReward.gold(30), QuestReward.intangible("The settlement's main road is safe to travel again")),
-                QuestTimeLimit.NONE));
-        registerRegionHook(questId);
-        return questId;
+                TOWN_HALL_ZONE_TYPE, "Kill 6 Zombies massing near {location}", MINECRAFT("zombie"), 6,
+                "warband_insignia_scraps", "Warband Insignia Scraps", "Crude, torn cloth -- whoever wore this won't be marching on the settlement.",
+                false, 2,
+                List.of(QuestReward.gold(30), QuestReward.intangible("The settlement's main road is safe to travel again")));
     }
 
     private static Identifier clearTheCaves() {
         Identifier questId = id("clear_the_caves");
-        String proofId = "bone_fragments";
-        ProofItemCatalog.register(proofId, "Arrow-Notched Bone Fragments",
-                "Splintered and grooved -- these didn't come from just walking around.");
-        QuestRegistry.register(new QuestDefinition(questId, "Clear the Caves",
+        return QuestHooks.registerRegionKillQuest(questId, "Clear the Caves",
                 "There's a cave system that's been spitting out more skeletons than usual lately, and a "
                         + "merchant caravan nearly didn't make it through last week. Thin them out before it "
                         + "costs this settlement its trade.",
-                TOWN_HALL_ZONE_TYPE,
-                List.of(
-                        QuestMilestone.kill("kill_skeletons", "Kill 5 Skeletons near {location}",
-                                Identifier.fromNamespaceAndPath("minecraft", "skeleton"), 5, proofId),
-                        QuestMilestone.optionalDeliverWithBonus("deliver_bones", "Bring back up to 5 Arrow-Notched Bone Fragments for bonus gold", proofId, 5, 2)
-                ),
-                List.of(QuestReward.gold(28), QuestReward.intangible("The trade road stays open")),
-                QuestTimeLimit.NONE));
-        registerRegionHook(questId);
-        return questId;
+                TOWN_HALL_ZONE_TYPE, "Kill 5 Skeletons near {location}", MINECRAFT("skeleton"), 5,
+                "bone_fragments", "Arrow-Notched Bone Fragments", "Splintered and grooved -- these didn't come from just walking around.",
+                false, 2,
+                List.of(QuestReward.gold(28), QuestReward.intangible("The trade road stays open")));
     }
 
-    // "1 mile from the NPC quest giver" -- explicit user spec, 2026-10-11, matching Cartographyr's
-    // own real-world-feet-to-block conversion (1 block ~= 1 meter, 1 mile ~= 1609 blocks).
-    private static final double REGION_QUEST_MAX_RADIUS_BLOCKS = 1609.0;
-    private static final double REGION_REWARD_MIN_MULTIPLIER = 0.75;
-    private static final double REGION_REWARD_MAX_MULTIPLIER = 2.0;
-
-    /**
-     * Registers a real, randomized-distance Cartographyr Region/Settlement target for a quest whose
-     * threat is "out there somewhere," not at the issuing NPC's own plot -- added 2026-10-11,
-     * explicit user correction: "they were always supposed to pick real, Cartographyr locations, not
-     * vague text ... [a region] was picked because it is a certain distance from town, which then
-     * directly influences the reward quality." Picks a real nearby Region/Settlement via {@code
-     * bridge.CartographyrRegionBridge#pickWeightedNearby} (weighted toward closer candidates, capped
-     * at {@link #REGION_QUEST_MAX_RADIUS_BLOCKS}, measured from the issuing plot's own location --
-     * see {@code bridge.SettlemyntsPlotLocationBridge}), substitutes its real name into the quest's
-     * own {@code {location}}-tokened milestone text, and scales {@link QuestInstance#rewardMultiplier()}
-     * linearly between {@link #REGION_REWARD_MIN_MULTIPLIER} (right at the minimum distance) and
-     * {@link #REGION_REWARD_MAX_MULTIPLIER} (right at the mile cap) by how far the chosen target
-     * actually landed. Grants a rough bearing+distance only (not the exact spot) -- same "someone
-     * described it to you" reveal {@link #findOldHarlen} already uses, since unlike an on-site quest
-     * the player was never actually standing at the real target. A no-op (static flavor text,
-     * no multiplier, same as before this feature existed) if Settlemynts/Cartographyr aren't loaded,
-     * the plot can't be resolved, or nothing qualifies within range.
-     */
-    private static void registerRegionHook(Identifier questId) {
-        QuestAssignmentHooks.register(questId, (player, instanceId, assignedId, plotId) -> {
-            if (!(player.level() instanceof net.minecraft.server.level.ServerLevel level)
-                    || !com.github.cerealklla.myssions.bridge.SettlemyntsPlotLocationBridge.isLoaded()
-                    || !com.github.cerealklla.myssions.bridge.CartographyrRegionBridge.isLoaded()) {
-                return;
-            }
-            com.github.cerealklla.myssions.bridge.SettlemyntsPlotLocationBridge.resolve(level, plotId).ifPresent(origin -> {
-                net.minecraft.server.level.ServerLevel originLevel = level.getServer().getLevel(origin.dimension());
-                if (originLevel == null) {
-                    return;
-                }
-                com.github.cerealklla.myssions.bridge.CartographyrRegionBridge.pickWeightedNearby(
-                        originLevel, origin.pos(), REGION_QUEST_MAX_RADIUS_BLOCKS, player.getRandom()
-                ).ifPresent(target -> {
-                    String settlementName = origin.settlementName().isBlank() ? "here" : origin.settlementName();
-                    String direction = directionWord(origin.pos(), target.pos());
-                    String directionPhrase = "to the " + direction + " of " + settlementName;
-
-                    // The real position is set as the hint immediately (what QuestWaypointTicker
-                    // actually points a waypoint circle at) -- only the *displayed text* starts vague;
-                    // see QuestInstance#withRegionKnowledge's own doc for why these are deliberately
-                    // decoupled.
-                    QuestEngine.setHint(player, instanceId, target.pos(), target.dimension().identifier().toString(),
-                            java.util.Optional.of(directionPhrase));
-                    QuestEngine.setRegionKnowledge(player, instanceId, target.placeId(), directionPhrase, target.displayName());
-
-                    double fraction = Math.max(0.0, Math.min(1.0, target.distanceBlocks() / REGION_QUEST_MAX_RADIUS_BLOCKS));
-                    double multiplier = REGION_REWARD_MIN_MULTIPLIER + (REGION_REWARD_MAX_MULTIPLIER - REGION_REWARD_MIN_MULTIPLIER) * fraction;
-                    QuestEngine.setRewardMultiplier(player, instanceId, multiplier);
-
-                    if (com.github.cerealklla.myssions.bridge.LyfeWaypointBridge.isLoaded()) {
-                        // A vague verbal description is itself a (small) form of knowledge -- rough
-                        // bearing and distance, not the exact spot. Purely additive (see
-                        // knowledge.PlayerKnowledge#learnLocationFactors): a player who already knows
-                        // this real place from ordinary exploration keeps whatever they already had,
-                        // which is exactly what makes an already-visited target resolve to a precise
-                        // marker for free -- explicit user spec, 2026-10-11.
-                        com.github.cerealklla.myssions.bridge.LyfeWaypointBridge.grantKnowledge(player, target.placeId(), true, true, false);
-                    }
-                    player.sendSystemMessage(net.minecraft.network.chat.Component.literal(
-                            "You get a rough idea where to look -- check your map."));
-                });
-            });
-        });
+    private static Identifier raidersOnTheOldRoad() {
+        Identifier questId = id("raiders_on_the_old_road");
+        return QuestHooks.registerRegionKillQuest(questId, "Raiders on the Old Road",
+                "A band of raiders has been shaking down travelers on the old road out of town. The "
+                        + "settlement can't afford to lose what little trade still comes through that way.",
+                TOWN_HALL_ZONE_TYPE, "Kill 6 Pillagers near {location}", MINECRAFT("pillager"), 6,
+                "raider_banners", "Torn Raider Banners", "Crude cloth, stitched with a symbol nobody here recognizes.",
+                false, 2,
+                List.of(QuestReward.gold(32), QuestReward.intangible("The old road is safe to travel again")));
     }
 
-    /** Plain 8-point compass direction from {@code origin} to {@code target}, Minecraft's own coordinate convention (-Z is north, +X is east). */
-    private static String directionWord(net.minecraft.core.BlockPos origin, net.minecraft.core.BlockPos target) {
-        String[] points = {"north", "northeast", "east", "southeast", "south", "southwest", "west", "northwest"};
-        double dx = target.getX() - origin.getX();
-        double dz = target.getZ() - origin.getZ();
-        double bearingDegrees = (Math.toDegrees(Math.atan2(dx, -dz)) + 360.0) % 360.0;
-        int index = ((int) Math.round(bearingDegrees / 45.0)) % 8;
-        return points[index];
+    private static Identifier theWitchInTheSwamp() {
+        Identifier questId = id("the_witch_in_the_swamp");
+        return QuestHooks.registerRegionKillQuest(questId, "The Witch in the Swamp",
+                "Livestock have been turning up sick on the settlement's outskirts, and more than one "
+                        + "person blames a witch said to be holed up nearby. Whether that's true or not, it's "
+                        + "worth looking into.",
+                TOWN_HALL_ZONE_TYPE, "Kill 3 Witches near {location}", MINECRAFT("witch"), 3,
+                "shattered_potion_glass", "Shattered Potion Glass", "Still smells faintly of something that shouldn't be inhaled.",
+                false, 3,
+                List.of(QuestReward.gold(26), QuestReward.intangible("Livestock around the settlement stop turning up sick")));
     }
 
-    /**
-     * Registers a real on-site hint for a quest whose threat is literally at the issuing NPC's own
-     * plot (not some vague distant location) -- added 2026-10-10, real user feedback: a milestone
-     * just saying "near the fields" means nothing once the player has forgotten where that was, and
-     * since they were standing right there when they accepted it, they already know exactly where
-     * it is (full knowledge, not a rough bearing -- unlike {@link #findOldHarlen}'s reveal). Sets
-     * both the hint position (the plot's own Plot Config Sign location, via {@code
-     * bridge.SettlemyntsPlotLocationBridge}) and {@link QuestInstance#locationName()} for this
-     * quest's own {@code {location}}-tokened milestone text (see {@code quest.QuestText}). A no-op
-     * if Settlemynts isn't loaded or the plot can't be resolved -- the milestone text's {@code
-     * {location}} token then just falls back to a generic phrase.
-     */
-    private static void registerOnSiteHook(Identifier questId) {
-        QuestAssignmentHooks.register(questId, (player, instanceId, assignedId, plotId) -> {
-            if (!(player.level() instanceof net.minecraft.server.level.ServerLevel level)
-                    || !com.github.cerealklla.myssions.bridge.SettlemyntsPlotLocationBridge.isLoaded()) {
-                return;
-            }
-            com.github.cerealklla.myssions.bridge.SettlemyntsPlotLocationBridge.resolve(level, plotId).ifPresent(loc -> {
-                net.minecraft.server.level.ServerLevel hintLevel = level.getServer().getLevel(loc.dimension());
-                if (hintLevel == null) {
-                    return;
-                }
-                java.util.Optional<String> settlementName = loc.settlementName().isBlank()
-                        ? java.util.Optional.empty() : java.util.Optional.of(loc.settlementName());
-                QuestEngine.setHint(player, instanceId, loc.pos(), loc.dimension().identifier().toString(), settlementName);
-
-                if (com.github.cerealklla.myssions.bridge.LyfeWaypointBridge.isLoaded()) {
-                    long placeId = QuestWaypointTicker.placeIdFor(instanceId);
-                    com.github.cerealklla.myssions.bridge.LyfeWaypointBridge.grantKnowledge(player, placeId, true, true, true);
-                }
-            });
-        });
+    private static Identifier drownedAtTheFord() {
+        Identifier questId = id("drowned_at_the_ford");
+        return QuestHooks.registerRegionKillQuest(questId, "Drowned at the Ford",
+                "The river crossing just outside the settlement has gotten dangerous -- something's "
+                        + "pulling travelers under at the ford. Clear it out before someone doesn't make it "
+                        + "across.",
+                TOWN_HALL_ZONE_TYPE, "Kill 5 Drowned near {location}", MINECRAFT("drowned"), 5,
+                "waterlogged_trinkets", "Waterlogged Trinkets", "Corroded almost past recognizing.",
+                false, 2,
+                List.of(QuestReward.gold(24), QuestReward.intangible("The river crossing is safe again")));
     }
 
-    // ---- Traveling Merchant (caravan-raid quest style, added 2026-10-11) ----
-
-    private static final double ESCORT_WAYPOINT_SPACING_BLOCKS = 45.0;
-    private static final int ESCORT_WAYPOINT_COUNT = 3;
-
-    /**
-     * The first caravan-raid quest (design-document.md's quest taxonomy, 4th category) -- a straight
-     * road of {@link #ESCORT_WAYPOINT_COUNT} waypoints in one random direction from the Traveling
-     * Merchant's own stall, each {@link #ESCORT_WAYPOINT_SPACING_BLOCKS} apart. Bandits (reusing
-     * vanilla's Pillager, no custom "bandit" entity exists yet) are an optional, bonus-only
-     * encounter -- the quest's only real required milestone is the caravan reaching the end of the
-     * road alive; see {@link #registerEscortHook}'s own doc for how the raid itself is gated.
-     */
-    private static Identifier merchantCaravanEscort() {
-        Identifier questId = id("merchant_caravan_escort");
-        QuestRegistry.register(new QuestDefinition(questId, "Guard the Caravan",
-                "I've got a caravan heading out along the road, and the last one that went out "
-                        + "light on guards never made it. Stay close the whole way -- if bandits don't see "
-                        + "anyone watching the caravan, they'll hit it. Keep them off and see it through safely.",
-                TRAVELING_MERCHANT_ZONE_TYPE,
-                List.of(
-                        new QuestMilestone("fend_off_bandits", "Fend off any Bandits that attack the caravan",
-                                true, 3, java.util.Optional.of(Identifier.fromNamespaceAndPath("minecraft", "pillager")),
-                                java.util.Optional.empty(), false, false, false, 0),
-                        QuestMilestone.escort("escort_caravan", "Escort the caravan safely to the end of the road")
-                ),
-                List.of(QuestReward.gold(20), QuestReward.intangible("The caravan reaches its destination safely")),
-                QuestTimeLimit.NONE));
-        registerEscortHook(questId);
-        return questId;
-    }
-
-    /**
-     * Spawns a {@code quest.entity.CaravanEntity} at the Traveling Merchant's own stall and gives it
-     * a straight {@link #ESCORT_WAYPOINT_COUNT}-point road in one random direction -- {@code
-     * quest.QuestEscortTicker} owns everything from here on (moving the caravan, continuously
-     * updating the hidden hint to its live position, and re-arming {@code QuestMobSpawnTicker}'s
-     * existing spawn-guarantee at each waypoint the caravan reaches without a nearby player, which is
-     * the actual raid trigger -- explicit user spec: "being near the caravan grants players an
-     * 'Escort' status... checks at each roadway stake if any players have a status... if not trigger
-     * the attack"). A no-op if Settlemynts isn't loaded or the plot can't be resolved.
-     */
-    private static void registerEscortHook(Identifier questId) {
-        QuestAssignmentHooks.register(questId, (player, instanceId, assignedId, plotId) -> {
-            if (!(player.level() instanceof net.minecraft.server.level.ServerLevel level)
-                    || !com.github.cerealklla.myssions.bridge.SettlemyntsPlotLocationBridge.isLoaded()) {
-                return;
-            }
-            com.github.cerealklla.myssions.bridge.SettlemyntsPlotLocationBridge.resolve(level, plotId).ifPresent(loc -> {
-                net.minecraft.server.level.ServerLevel roadLevel = level.getServer().getLevel(loc.dimension());
-                if (roadLevel == null) {
-                    return;
-                }
-                double angle = player.getRandom().nextDouble() * Math.PI * 2;
-                List<net.minecraft.core.BlockPos> route = new java.util.ArrayList<>();
-                for (int i = 1; i <= ESCORT_WAYPOINT_COUNT; i++) {
-                    double distance = ESCORT_WAYPOINT_SPACING_BLOCKS * i;
-                    int x = loc.pos().getX() + (int) Math.round(Math.cos(angle) * distance);
-                    int z = loc.pos().getZ() + (int) Math.round(Math.sin(angle) * distance);
-                    int groundY = roadLevel.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z);
-                    route.add(new net.minecraft.core.BlockPos(x, groundY, z));
-                }
-
-                com.github.cerealklla.myssions.quest.entity.CaravanEntity caravan =
-                        new com.github.cerealklla.myssions.quest.entity.CaravanEntity(
-                                com.github.cerealklla.myssions.registration.ModEntities.CARAVAN.get(), roadLevel);
-                caravan.setPos(loc.pos().getX() + 0.5, loc.pos().getY(), loc.pos().getZ() + 0.5);
-                caravan.configure(player.getUUID(), instanceId);
-                caravan.setTargetPos(route.get(0));
-                roadLevel.addFreshEntity(caravan);
-
-                QuestEngine.assignEscort(player, instanceId, caravan.getUUID(), route);
-                QuestEngine.setHint(player, instanceId, loc.pos(), loc.dimension().identifier().toString());
-                player.sendSystemMessage(net.minecraft.network.chat.Component.literal(
-                        "The caravan sets out -- stay close, or bandits may see their chance."));
-            });
-        });
+    private static Identifier phantomsOverTheWalls() {
+        Identifier questId = id("phantoms_over_the_walls");
+        return QuestHooks.registerRegionKillQuest(questId, "Phantoms Over the Walls",
+                "Watch has reported phantoms circling the settlement after dark, close enough to spook "
+                        + "the guards on the wall. They only show themselves at night, so you'll have to go "
+                        + "looking after sundown.",
+                TOWN_HALL_ZONE_TYPE, "Kill 4 Phantoms near {location} at night", MINECRAFT("phantom"), 4,
+                "tattered_phantom_membrane", "Tattered Phantom Membrane", "Papery and strange, like old parchment that was never quite alive.",
+                true, 3,
+                List.of(QuestReward.gold(27), QuestReward.intangible("The night watch can finally stand down")));
     }
 
     // "2 miles" -- the user's own original phrasing for this quest style's search radius.
     private static final double UNBORN_TOWN_SEARCH_RADIUS_BLOCKS = 2 * 1609.0;
 
     /**
-     * The "unborn town" quest style (design-document.md's quest taxonomy, 4th category) -- explicit
-     * user spec, 2026-10-11: a quest can name a real town that hasn't generated yet, using vanilla's
-     * own structure-placement seed math (no forced generation -- a user correction mid-design,
-     * since force-generating the chunks to check would risk real server-tick lag spikes) to predict
-     * where it will sit, via {@code bridge.CartographyrRegionBridge#findUnbornTownNear} ->
-     * {@code Cartography.findOrPredictSettlementNear}. The player only ever sees the name; the real
-     * chunk generates naturally whenever they (or anyone else) actually walk there, at which point
-     * Cartographyr's own discovery listener promotes the same placeholder in place rather than
-     * creating a second, differently-named entity for it.
-     *
-     * <p><b>Known Phase 1 simplification</b>: this quest is offered from the same Town Hall pool as
-     * every other Mayor quest, with no "only near the edge of the known world" eligibility gate yet
-     * (the user's stated preference) -- {@code IssuerQuestPools}/{@code IssuerQuestBoard} have no
-     * per-quest eligibility-predicate mechanism to hook today; adding one is real, separate follow-up
-     * work, not done here. In practice this rarely matters: near a well-explored area the bridge just
-     * returns an already-real, already-discovered town instead of a predicted one.
+     * The "unborn town" quest style (design-document.md's quest taxonomy) -- see this class's
+     * earlier doc for the full design. {@link #beyondTheKnownMap} is a second, differently-flavored
+     * instance of the exact same mechanic.
      */
     private static Identifier scoutTheFrontier() {
-        Identifier questId = id("scout_the_frontier");
-        QuestRegistry.register(new QuestDefinition(questId, "Scout the Frontier",
+        return registerUnbornTownQuest(id("scout_the_frontier"), "Scout the Frontier",
                 "Traders keep talking about a town out past the edge of what we've properly mapped. "
                         + "Nobody from here has actually laid eyes on it. Go find it, see what's really out "
                         + "there, and bring back word.",
+                15, "A Passing Scout",
+                "Word is there's a town called ", ". Find it and report back.",
+                "Nobody can point to anywhere unmapped worth scouting right now.");
+    }
+
+    private static Identifier beyondTheKnownMap() {
+        return registerUnbornTownQuest(id("beyond_the_known_map"), "Beyond the Known Map",
+                "Every settlement worth its salt knows roughly what's out past its own borders. We "
+                        + "don't, not in this direction. Go find out what's actually out there and bring back "
+                        + "word before someone else claims it first.",
+                18, "A Returning Surveyor",
+                "There's supposedly a place called ", " out that way. Go confirm it and report back.",
+                "There's nowhere unclaimed left worth surveying right now.");
+    }
+
+    private static Identifier registerUnbornTownQuest(Identifier questId, String name, String description,
+                                                         int goldReward, String reporterName,
+                                                         String wordOfMessagePrefix, String wordOfMessageSuffix,
+                                                         String nothingFoundMessage) {
+        QuestRegistry.register(new QuestDefinition(questId, name, description,
                 TOWN_HALL_ZONE_TYPE,
                 List.of(QuestMilestone.talk("report_back", "Return and report what you found")),
-                List.of(QuestReward.gold(15), QuestReward.intangible("The map grows a little less empty")),
+                List.of(QuestReward.gold(goldReward), QuestReward.intangible("The map grows a little less empty")),
                 QuestTimeLimit.NONE));
         QuestAssignmentHooks.register(questId, (player, instanceId, assignedId, plotId) -> {
             if (!(player.level() instanceof net.minecraft.server.level.ServerLevel level)
@@ -526,67 +398,141 @@ public final class NpcQuests {
             com.github.cerealklla.myssions.bridge.CartographyrRegionBridge.findUnbornTownNear(
                     level, player.blockPosition(), UNBORN_TOWN_SEARCH_RADIUS_BLOCKS
             ).ifPresentOrElse(target -> {
-                String direction = directionWord(player.blockPosition(), target.pos());
+                String direction = QuestHooks.directionWord(player.blockPosition(), target.pos());
                 QuestEngine.setHint(player, instanceId, target.pos(), target.dimension().identifier().toString(),
-                        java.util.Optional.of(target.displayName()));
-
-                // A named NPC-reporting step (same shape as findOldHarlen) stands in for "report back
-                // to the Mayor" -- spawned right next to the player so the talk milestone has a real
-                // interaction target without needing a whole dedicated turn-in flow for this one quest.
-                QuestNpcSpawner.spawn(level, player.blockPosition(), player.getUUID(), instanceId, false, "A Passing Scout");
-
+                        Optional.of(target.displayName()));
+                QuestNpcSpawner.spawn(level, player.blockPosition(), player.getUUID(), instanceId, false, reporterName);
                 player.sendSystemMessage(net.minecraft.network.chat.Component.literal(
-                        "Word is there's a town called " + target.displayName() + ", " + direction + " of here. "
-                                + "Find it and report back."));
-            }, () -> player.sendSystemMessage(net.minecraft.network.chat.Component.literal(
-                    "Nobody can point to anywhere unmapped worth scouting right now.")));
+                        wordOfMessagePrefix + target.displayName() + ", " + direction + " of here" + wordOfMessageSuffix));
+            }, () -> player.sendSystemMessage(net.minecraft.network.chat.Component.literal(nothingFoundMessage)));
         });
         return questId;
     }
 
     /**
-     * Design doc items 8/9's real demo -- "go talk to a named NPC who hides at night." Spawns a
-     * {@link QuestNpcEntity} right next to the player the moment they accept, via {@link
-     * QuestAssignmentHooks} (not geo-fenced to any particular location, same honest simplification
-     * as the kill quests above -- real "the NPC is actually somewhere specific" placement needs the
-     * still-unbuilt waypoint system). Visible only to the assignee ({@code ownerPlayerId}) and only
-     * during the day ({@code hidesAtNight = true}) -- see {@link QuestNpcEntity}'s own doc for
-     * exactly what that means mechanically.
+     * Design doc items 8/9's real demo -- "go talk to a named NPC who hides at night." See {@link
+     * QuestHooks#registerTalkNpcHook}'s own doc. {@link #theHermitsApprentice} is a second,
+     * differently-flavored instance of the same mechanic.
      */
     private static Identifier findOldHarlen() {
         Identifier questId = id("find_old_harlen");
-        QuestRegistry.register(new QuestDefinition(questId, "Find Old Harlen",
+        return QuestHooks.registerTalkQuest(questId, "Find Old Harlen",
                 "There's an old hermit who knows these parts better than anyone -- goes by Harlen. "
                         + "Skittish type, only ever seen during the day; word is he's been spotted nearby. "
                         + "Track him down and see what he has to say.",
-                TOWN_HALL_ZONE_TYPE,
-                List.of(QuestMilestone.talk("talk_to_harlen", "Find and talk to Old Harlen")),
-                List.of(QuestReward.gold(8), QuestReward.intangible("Old Harlen's thanks")),
-                QuestTimeLimit.NONE));
-        QuestAssignmentHooks.register(questId, (player, instanceId, assignedId, plotId) -> {
-            if (player.level() instanceof net.minecraft.server.level.ServerLevel level) {
-                // A real target somewhere out past the player, not right at their feet -- the whole
-                // point of the waypoint hint (design doc item 2) is having to go find it.
-                double angle = player.getRandom().nextDouble() * Math.PI * 2;
-                double distance = 80 + player.getRandom().nextDouble() * 120;
-                net.minecraft.core.BlockPos roughSpot = player.blockPosition().offset(
-                        (int) Math.round(Math.cos(angle) * distance), 0, (int) Math.round(Math.sin(angle) * distance));
-                int groundY = level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, roughSpot.getX(), roughSpot.getZ());
-                net.minecraft.core.BlockPos truePos = new net.minecraft.core.BlockPos(roughSpot.getX(), groundY, roughSpot.getZ());
+                TOWN_HALL_ZONE_TYPE, "Find and talk to Old Harlen", "Old Harlen", true,
+                "The Mayor gives you a rough idea where to look for Harlen -- check your map.",
+                List.of(QuestReward.gold(8), QuestReward.intangible("Old Harlen's thanks")));
+    }
 
-                QuestEngine.setHint(player, instanceId, truePos, level.dimension().identifier().toString());
-                QuestNpcSpawner.spawn(level, truePos, player.getUUID(), instanceId, true, "Old Harlen");
+    private static Identifier theHermitsApprentice() {
+        Identifier questId = id("the_hermits_apprentice");
+        return QuestHooks.registerTalkQuest(questId, "The Hermit's Apprentice",
+                "Old Harlen's taken on an apprentice, apparently -- a young woman named Dara, just as "
+                        + "skittish as he is. She's been spotted out past the settlement; go see if she'll talk "
+                        + "to you.",
+                TOWN_HALL_ZONE_TYPE, "Find and talk to Dara", "Dara", false,
+                "The Mayor gives you a rough idea where to look for Dara -- check your map.",
+                List.of(QuestReward.gold(9), QuestReward.intangible("Dara's cautious thanks")));
+    }
 
-                if (com.github.cerealklla.myssions.bridge.LyfeWaypointBridge.isLoaded()) {
-                    long placeId = QuestWaypointTicker.placeIdFor(instanceId);
-                    // Simulates "the Mayor gave you a rough description" -- a real bearing and
-                    // distance, but not the exact spot -- rather than starting from zero knowledge.
-                    com.github.cerealklla.myssions.bridge.LyfeWaypointBridge.grantKnowledge(player, placeId, true, true, false);
-                }
-                player.sendSystemMessage(net.minecraft.network.chat.Component.literal(
-                        "The Mayor gives you a rough idea where to look for Harlen -- check your map."));
-            }
-        });
-        return questId;
+    // ---- Traveling Merchant (caravan-raid quest style) ----
+
+    /**
+     * The first caravan-raid quest (design-document.md's quest taxonomy) -- a straight 3-waypoint
+     * road in one random direction from the Traveling Merchant's own stall. Bandits (reusing
+     * vanilla's Pillager) are an optional, bonus-only encounter -- the quest's only real required
+     * milestone is the caravan reaching the end of the road alive. See {@link
+     * QuestHooks#registerEscortHook}'s own doc for how the raid itself is gated.
+     */
+    private static Identifier merchantCaravanEscort() {
+        Identifier questId = id("merchant_caravan_escort");
+        return QuestHooks.registerEscortQuest(questId, "Guard the Caravan",
+                "I've got a caravan heading out along the road, and the last one that went out "
+                        + "light on guards never made it. Stay close the whole way -- if bandits don't see "
+                        + "anyone watching the caravan, they'll hit it. Keep them off and see it through safely.",
+                TRAVELING_MERCHANT_ZONE_TYPE, 3, 3,
+                List.of(QuestReward.gold(20), QuestReward.intangible("The caravan reaches its destination safely")));
+    }
+
+    private static Identifier aShortSupplyRun() {
+        Identifier questId = id("a_short_supply_run");
+        return QuestHooks.registerEscortQuest(questId, "A Short Supply Run",
+                "Nothing fancy -- just a short hop out to resupply and back. Shouldn't take long, but "
+                        + "an extra set of eyes never hurts.",
+                TRAVELING_MERCHANT_ZONE_TYPE, 2, 2,
+                List.of(QuestReward.gold(12), QuestReward.intangible("The short run goes off without a hitch")));
+    }
+
+    private static Identifier theLongHaul() {
+        Identifier questId = id("the_long_haul");
+        return QuestHooks.registerEscortQuest(questId, "The Long Haul",
+                "This is the big one -- a long haul out and back, further than I'd ever risk without "
+                        + "someone watching the road. Stay close the whole way.",
+                TRAVELING_MERCHANT_ZONE_TYPE, 5, 4,
+                List.of(QuestReward.gold(35), QuestReward.intangible("The long haul reaches its destination safely")));
+    }
+
+    private static Identifier theBackRoads() {
+        Identifier questId = id("the_back_roads");
+        return QuestHooks.registerEscortQuest(questId, "The Back Roads",
+                "I'd rather take the back roads this time -- fewer eyes, but fewer friendly ones too if "
+                        + "something goes wrong. Keep the caravan safe.",
+                TRAVELING_MERCHANT_ZONE_TYPE, 4, 3,
+                List.of(QuestReward.gold(26), QuestReward.intangible("The back roads prove safe enough, this time")));
+    }
+
+    private static Identifier escortToTheCrossroads() {
+        Identifier questId = id("escort_to_the_crossroads");
+        return QuestHooks.registerEscortQuest(questId, "Escort to the Crossroads",
+                "Just need the caravan out to the crossroads and back -- not far, but it's exactly the "
+                        + "kind of stretch bandits like to watch.",
+                TRAVELING_MERCHANT_ZONE_TYPE, 3, 3,
+                List.of(QuestReward.gold(20), QuestReward.intangible("The caravan reaches the crossroads and back safely")));
+    }
+
+    private static Identifier aRiskyShortcut() {
+        Identifier questId = id("a_risky_shortcut");
+        return QuestHooks.registerEscortQuest(questId, "A Risky Shortcut",
+                "There's a shortcut that'd save real time, but it's exactly the kind of stretch bandits "
+                        + "love to watch. Worth it if you can keep the caravan safe.",
+                TRAVELING_MERCHANT_ZONE_TYPE, 2, 5,
+                List.of(QuestReward.gold(24), QuestReward.intangible("The shortcut pays off, this time")));
+    }
+
+    private static Identifier stockBeforeTheRun() {
+        Identifier questId = id("stock_before_the_run");
+        return QuestHooks.registerGatherQuest(questId, "Stock Before the Run",
+                "Can't head out again until I've restocked -- bring me a good haul of wheat and I'll "
+                        + "make it worth the trouble.",
+                TRAVELING_MERCHANT_ZONE_TYPE, "Bring 16 Wheat", MINECRAFT("wheat"), 16, 1,
+                List.of(QuestReward.intangible("The caravan is stocked for the next run")));
+    }
+
+    private static Identifier sparePartsForTheCart() {
+        Identifier questId = id("spare_parts_for_the_cart");
+        return QuestHooks.registerGatherQuest(questId, "Spare Parts for the Cart",
+                "The cart's seen better days -- could use some iron to shore it up before the next long "
+                        + "haul. Bring me what you can.",
+                TRAVELING_MERCHANT_ZONE_TYPE, "Bring 8 Iron Ingots", MINECRAFT("iron_ingot"), 8, 3,
+                List.of(QuestReward.intangible("The cart is fit for the road again")));
+    }
+
+    private static Identifier aTradeGoodRequest() {
+        Identifier questId = id("a_trade_good_request");
+        return QuestHooks.registerBuyItemQuest(questId, "A Trade Good Request",
+                "There's something from one of the shops in town I'd like to carry on the next run -- "
+                        + "fetch it for me and I'll make it worth your while.",
+                TRAVELING_MERCHANT_ZONE_TYPE,
+                List.of(QuestReward.intangible("The caravan carries one more good on its next run")));
+    }
+
+    private static Identifier restockingSilver() {
+        Identifier questId = id("restocking_silver");
+        return QuestHooks.registerBuyItemQuest(questId, "Restocking Silver",
+                "Lost a buyer last trip because I didn't have the right goods on hand. Fetch me "
+                        + "something from one of the shops in town so it doesn't happen again.",
+                TRAVELING_MERCHANT_ZONE_TYPE,
+                List.of(QuestReward.intangible("The caravan won't lose that buyer again")));
     }
 }

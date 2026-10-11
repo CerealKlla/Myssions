@@ -23,12 +23,18 @@ import net.neoforged.neoforge.event.entity.living.LivingDeathEvent;
  * kill zombies somewhere else [it] will not count toward the quest Milestones ... that is how it
  * SHOULD behave") -- a kill only counts if the instance has a real {@link
  * QuestInstance#hintPos()}/{@link QuestInstance#hintDimensionId()} (set by {@code
- * NpcQuests#registerOnSiteHook}/{@code #findOldHarlen} for the quests that actually have one) and
+ * NpcQuests#registerRegionHook}/{@code #findOldHarlen} for the quests that actually have one) and
  * the dead entity is within {@link #GEOFENCE_RADIUS_BLOCKS} of it in the same dimension. A quest
  * with no hint at all (the genuinely vague, distant wilderness/road quests -- {@code
  * timberWolves}/{@code webChokedGrove}/both Mayor quests, see {@code NpcQuests}' own doc) has no
  * real location to fence against, so those are deliberately left as "kill anywhere" -- unchanged,
  * not an oversight.
+ *
+ * <p><b>Night-only milestones, 2026-10-11</b> -- a kill against a {@link QuestMilestone#nightOnly()}
+ * milestone only counts while {@code level.isDarkOutside()} (same call {@code QuestNpcEntity}'s own
+ * day/night gating already uses), so a quest that claims "this only happens at night" actually
+ * enforces it instead of being flavor text a player can ignore. Silent no-op during the day, same
+ * shape as the geofence check above -- no current quest sets this flag yet.
  */
 public final class QuestKillListener {
 
@@ -53,6 +59,9 @@ public final class QuestKillListener {
             QuestRegistry.get(instance.definitionId()).ifPresent(definition -> {
                 for (QuestMilestone milestone : definition.milestones()) {
                     if (milestone.killTargetEntityType().isEmpty() || !milestone.killTargetEntityType().get().equals(deadType)) {
+                        continue;
+                    }
+                    if (milestone.nightOnly() && !player.level().isDarkOutside()) {
                         continue;
                     }
                     int current = instance.milestoneProgress().getOrDefault(milestone.id(), 0);

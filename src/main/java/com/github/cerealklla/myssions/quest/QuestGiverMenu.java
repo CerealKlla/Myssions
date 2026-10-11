@@ -1,7 +1,6 @@
 package com.github.cerealklla.myssions.quest;
 
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 
 import net.minecraft.resources.Identifier;
@@ -13,7 +12,7 @@ import net.minecraft.resources.Identifier;
  * mod's UI (Settlemynts' "Press H" chat menu) via {@code api.Myssions#getQuestGiverMenu} -- a
  * read-only snapshot, never mutates anything.
  */
-public record QuestGiverMenu(List<ActiveEntry> activeQuests, Optional<NewOffer> newOffer) {
+public record QuestGiverMenu(List<ActiveEntry> activeQuests, List<NewOffer> newOffers) {
 
     /**
      * One of the player's own in-progress instances from this issuer's pool, by its hidden
@@ -27,9 +26,9 @@ public record QuestGiverMenu(List<ActiveEntry> activeQuests, Optional<NewOffer> 
     public record ActiveEntry(UUID instanceId, String questName, boolean readyToComplete, boolean needsTalk) {
     }
 
-    /** The plot's current (unclaimed) board offer, if any and if the player doesn't already have a record of it. */
+    /** One of the plot's current (unclaimed) board offers, filtered to ones the player doesn't already have a record of. */
     public record NewOffer(Identifier questId, String questName, String description) {
     }
 
-    public static final QuestGiverMenu EMPTY = new QuestGiverMenu(List.of(), Optional.empty());
+    public static final QuestGiverMenu EMPTY = new QuestGiverMenu(List.of(), List.of());
 }

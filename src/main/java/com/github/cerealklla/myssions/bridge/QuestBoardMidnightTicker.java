@@ -1,11 +1,13 @@
 package com.github.cerealklla.myssions.bridge;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
 import com.github.cerealklla.myssions.quest.IssuerQuestBoard;
 import com.github.cerealklla.myssions.quest.IssuerQuestPools;
+import com.github.cerealklla.myssions.quest.QuestEligibility;
 import com.github.cerealklla.settlemynts.api.Settlemynts;
 import com.github.cerealklla.settlemynts.plotsign.PlotConfigSignIndex;
 
@@ -24,7 +26,14 @@ import net.neoforged.neoforge.event.tick.ServerTickEvent;
  * enumerates every known plot via Settlemynts' own {@code plotsign.PlotConfigSignIndex} (the same
  * save-wide index {@code zone.ShopMidnightRestockTicker} already uses for the identical "every
  * plot, once a day" shape), resolves each one's Zone Type, and rolls a fresh {@link IssuerQuestBoard}
- * entry for any plot with a registered quest pool and an empty board slot.
+ * entry for any plot with a registered quest pool and at least one free board slot (widened
+ * 2026-10-11 from a single slot per plot to {@link IssuerQuestBoard#MAX_BOARD_SLOTS} -- "NPCs should
+ * be able to hold 5 available quests at one time, and not roll any more when at that limit").
+ * Candidates are first filtered through {@link QuestEligibility} (e.g. the buy-item quest can't be
+ * offered at all if the settlement has nothing resolvable to sell); if the chosen quest has its own
+ * registered eligibility predicate at all, one more free slot is immediately filled too, per
+ * explicit user spec ("if an NPC generates a local quest [like buying a specific item], it should
+ * roll an additional quest too").
  *
  * <p>Day-boundary detection mirrors Settlemynts' own {@code zone.ShopMidnightRestockTicker} exactly
  * (a local {@code lastKnownDay} compared against {@code TICKS_PER_DAY}), rather than depending on
@@ -54,8 +63,8 @@ public final class QuestBoardMidnightTicker {
         IssuerQuestBoard board = IssuerQuestBoard.get(server);
         for (Map.Entry<UUID, GlobalPos> entry : PlotConfigSignIndex.get(server).all().entrySet()) {
             UUID plotId = entry.getKey();
-            if (board.get(plotId).isPresent()) {
-                continue; // Already has an unclaimed quest sitting on the board -- never overwritten.
+            if (board.get(plotId).size() >= IssuerQuestBoard.MAX_BOARD_SLOTS) {
+                continue; // Already at the cap -- "not roll any more when at that limit."
             }
             GlobalPos pos = entry.getValue();
             ServerLevel level = server.getLevel(pos.dimension());
@@ -64,11 +73,37 @@ public final class QuestBoardMidnightTicker {
             }
             Settlemynts.findPlotRecord(level, plotId).ifPresent(plot -> {
                 List<Identifier> pool = IssuerQuestPools.poolFor(plot.zoneTypeId().toString());
-                if (pool.isEmpty() || level.getRandom().nextDouble() >= GENERATE_CHANCE) {
+                if (pool.isEmpty()) {
                     return;
                 }
-                Identifier chosen = pool.get(level.getRandom().nextInt(pool.size()));
-                board.set(plotId, chosen);
+                List<Identifier> eligible = new ArrayList<>();
+                for (Identifier candidate : pool) {
+                    if (QuestEligibility.isEligible(level, plotId, candidate)) {
+                        eligible.add(candidate);
+                    }
+                }
+                if (eligible.isEmpty() || level.getRandom().nextDouble() >= GENERATE_CHANCE) {
+                    return;
+                }
+                Identifier chosen = eligible.get(level.getRandom().nextInt(eligible.size()));
+                board.add(plotId, chosen);
+
+                // "If an NPC generates a local quest [with a resolved vendor/item requirement], it
+                // should roll an additional quest too" -- explicit user spec, 2026-10-11. Today only
+                // the buy-item quest type has a registered eligibility predicate at all, so this is
+                // effectively "a buy-item quest grants one free extra roll," generalized by checking
+                // for any registered predicate rather than a hardcoded quest id.
+                if (QuestEligibility.hasPredicate(chosen) && board.get(plotId).size() < IssuerQuestBoard.MAX_BOARD_SLOTS) {
+                    List<Identifier> stillEligible = new ArrayList<>();
+                    for (Identifier candidate : pool) {
+                        if (!candidate.equals(chosen) && QuestEligibility.isEligible(level, plotId, candidate)) {
+                            stillEligible.add(candidate);
+                        }
+                    }
+                    if (!stillEligible.isEmpty()) {
+                        board.add(plotId, stillEligible.get(level.getRandom().nextInt(stillEligible.size())));
+                    }
+                }
             });
         }
     }

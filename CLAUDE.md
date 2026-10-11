@@ -222,4 +222,42 @@ flat-field approach hit Mojang's real 16-field `RecordCodecBuilder` arity limit.
 green across Lyfe/Settlemynts/Myssions, whole-suite boot-smoke-tested clean. **Not yet live-tested**
 — no Settlemynts UI exists yet for a player to actually post or accept one of these quests.
 
+**On-site combat quests removed; night-only milestones, buy-item quest, board widened to 5,
+2026-10-11** (see [context/decisions.md](context/decisions.md), the same-day entry,
+[context/classes/IssuerQuestBoard.md](context/classes/IssuerQuestBoard.md),
+[context/classes/FetchQuestContent.md](context/classes/FetchQuestContent.md)) — real report: the 6
+on-site kill quests spawned mobs right at a settlement plot, where Settlemynts' own town guards
+reliably killed them before the player could. All 6 deleted outright (a future "global kill count,
+turn in proof without a personal kill" variant is a real idea, explicitly deferred, noted in
+decisions.md). New forward-looking `QuestMilestone#nightOnly` (enforced via `level.isDarkOutside()`
+in `QuestKillListener`) — no current quest sets it, since the only night-flavored content was the
+quests just removed. New "A Useful Errand" buy-item quest type: the target item is resolved from the
+issuing settlement's real shop listings (new `api.Settlemynts#getAllSettlementListings`,
+`bridge.SettlemyntsShopBridge`), never offered at all if nothing resolves (new, generic
+`quest.QuestEligibility`), and the resolved id (plus its reward) lives in a new side-table
+`quest.BuyItemTargets` rather than a new `QuestInstance` field (already at the 16-field codec arity
+limit). Its gold reward is sized around the real item's vendor price + 15% (floored at 1), computed
+once at acceptance time and paid via new `QuestEngine#addBuyItemReward` instead of a flat amount on
+the definition. `IssuerQuestBoard`
+widened from one slot per plot to up to 5, independently rolled; generating an eligibility-gated
+quest grants one free extra roll. This rippled into Settlemynts' "Press H" chat menu (multiple board
+offers at once instead of one). `client.ActiveQuestOverlay` now shows a live "(current/required)"
+count, and deliver-milestone text was shortened since the count is no longer spelled out in prose.
+`./gradlew build` green in both repos, whole-suite (8 mods) boot-smoke-tested clean. **Not yet
+live-tested or deployed.**
+
+**Quest content expansion: 10 quests per profession, 110 total, 2026-10-11 (same day)** (see
+[context/decisions.md](context/decisions.md)'s two same-day entries,
+[context/classes/FetchQuestContent.md](context/classes/FetchQuestContent.md)) — the standing,
+previously-deferred content-expansion item, picked up: every one of the 11 plot professions
+(Lumberjack/Farmer/Mayor/Traveling Merchant topped up, plus seven brand-new classes — Grocer,
+Blacksmith, Armorer, Restaurant, Building Supplier, Stonemason, Tavern) now has exactly 10 real
+quests (up from 13 total). New shared `quest.QuestHooks` library + a new, previously-undesigned
+**location-agnostic/quantity-scaled** mechanic (`QuestMilestone#isGatherMilestone`, "bring me N of a
+fixed item") made this tractable — see the class doc for the full field-reuse details. Also folded
+in the same day: "A Useful Errand"'s gold reward is now sized around the real item's vendor price
++15% instead of a flat amount (explicit follow-up request). `./gradlew build` green, whole-suite (8
+mods) boot-smoke-tested clean, 110 quest ids registered with no duplicate-id conflicts. **Not yet
+live-tested or deployed.**
+
 See [context/classes/](context/classes/) for per-class reference.

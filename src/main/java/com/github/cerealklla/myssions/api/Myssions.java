@@ -102,9 +102,9 @@ public final class Myssions {
         return QuestTurnIn.getMenu(player, plotId, zoneTypeId);
     }
 
-    /** Accepts plot {@code plotId}'s current board offer, returning the new instanceId. See {@code QuestTurnIn#acceptBoardOffer}'s own doc. */
-    public static Optional<UUID> acceptBoardOffer(ServerPlayer player, UUID plotId) {
-        return QuestTurnIn.acceptBoardOffer(player, plotId);
+    /** Accepts one specific offer (by definition id) sitting on plot {@code plotId}'s board, returning the new instanceId. See {@code QuestTurnIn#acceptBoardOffer}'s own doc. */
+    public static Optional<UUID> acceptBoardOffer(ServerPlayer player, UUID plotId, Identifier questId) {
+        return QuestTurnIn.acceptBoardOffer(player, plotId, questId);
     }
 
     /** The real accept-new-quest-or-complete-current-one shift+right-click action. See {@code QuestTurnIn#quickInteract}'s own doc. */
@@ -118,7 +118,7 @@ public final class Myssions {
      * asking) -- unlike {@link #getQuestGiverMenu}, which is per-player.
      */
     public static boolean hasPendingBoardOffer(MinecraftServer server, UUID plotId) {
-        return IssuerQuestBoard.get(server).get(plotId).isPresent();
+        return !IssuerQuestBoard.get(server).get(plotId).isEmpty();
     }
 
     /**

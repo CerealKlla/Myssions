@@ -113,6 +113,11 @@ public final class QuestEngine {
         }
     }
 
+    /** Records the real item (and its cost-sized gold reward) this instance's buy milestone resolved to -- see {@code BuyItemTargets}' own doc for why this lives in a side table, not a new {@link QuestInstance} field, and {@code NpcQuests#aUsefulErrand} for the call site. */
+    public static void setBuyItemTarget(ServerPlayer player, UUID instanceId, Identifier itemId, int goldReward) {
+        BuyItemTargets.get(player.level().getServer()).set(instanceId, itemId, goldReward);
+    }
+
     /** Marks this instance's completability-ensuring spawn as already done -- see {@code QuestMobSpawnTicker}. */
     public static void markMobsSpawned(ServerPlayer player, UUID instanceId) {
         PlayerQuestData data = player.getData(ModAttachments.QUEST_DATA);
@@ -227,6 +232,8 @@ public final class QuestEngine {
         applyImmediateRewards(player, definition, multiplier);
         List<ItemStack> rewardItems = buildRewardItemStacks(definition, multiplier);
         addBonusProofGold(rewardItems, definition, updated, multiplier);
+        addBuyItemReward(rewardItems, definition, updated, multiplier, player.level().getServer());
+        addGatherReward(rewardItems, definition, updated, multiplier);
         PlayerQuestData data = player.getData(ModAttachments.QUEST_DATA);
         if (rewardItems.isEmpty()) {
             finalizeInstance(player, data, definition, updated);
@@ -295,6 +302,42 @@ public final class QuestEngine {
         }
     }
 
+    /**
+     * Pays the "Useful Errand" buy-item quest's cost-sized gold reward (explicit user spec,
+     * 2026-10-11: "the reward needs to match the cost of actually buying the item, + say, 15%? that
+     * way there is an actual reward") -- the amount was computed once at acceptance time from the
+     * real vendor's listed price (see {@code NpcQuests#registerUsefulErrandHook}) and stored on
+     * {@link BuyItemTargets}, since the target item (and so its price) varies per-instance, not
+     * per-definition. Only pays once the buy milestone is actually complete.
+     */
+    private static void addBuyItemReward(List<ItemStack> rewardItems, QuestDefinition definition, QuestInstance updated, double multiplier, net.minecraft.server.MinecraftServer server) {
+        for (QuestMilestone milestone : definition.milestones()) {
+            if (!milestone.isBuyMilestone() || !updated.isMilestoneComplete(milestone)) {
+                continue;
+            }
+            BuyItemTargets.get(server).get(updated.instanceId()).ifPresent(target -> {
+                if (target.goldReward() > 0) {
+                    addStacks(rewardItems, Items.GOLD_NUGGET, scaledAmount(target.goldReward(), multiplier));
+                }
+            });
+        }
+    }
+
+    /**
+     * Pays a gather milestone's quantity-scaled reward -- {@link QuestMilestone#bonusGoldPerProof()}
+     * reused as "gold per unit" (see that class's own doc), multiplied by {@link
+     * QuestMilestone#requiredCount()} directly since the target quantity is fixed on the
+     * definition itself, unlike the buy-item quest's per-instance-resolved price.
+     */
+    private static void addGatherReward(List<ItemStack> rewardItems, QuestDefinition definition, QuestInstance updated, double multiplier) {
+        for (QuestMilestone milestone : definition.milestones()) {
+            if (!milestone.isGatherMilestone() || milestone.bonusGoldPerProof() <= 0 || !updated.isMilestoneComplete(milestone)) {
+                continue;
+            }
+            addStacks(rewardItems, Items.GOLD_NUGGET, scaledAmount(milestone.bonusGoldPerProof() * milestone.requiredCount(), multiplier));
+        }
+    }
+
     private static int scaledAmount(int baseAmount, double multiplier) {
         return Math.max(1, (int) Math.round(baseAmount * multiplier));
     }
@@ -321,6 +364,20 @@ public final class QuestEngine {
      * useful partial delivery, not a failure. False if the milestone isn't a deliver milestone, the
      * instance isn't in progress, it's already done, or (required milestones only) there isn't enough
      * proof yet.
+     *
+     * <p><b>Buy-item milestones</b> ({@link QuestMilestone#isBuyMilestone()}, added 2026-10-11) are
+     * a deliver milestone too, but the "proof" is a real item, resolved per-instance via {@link
+     * BuyItemTargets} rather than a {@link QuestMilestone#proofId()}-keyed synthetic one -- the
+     * player just needs to be holding one real unit of that item, consumed on turn-in exactly like
+     * any other proof, however they actually obtained it (buying it from the vendor the flavor text
+     * names is a suggestion, never enforced).
+     *
+     * <p><b>Gather milestones</b> ({@link QuestMilestone#isGatherMilestone()}, added 2026-10-11) are
+     * the static sibling of a buy milestone -- also a real {@code ItemStack}, but the target item is
+     * fixed per-definition (parsed back out of {@link QuestMilestone#proofId()}, see that class's own
+     * doc), not resolved per-instance, so no side table is consulted. Always required, never
+     * optional/partial -- same all-or-nothing behavior the generic branch below already gives any
+     * non-bonus-paying deliver milestone.
      */
     public static boolean tryDeliverProof(ServerPlayer player, UUID instanceId, String milestoneId) {
         PlayerQuestData data = player.getData(ModAttachments.QUEST_DATA);
@@ -334,12 +391,28 @@ public final class QuestEngine {
         }
         QuestDefinition definition = definitionOpt.get();
         QuestMilestone milestone = definition.milestones().stream().filter(m -> m.id().equals(milestoneId)).findFirst().orElse(null);
-        if (milestone == null || milestone.proofId().isEmpty() || instance.isMilestoneComplete(milestone)) {
+        if (milestone == null || !milestone.isDeliverMilestone() || instance.isMilestoneComplete(milestone)) {
             return false;
         }
-        String proofId = milestone.proofId().get();
+
+        Optional<Identifier> buyItemId = milestone.isBuyMilestone()
+                ? BuyItemTargets.get(player.level().getServer()).get(instanceId).map(BuyItemTargets.Target::itemId) : Optional.empty();
+        if (milestone.isBuyMilestone() && buyItemId.isEmpty()) {
+            return false; // Target never resolved (e.g. the eligibility re-check failed at accept time) -- nothing to deliver.
+        }
+        Optional<Identifier> gatherItemId = milestone.isGatherMilestone()
+                ? milestone.proofId().flatMap(s -> Optional.ofNullable(Identifier.tryParse(s))) : Optional.empty();
+        if (milestone.isGatherMilestone() && gatherItemId.isEmpty()) {
+            return false; // Malformed/missing item id on the definition itself -- nothing to deliver.
+        }
+        if (!milestone.isBuyMilestone() && !milestone.isGatherMilestone() && milestone.proofId().isEmpty()) {
+            return false;
+        }
+
         int remaining = milestone.requiredCount() - instance.milestoneProgress().getOrDefault(milestoneId, 0);
-        int held = countProof(player, proofId);
+        int held = milestone.isBuyMilestone() ? countRealItem(player, buyItemId.get())
+                : milestone.isGatherMilestone() ? countRealItem(player, gatherItemId.get())
+                : countProof(player, milestone.proofId().get());
 
         int toDeliver;
         if (milestone.optional() && milestone.bonusGoldPerProof() > 0) {
@@ -353,7 +426,13 @@ public final class QuestEngine {
             }
             toDeliver = remaining;
         }
-        consumeProof(player, proofId, toDeliver);
+        if (milestone.isBuyMilestone()) {
+            consumeRealItem(player, buyItemId.get(), toDeliver);
+        } else if (milestone.isGatherMilestone()) {
+            consumeRealItem(player, gatherItemId.get(), toDeliver);
+        } else {
+            consumeProof(player, milestone.proofId().get(), toDeliver);
+        }
         reportMilestoneProgress(player, instanceId, milestoneId, toDeliver);
         return true;
     }
@@ -447,6 +526,11 @@ public final class QuestEngine {
         return countProof(player, proofId) >= needed;
     }
 
+    /** Buy-milestone equivalent of {@link #hasEnoughProof} -- real inventory count of a real item, not a synthetic proof. */
+    public static boolean hasEnoughRealItem(ServerPlayer player, Identifier itemId, int needed) {
+        return countRealItem(player, itemId) >= needed;
+    }
+
     private static int countProof(ServerPlayer player, String proofId) {
         int total = 0;
         for (int i = 0; i < player.getInventory().getContainerSize(); i++) {
@@ -463,6 +547,29 @@ public final class QuestEngine {
         for (int i = 0; i < player.getInventory().getContainerSize() && remaining > 0; i++) {
             ItemStack stack = player.getInventory().getItem(i);
             if (stack.getItem() instanceof QuestProofItem && QuestProofItem.proofIdOf(stack).equals(proofId)) {
+                int take = Math.min(remaining, stack.getCount());
+                stack.shrink(take);
+                remaining -= take;
+            }
+        }
+    }
+
+    private static int countRealItem(ServerPlayer player, Identifier itemId) {
+        int total = 0;
+        for (int i = 0; i < player.getInventory().getContainerSize(); i++) {
+            ItemStack stack = player.getInventory().getItem(i);
+            if (BuiltInRegistries.ITEM.getKey(stack.getItem()).equals(itemId)) {
+                total += stack.getCount();
+            }
+        }
+        return total;
+    }
+
+    private static void consumeRealItem(ServerPlayer player, Identifier itemId, int amount) {
+        int remaining = amount;
+        for (int i = 0; i < player.getInventory().getContainerSize() && remaining > 0; i++) {
+            ItemStack stack = player.getInventory().getItem(i);
+            if (BuiltInRegistries.ITEM.getKey(stack.getItem()).equals(itemId)) {
                 int take = Math.min(remaining, stack.getCount());
                 stack.shrink(take);
                 remaining -= take;

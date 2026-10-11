@@ -102,8 +102,8 @@ public final class QuestWaypointTicker {
      * repeated calls (every tick interval) don't jitter the circle around, and so a retried quest
      * (a brand-new instanceId) never reuses a previous attempt's stale knowledge, closing a
      * previously-flagged edge case. Public so a quest's own assignment hook (e.g. {@code
-     * NpcQuests#findOldHarlen}/{@code #registerOnSiteHook}) can grant initial knowledge factors
-     * against the exact same key this ticker will later read.
+     * NpcQuests#findOldHarlen}) can grant initial knowledge factors against the exact same key this
+     * ticker will later read.
      */
     public static long placeIdFor(java.util.UUID instanceId) {
         return instanceId.getMostSignificantBits() ^ instanceId.getLeastSignificantBits();

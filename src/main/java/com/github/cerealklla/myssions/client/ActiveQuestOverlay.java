@@ -54,7 +54,7 @@ public final class ActiveQuestOverlay implements GuiLayer {
         Font font = minecraft.font;
         int maxTextWidth = font.width(definition.name());
         for (QuestMilestone milestone : definition.milestones()) {
-            maxTextWidth = Math.max(maxTextWidth, font.width("- " + QuestText.resolve(milestone.description(), instance)));
+            maxTextWidth = Math.max(maxTextWidth, font.width(milestoneLine(milestone, instance)));
         }
         int lineCount = 1 + definition.milestones().size();
         int left = MARGIN;
@@ -68,12 +68,30 @@ public final class ActiveQuestOverlay implements GuiLayer {
         y += font.lineHeight;
         for (QuestMilestone milestone : definition.milestones()) {
             boolean complete = instance.isMilestoneComplete(milestone);
-            String line = "- " + QuestText.resolve(milestone.description(), instance) + (milestone.optional() ? " (optional)" : "");
+            String line = milestoneLine(milestone, instance);
             if (complete) {
                 line = ChatFormatting.STRIKETHROUGH + line;
             }
             graphics.text(font, line, left + PADDING, y, complete ? DONE_COLOR : TEXT_COLOR);
             y += font.lineHeight;
         }
+    }
+
+    /**
+     * One milestone's HUD line, kept as succinct as possible (2026-10-11, real report: deliver-type
+     * milestone text was running off-screen) -- a live "(current/required)" count (same condition
+     * and format {@code client.QuestLogScreen} already uses) replaces spelling the target count out
+     * in prose, placed before "(optional)" so that's the last thing truncated if the line still
+     * doesn't fit.
+     */
+    private static String milestoneLine(QuestMilestone milestone, QuestInstance instance) {
+        String line = "- " + QuestText.resolve(milestone.description(), instance);
+        if (milestone.requiredCount() > 1) {
+            line += " (" + instance.milestoneProgress().getOrDefault(milestone.id(), 0) + "/" + milestone.requiredCount() + ")";
+        }
+        if (milestone.optional()) {
+            line += " (optional)";
+        }
+        return line;
     }
 }

@@ -46,11 +46,35 @@ import net.minecraft.resources.Identifier;
  * {@code bonusGoldPerProof * (however many were actually delivered)} extra Gold on top of the
  * quest's normal flat rewards. The base quest (its required kill milestone) completes with or
  * without any delivery at all, since the milestone itself is optional.
+ *
+ * <p>{@link #nightOnly()} (added 2026-10-11, forward-looking -- no current quest sets it true):
+ * when true on a kill milestone, {@code quest.QuestKillListener} only counts a kill toward it if it
+ * happened while {@code level.isDarkOutside()} (same call {@code quest.QuestNpcEntity}'s own
+ * day/night visibility gating already uses) -- a real, enforced "this only happens at night" instead
+ * of flavor text that isn't actually gated.
+ *
+ * <p>{@link #isBuyMilestone()} (added 2026-10-11) marks a deliver milestone whose target item is
+ * resolved per-instance (see {@code QuestInstance#buyItemId()}) from a settlement's real shop
+ * listings, rather than a fixed {@link #proofId()}-keyed synthetic proof item -- see {@code
+ * NpcQuests#aUsefulErrand} and {@code QuestEngine#tryDeliverProof}'s own doc for how turn-in differs
+ * for this kind.
+ *
+ * <p>{@link #isGatherMilestone()} (added 2026-10-11, the taxonomy's "location-agnostic/
+ * quantity-scaled" shape -- "bring me 12 Wheat, I don't care where it came from") is the static
+ * sibling of a buy milestone: also a deliver milestone whose "proof" is a real {@code ItemStack},
+ * but the target item is fixed per-*definition*, not resolved per-instance, so no side table is
+ * needed. Deliberately reuses {@link #proofId()} to carry the target item's own {@code
+ * Identifier#toString()} (parsed back via {@code Identifier#tryParse}) rather than adding yet
+ * another field -- same "reuse a field/token instead of adding one" precedent {@code
+ * NpcQuests#aUsefulErrand} already set for {@code {location}}. {@link #bonusGoldPerProof()} is
+ * reused too, as a flat gold-per-unit reward multiplier (see {@code QuestEngine#addGatherReward}) --
+ * its name describes the deliver-bonus use; for a gather milestone it's simply "gold per unit
+ * delivered," read directly off the (already-static) {@link #requiredCount()}.
  */
 public record QuestMilestone(String id, String description, boolean optional, int requiredCount,
                               Optional<Identifier> killTargetEntityType, Optional<String> proofId,
                               boolean isDeliverMilestone, boolean isTalkMilestone, boolean isEscortMilestone,
-                              int bonusGoldPerProof) {
+                              int bonusGoldPerProof, boolean nightOnly, boolean isBuyMilestone, boolean isGatherMilestone) {
 
     public static final Codec<QuestMilestone> CODEC = RecordCodecBuilder.create(instance -> instance.group(
             Codec.STRING.fieldOf("id").forGetter(QuestMilestone::id),
@@ -62,35 +86,53 @@ public record QuestMilestone(String id, String description, boolean optional, in
             Codec.BOOL.optionalFieldOf("is_deliver_milestone", false).forGetter(QuestMilestone::isDeliverMilestone),
             Codec.BOOL.optionalFieldOf("is_talk_milestone", false).forGetter(QuestMilestone::isTalkMilestone),
             Codec.BOOL.optionalFieldOf("is_escort_milestone", false).forGetter(QuestMilestone::isEscortMilestone),
-            Codec.INT.optionalFieldOf("bonus_gold_per_proof", 0).forGetter(QuestMilestone::bonusGoldPerProof)
+            Codec.INT.optionalFieldOf("bonus_gold_per_proof", 0).forGetter(QuestMilestone::bonusGoldPerProof),
+            Codec.BOOL.optionalFieldOf("night_only", false).forGetter(QuestMilestone::nightOnly),
+            Codec.BOOL.optionalFieldOf("is_buy_milestone", false).forGetter(QuestMilestone::isBuyMilestone),
+            Codec.BOOL.optionalFieldOf("is_gather_milestone", false).forGetter(QuestMilestone::isGatherMilestone)
     ).apply(instance, QuestMilestone::new));
 
     public static QuestMilestone simple(String id, String description) {
-        return new QuestMilestone(id, description, false, 1, Optional.empty(), Optional.empty(), false, false, false, 0);
+        return new QuestMilestone(id, description, false, 1, Optional.empty(), Optional.empty(), false, false, false, 0, false, false, false);
     }
 
     public static QuestMilestone simple(String id, String description, boolean optional) {
-        return new QuestMilestone(id, description, optional, 1, Optional.empty(), Optional.empty(), false, false, false, 0);
+        return new QuestMilestone(id, description, optional, 1, Optional.empty(), Optional.empty(), false, false, false, 0, false, false, false);
     }
 
     public static QuestMilestone kill(String id, String description, Identifier entityType, int count, String proofId) {
-        return new QuestMilestone(id, description, false, count, Optional.of(entityType), Optional.of(proofId), false, false, false, 0);
+        return new QuestMilestone(id, description, false, count, Optional.of(entityType), Optional.of(proofId), false, false, false, 0, false, false, false);
+    }
+
+    /** Like {@link #kill(String, String, Identifier, int, String)}, but only counts a kill at night -- see this class's own doc. */
+    public static QuestMilestone kill(String id, String description, Identifier entityType, int count, String proofId, boolean nightOnly) {
+        return new QuestMilestone(id, description, false, count, Optional.of(entityType), Optional.of(proofId), false, false, false, 0, nightOnly, false, false);
     }
 
     public static QuestMilestone deliver(String id, String description, String proofId, int count) {
-        return new QuestMilestone(id, description, false, count, Optional.empty(), Optional.of(proofId), true, false, false, 0);
+        return new QuestMilestone(id, description, false, count, Optional.empty(), Optional.of(proofId), true, false, false, 0, false, false, false);
     }
 
     /** An optional deliver milestone that pays {@code bonusGoldPerProof} Gold per item actually turned in (up to {@code maxCount}) -- see this class's own doc for how this differs from the required {@link #deliver} above. */
     public static QuestMilestone optionalDeliverWithBonus(String id, String description, String proofId, int maxCount, int bonusGoldPerProof) {
-        return new QuestMilestone(id, description, true, maxCount, Optional.empty(), Optional.of(proofId), true, false, false, bonusGoldPerProof);
+        return new QuestMilestone(id, description, true, maxCount, Optional.empty(), Optional.of(proofId), true, false, false, bonusGoldPerProof, false, false, false);
     }
 
     public static QuestMilestone talk(String id, String description) {
-        return new QuestMilestone(id, description, false, 1, Optional.empty(), Optional.empty(), false, true, false, 0);
+        return new QuestMilestone(id, description, false, 1, Optional.empty(), Optional.empty(), false, true, false, 0, false, false, false);
     }
 
     public static QuestMilestone escort(String id, String description) {
-        return new QuestMilestone(id, description, false, 1, Optional.empty(), Optional.empty(), false, false, true, 0);
+        return new QuestMilestone(id, description, false, 1, Optional.empty(), Optional.empty(), false, false, true, 0, false, false, false);
+    }
+
+    /** See this class's own doc for {@link #isBuyMilestone()} -- the real target item is resolved per-instance, not stored here. */
+    public static QuestMilestone buyItem(String id, String description, int count) {
+        return new QuestMilestone(id, description, false, count, Optional.empty(), Optional.empty(), true, false, false, 0, false, true, false);
+    }
+
+    /** See this class's own doc for {@link #isGatherMilestone()} -- {@code itemId} is fixed for every instance of this quest definition; {@code goldPerUnit} sizes the turn-in reward (see {@code QuestEngine#addGatherReward}). */
+    public static QuestMilestone gather(String id, String description, Identifier itemId, int count, int goldPerUnit) {
+        return new QuestMilestone(id, description, false, count, Optional.empty(), Optional.of(itemId.toString()), true, false, false, goldPerUnit, false, false, true);
     }
 }
