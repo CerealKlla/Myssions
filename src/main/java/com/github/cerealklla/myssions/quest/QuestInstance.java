@@ -1,5 +1,6 @@
 package com.github.cerealklla.myssions.quest;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -10,6 +11,7 @@ import com.mojang.serialization.codecs.RecordCodecBuilder;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.UUIDUtil;
 import net.minecraft.resources.Identifier;
+import net.minecraft.world.item.ItemStack;
 
 /**
  * One single acceptance of a {@link QuestDefinition} -- created the moment a quest is assigned
@@ -37,10 +39,17 @@ import net.minecraft.resources.Identifier;
  * name -- e.g. a settlement's own name -- to substitute into a quest's {@code {location}}-tokened
  * flavor text (see {@code quest.QuestText#resolve}). Empty for a quest with no resolvable real
  * location (the token then falls back to a generic phrase).
+ *
+ * <p>{@code pendingRewardItems} (added 2026-10-11, explicit user spec: turning in a quest should
+ * open a reward-collection GUI with a "Take All" button, only actually flagging the quest complete
+ * once everything's been collected -- see {@code quest.QuestRewardMenu}'s own doc) holds the
+ * Gold/Item reward stacks still waiting to be picked up while {@link #status()} is {@link
+ * QuestStatus#AWAITING_REWARD_PICKUP}. Persisted (not just an in-memory menu) so closing the GUI
+ * without collecting everything and coming back later doesn't lose or duplicate anything.
  */
 public record QuestInstance(UUID instanceId, Identifier definitionId, QuestStatus status, Map<String, Integer> milestoneProgress,
                              long assignedAtGameTime, Optional<BlockPos> hintPos, Optional<String> hintDimensionId,
-                             Optional<String> locationName) {
+                             Optional<String> locationName, List<ItemStack> pendingRewardItems) {
 
     public static final Codec<QuestInstance> CODEC = RecordCodecBuilder.create(instance -> instance.group(
             UUIDUtil.CODEC.fieldOf("instance_id").forGetter(QuestInstance::instanceId),
@@ -50,25 +59,31 @@ public record QuestInstance(UUID instanceId, Identifier definitionId, QuestStatu
             Codec.LONG.fieldOf("assigned_at_game_time").forGetter(QuestInstance::assignedAtGameTime),
             BlockPos.CODEC.optionalFieldOf("hint_pos").forGetter(QuestInstance::hintPos),
             Codec.STRING.optionalFieldOf("hint_dimension_id").forGetter(QuestInstance::hintDimensionId),
-            Codec.STRING.optionalFieldOf("location_name").forGetter(QuestInstance::locationName)
+            Codec.STRING.optionalFieldOf("location_name").forGetter(QuestInstance::locationName),
+            ItemStack.CODEC.listOf().optionalFieldOf("pending_reward_items", List.of()).forGetter(QuestInstance::pendingRewardItems)
     ).apply(instance, QuestInstance::new));
 
     public static QuestInstance freshlyAssigned(Identifier definitionId, long gameTime) {
-        return new QuestInstance(UUID.randomUUID(), definitionId, QuestStatus.IN_PROGRESS, Map.of(), gameTime, Optional.empty(), Optional.empty(), Optional.empty());
+        return new QuestInstance(UUID.randomUUID(), definitionId, QuestStatus.IN_PROGRESS, Map.of(), gameTime, Optional.empty(), Optional.empty(), Optional.empty(), List.of());
     }
 
     public QuestInstance withStatus(QuestStatus newStatus) {
-        return new QuestInstance(instanceId, definitionId, newStatus, milestoneProgress, assignedAtGameTime, hintPos, hintDimensionId, locationName);
+        return new QuestInstance(instanceId, definitionId, newStatus, milestoneProgress, assignedAtGameTime, hintPos, hintDimensionId, locationName, pendingRewardItems);
     }
 
     public QuestInstance withProgress(String milestoneId, int amount) {
         Map<String, Integer> updated = new java.util.HashMap<>(milestoneProgress);
         updated.put(milestoneId, amount);
-        return new QuestInstance(instanceId, definitionId, status, Map.copyOf(updated), assignedAtGameTime, hintPos, hintDimensionId, locationName);
+        return new QuestInstance(instanceId, definitionId, status, Map.copyOf(updated), assignedAtGameTime, hintPos, hintDimensionId, locationName, pendingRewardItems);
     }
 
     public QuestInstance withHint(BlockPos pos, String dimensionId, Optional<String> newLocationName) {
-        return new QuestInstance(instanceId, definitionId, status, milestoneProgress, assignedAtGameTime, Optional.of(pos), Optional.of(dimensionId), newLocationName);
+        return new QuestInstance(instanceId, definitionId, status, milestoneProgress, assignedAtGameTime, Optional.of(pos), Optional.of(dimensionId), newLocationName, pendingRewardItems);
+    }
+
+    /** Transitions to {@link QuestStatus#AWAITING_REWARD_PICKUP} carrying the still-uncollected reward stacks. */
+    public QuestInstance withPendingRewardItems(List<ItemStack> items) {
+        return new QuestInstance(instanceId, definitionId, QuestStatus.AWAITING_REWARD_PICKUP, milestoneProgress, assignedAtGameTime, hintPos, hintDimensionId, locationName, List.copyOf(items));
     }
 
     public boolean isMilestoneComplete(QuestMilestone milestone) {

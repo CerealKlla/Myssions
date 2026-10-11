@@ -43,7 +43,7 @@ public final class ActiveQuestOverlay implements GuiLayer {
             return;
         }
         QuestInstance instance = data.quests().get(data.activeQuestId().get());
-        if (instance == null || instance.status() != QuestStatus.IN_PROGRESS) {
+        if (instance == null || (instance.status() != QuestStatus.IN_PROGRESS && instance.status() != QuestStatus.AWAITING_REWARD_PICKUP)) {
             return;
         }
         QuestDefinition definition = QuestRegistry.get(instance.definitionId()).orElse(null);

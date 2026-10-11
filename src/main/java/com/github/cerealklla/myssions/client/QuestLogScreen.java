@@ -86,7 +86,11 @@ public final class QuestLogScreen extends Screen {
             QuestRegistry.get(instance.definitionId()).ifPresent(def -> {
                 boolean isActiveQuest = data.activeQuestId().map(id -> id.equals(instance.instanceId())).orElse(false);
                 int color = instance.status() == QuestStatus.COMPLETED ? DIM_TEXT_COLOR : (isActiveQuest ? ACTIVE_TEXT_COLOR : TEXT_COLOR);
-                String prefix = instance.status() == QuestStatus.COMPLETED ? "[Done] " : (isActiveQuest ? "* " : "");
+                String prefix = switch (instance.status()) {
+                    case COMPLETED -> "[Done] ";
+                    case AWAITING_REWARD_PICKUP -> "[Ready] ";
+                    default -> isActiveQuest ? "* " : "";
+                };
                 rows.add(new ListRow(instance.instanceId(), prefix + def.name(), color, false));
             });
         }
@@ -115,7 +119,7 @@ public final class QuestLogScreen extends Screen {
         }
         int detailsLeft = width * LIST_WIDTH_FRACTION_NUM / FRACTION_DEN + MARGIN * 2;
         int buttonY = MARGIN;
-        if (instance.status() == QuestStatus.IN_PROGRESS) {
+        if (instance.status() == QuestStatus.IN_PROGRESS || instance.status() == QuestStatus.AWAITING_REWARD_PICKUP) {
             boolean isActiveQuest = data.activeQuestId().map(id -> id.equals(selectedId)).orElse(false);
             actionButton = addRenderableWidget(Button.builder(
                             Component.literal(isActiveQuest ? "Active Quest" : "Set as Active Quest"),
@@ -267,6 +271,9 @@ public final class QuestLogScreen extends Screen {
         if (instance.status() == QuestStatus.FAILED) {
             y += 4;
             drawWrapped(graphics, "This quest was failed.", left, y, wrapWidth, FAILED_TEXT_COLOR, lineHeight);
+        } else if (instance.status() == QuestStatus.AWAITING_REWARD_PICKUP) {
+            y += 4;
+            drawWrapped(graphics, "Done -- talk to the issuer to collect your reward.", left, y, wrapWidth, ACTIVE_TEXT_COLOR, lineHeight);
         }
         graphics.disableScissor();
     }

@@ -13,6 +13,7 @@ import com.github.cerealklla.myssions.quest.SampleQuests;
 import com.github.cerealklla.myssions.registration.ModAttachments;
 import com.github.cerealklla.myssions.registration.ModEntities;
 import com.github.cerealklla.myssions.registration.ModItems;
+import com.github.cerealklla.myssions.registration.ModMenus;
 
 import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.bus.api.IEventBus;
@@ -37,6 +38,7 @@ public class MyssionsMod {
         ModItems.DATA_COMPONENTS.register(modEventBus);
         ModEntities.ENTITIES.register(modEventBus);
         ModAttachments.ATTACHMENT_TYPES.register(modEventBus);
+        ModMenus.MENU_TYPES.register(modEventBus);
 
         modEventBus.addListener(this::commonSetup);
         modEventBus.addListener(this::registerPayloads);

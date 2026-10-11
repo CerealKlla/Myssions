@@ -4,6 +4,8 @@ import com.mojang.blaze3d.platform.InputConstants;
 
 import com.github.cerealklla.myssions.client.ActiveQuestOverlay;
 import com.github.cerealklla.myssions.client.QuestLogScreen;
+import com.github.cerealklla.myssions.client.QuestRewardScreen;
+import com.github.cerealklla.myssions.registration.ModMenus;
 
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
@@ -17,6 +19,7 @@ import net.neoforged.neoforge.client.event.ClientTickEvent;
 import net.neoforged.neoforge.client.event.EntityRenderersEvent;
 import net.neoforged.neoforge.client.event.RegisterGuiLayersEvent;
 import net.neoforged.neoforge.client.event.RegisterKeyMappingsEvent;
+import net.neoforged.neoforge.client.event.RegisterMenuScreensEvent;
 import org.lwjgl.glfw.GLFW;
 
 @Mod(value = MyssionsMod.MODID, dist = Dist.CLIENT)
@@ -43,6 +46,11 @@ public class MyssionsModClient {
         // bespoke model, same precedent as Settlemynts' own plot worker NPCs.
         event.registerEntityRenderer(com.github.cerealklla.myssions.registration.ModEntities.QUEST_NPC.get(),
                 net.minecraft.client.renderer.entity.VillagerRenderer::new);
+    }
+
+    @SubscribeEvent
+    static void onRegisterMenuScreens(RegisterMenuScreensEvent event) {
+        event.register(ModMenus.QUEST_REWARD.get(), QuestRewardScreen::new);
     }
 
     @SubscribeEvent

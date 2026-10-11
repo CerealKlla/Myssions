@@ -152,4 +152,18 @@ from two different NPCs) no longer collide — every per-instance API/payload no
 then Complete Quest" flow on Settlemynts' own chat menu (see its own CLAUDE.md). `./gradlew build`
 green in both repos, whole-suite boot-smoke-tested clean. **Not yet live-tested or deployed.**
 
+**Quest-reward pickup GUI built, 2026-10-11** (see
+[context/classes/QuestRewardPickup.md](context/classes/QuestRewardPickup.md)) — explicit user spec:
+turning in a quest now opens a real reward-collection screen (styled like Yconomics' own Loot Bag,
+copied rather than reused since that class bakes in world-entity/despawn/ground-drop semantics that
+don't fit here) with "Take All" (leaves anything that doesn't fit rather than dropping it) plus a
+"Complete Quest" button that only finalizes once every slot is empty. New `QuestStatus
+.AWAITING_REWARD_PICKUP` state and a persisted `QuestInstance#pendingRewardItems` field mean closing
+the GUI without collecting everything and coming back later doesn't lose or duplicate anything. A
+real client/server race condition (the reward GUI being instantly closed by Settlemynts' own
+chat-menu refresh packet) was found and fixed before ever live-testing — see Settlemynts' own
+CLAUDE.md for its half. `./gradlew build` green in both repos, whole-suite boot-smoke-tested clean.
+**Never opened in a live client** — new GUI/menu-registration code that only a real `runClient`
+session can actually verify.
+
 See [context/classes/](context/classes/) for per-class reference.

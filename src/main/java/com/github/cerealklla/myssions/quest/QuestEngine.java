@@ -1,5 +1,7 @@
 package com.github.cerealklla.myssions.quest;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -24,7 +26,7 @@ import net.minecraft.world.item.Items;
  */
 public final class QuestEngine {
 
-    /** "Players can only have 5 quests active [accepted] at once" -- explicit user spec, 2026-10-10. Counts only IN_PROGRESS instances; completed/failed ones don't count against the cap. */
+    /** "Players can only have 5 quests active [accepted] at once" -- explicit user spec, 2026-10-10. Counts only IN_PROGRESS instances; completed/failed/awaiting-pickup ones don't count against the cap. */
     public static final int MAX_ACCEPTED_QUESTS = 5;
 
     private QuestEngine() {
@@ -102,9 +104,9 @@ public final class QuestEngine {
 
     /**
      * Adds {@code amount} progress to one milestone of an in-progress instance, then checks whether
-     * every non-optional milestone is now complete -- if so, completes the quest and applies its
-     * rewards. Silently no-ops for an instance the player doesn't have, isn't {@code IN_PROGRESS},
-     * or a milestone id that doesn't belong to its definition.
+     * every non-optional milestone is now complete -- if so, begins reward pickup (see {@link
+     * #beginRewardPickup}). Silently no-ops for an instance the player doesn't have, isn't {@code
+     * IN_PROGRESS}, or a milestone id that doesn't belong to its definition.
      */
     public static void reportMilestoneProgress(ServerPlayer player, UUID instanceId, String milestoneId, int amount) {
         PlayerQuestData data = player.getData(ModAttachments.QUEST_DATA);
@@ -129,52 +131,81 @@ public final class QuestEngine {
                 .allMatch(updated::isMilestoneComplete);
 
         if (allRequiredComplete) {
-            completeQuest(player, definition, updated);
+            beginRewardPickup(player, definition, updated);
         } else {
             player.setData(ModAttachments.QUEST_DATA, data.withQuest(updated));
         }
     }
 
-    private static void completeQuest(ServerPlayer player, QuestDefinition definition, QuestInstance updated) {
-        QuestInstance completed = updated.withStatus(QuestStatus.COMPLETED);
-        PlayerQuestData data = player.getData(ModAttachments.QUEST_DATA)
-                .withQuest(completed)
-                .withIssuerCompletionIncremented(definition.issuerId());
-        player.setData(ModAttachments.QUEST_DATA, data);
-        player.sendSystemMessage(Component.literal("Quest complete: " + definition.name()));
-        applyRewards(player, definition);
+    /**
+     * Every non-optional milestone just became complete -- explicit user spec, 2026-10-11: turning
+     * in a quest should open a reward-collection GUI ({@code quest.QuestRewardMenu}) with a "Take
+     * All" button, only actually flagging the quest complete once everything's been collected.
+     * Applies XP/Intangible rewards immediately (no physical item to collect, no reason to wait),
+     * builds the Gold/Item rewards into real {@link ItemStack}s and parks them on the instance as
+     * {@link QuestInstance#pendingRewardItems()}, transitioning to {@link
+     * QuestStatus#AWAITING_REWARD_PICKUP}. A quest with no Gold/Item reward at all has nothing to
+     * collect, so it skips the GUI step entirely and finalizes immediately. Deliberately does NOT
+     * open the reward GUI itself -- this can fire from a passive event (a kill mid-combat via {@code
+     * QuestKillListener}), so popping a screen open here would be jarring; the GUI only opens when
+     * the player actually clicks "Complete Quest" (see {@link #tryCompleteQuest}).
+     */
+    private static void beginRewardPickup(ServerPlayer player, QuestDefinition definition, QuestInstance updated) {
+        applyImmediateRewards(player, definition);
+        List<ItemStack> rewardItems = buildRewardItemStacks(definition);
+        PlayerQuestData data = player.getData(ModAttachments.QUEST_DATA);
+        if (rewardItems.isEmpty()) {
+            finalizeInstance(player, data, definition, updated);
+            return;
+        }
+        QuestInstance awaiting = updated.withPendingRewardItems(rewardItems);
+        player.setData(ModAttachments.QUEST_DATA, data.withQuest(awaiting));
+        player.sendSystemMessage(Component.literal(definition.name() + " is ready to turn in -- go collect your reward."));
     }
 
-    private static void applyRewards(ServerPlayer player, QuestDefinition definition) {
+    private static void finalizeInstance(ServerPlayer player, PlayerQuestData data, QuestDefinition definition, QuestInstance instance) {
+        QuestInstance completed = instance.withStatus(QuestStatus.COMPLETED);
+        PlayerQuestData updatedData = data.withQuest(completed).withIssuerCompletionIncremented(definition.issuerId());
+        player.setData(ModAttachments.QUEST_DATA, updatedData);
+        player.sendSystemMessage(Component.literal("Quest complete: " + definition.name()));
+    }
+
+    private static void applyImmediateRewards(ServerPlayer player, QuestDefinition definition) {
+        for (QuestReward reward : definition.rewards()) {
+            if (reward.kind() == QuestReward.Kind.XP && LyfeXpBridge.isLoaded()) {
+                LyfeXpBridge.grantXp(player, reward.skillId(), reward.amount());
+            }
+            // INTANGIBLE: no mechanical effect yet (see QuestReward's own doc), nothing to apply.
+        }
+    }
+
+    /** Builds real, max-stack-respecting {@link ItemStack}s for every Gold/Item reward -- what ends up in {@code quest.QuestRewardMenu}. */
+    private static List<ItemStack> buildRewardItemStacks(QuestDefinition definition) {
+        List<ItemStack> stacks = new ArrayList<>();
         for (QuestReward reward : definition.rewards()) {
             switch (reward.kind()) {
-                case GOLD -> giveItem(player, Items.GOLD_NUGGET, reward.amount());
+                case GOLD -> addStacks(stacks, Items.GOLD_NUGGET, reward.amount());
                 case ITEM -> {
                     Item item = BuiltInRegistries.ITEM.getOptional(reward.itemId()).orElse(null);
                     if (item != null) {
-                        giveItem(player, item, reward.amount());
+                        addStacks(stacks, item, reward.amount());
                     }
                 }
-                case XP -> {
-                    if (LyfeXpBridge.isLoaded()) {
-                        LyfeXpBridge.grantXp(player, reward.skillId(), reward.amount());
-                    }
-                }
-                case INTANGIBLE -> {
-                    // No mechanical effect yet (see QuestReward's own doc) -- already shown as a
-                    // reward line in the Quest Log, nothing further to apply here.
+                default -> {
+                    // XP/INTANGIBLE have no physical item -- handled by applyImmediateRewards instead.
                 }
             }
         }
+        return stacks;
     }
 
-    private static void giveItem(ServerPlayer player, Item item, int count) {
-        if (count <= 0) {
-            return;
-        }
-        ItemStack stack = new ItemStack(item, count);
-        if (!player.getInventory().add(stack)) {
-            player.drop(stack, false);
+    private static void addStacks(List<ItemStack> stacks, Item item, int count) {
+        int remaining = count;
+        while (remaining > 0) {
+            int maxStack = new ItemStack(item).getMaxStackSize();
+            int take = Math.min(maxStack, remaining);
+            stacks.add(new ItemStack(item, take));
+            remaining -= take;
         }
     }
 
@@ -211,18 +242,32 @@ public final class QuestEngine {
     }
 
     /**
-     * "Complete Quest" on {@code client.QuestOfferScreen}'s active-quest sub-menu (2026-10-10,
-     * explicit user spec: "a sub-menu [with] the option to complete the quest (which checks if all
-     * required milestones are complete) and finishes it up"). Attempts to deliver proof for every
-     * not-yet-complete deliver milestone (best effort -- a milestone without enough proof on hand
-     * just stays incomplete, no error), then reports whether the instance is now actually {@code
-     * COMPLETED} -- a kill-count milestone that's still short can never be completed this way, only
-     * real kills (via {@code QuestKillListener}) advance those.
+     * "Complete Quest" on {@code client.QuestCompleteScreen} (2026-10-10/11, explicit user spec: "a
+     * sub-menu [with] the option to complete the quest (which checks if all required milestones are
+     * complete) and finishes it up"). Two cases:
+     * <ul>
+     *   <li>Already {@link QuestStatus#AWAITING_REWARD_PICKUP} (milestones were already satisfied by
+     *   an earlier call, or a kill/delivery) -- just (re)opens the reward GUI; it's safe to call this
+     *   repeatedly, nothing is re-rolled or duplicated.</li>
+     *   <li>Still {@link QuestStatus#IN_PROGRESS} -- attempts to deliver proof for every not-yet-
+     *   complete deliver milestone (best effort, a milestone without enough proof on hand just stays
+     *   incomplete), then opens the reward GUI if that was enough to finish every milestone.</li>
+     * </ul>
+     * A kill-count milestone that's still short can never be completed this way, only real kills (via
+     * {@code QuestKillListener}) advance those. Returns true if the reward GUI was (re)opened or the
+     * quest was already fully {@code COMPLETED}; false if there's genuinely still more to do.
      */
     public static boolean tryCompleteQuest(ServerPlayer player, UUID instanceId) {
         QuestInstance instance = player.getData(ModAttachments.QUEST_DATA).quests().get(instanceId);
-        if (instance == null || instance.status() != QuestStatus.IN_PROGRESS) {
+        if (instance == null) {
             return false;
+        }
+        if (instance.status() == QuestStatus.AWAITING_REWARD_PICKUP) {
+            openRewardMenu(player, instance);
+            return true;
+        }
+        if (instance.status() != QuestStatus.IN_PROGRESS) {
+            return instance.status() == QuestStatus.COMPLETED;
         }
         Optional<QuestDefinition> definitionOpt = QuestRegistry.get(instance.definitionId());
         if (definitionOpt.isEmpty()) {
@@ -234,7 +279,50 @@ public final class QuestEngine {
             }
         }
         QuestInstance updated = player.getData(ModAttachments.QUEST_DATA).quests().get(instanceId);
-        return updated != null && updated.status() == QuestStatus.COMPLETED;
+        if (updated == null) {
+            return false;
+        }
+        if (updated.status() == QuestStatus.AWAITING_REWARD_PICKUP) {
+            openRewardMenu(player, updated);
+            return true;
+        }
+        return updated.status() == QuestStatus.COMPLETED;
+    }
+
+    private static void openRewardMenu(ServerPlayer player, QuestInstance instance) {
+        String title = QuestRegistry.get(instance.definitionId()).map(QuestDefinition::name).orElse("Quest Reward");
+        QuestRewardMenu.open(player, instance.instanceId(), instance.pendingRewardItems(), title);
+    }
+
+    /**
+     * "Complete Quest" button inside {@code quest.QuestRewardMenu} itself -- called once the
+     * container is confirmed empty (see that class's own doc). Finalizes the instance: marks it
+     * {@code COMPLETED}, increments the per-issuer count, and sends the real completion message.
+     * False (a no-op) if the instance isn't actually awaiting pickup, which the menu itself should
+     * never allow to happen, but defended here anyway since this crosses a UI boundary.
+     */
+    public static boolean finalizeRewardPickup(ServerPlayer player, UUID instanceId) {
+        PlayerQuestData data = player.getData(ModAttachments.QUEST_DATA);
+        QuestInstance instance = data.quests().get(instanceId);
+        if (instance == null || instance.status() != QuestStatus.AWAITING_REWARD_PICKUP) {
+            return false;
+        }
+        Optional<QuestDefinition> definitionOpt = QuestRegistry.get(instance.definitionId());
+        if (definitionOpt.isEmpty()) {
+            return false;
+        }
+        finalizeInstance(player, data, definitionOpt.get(), instance);
+        return true;
+    }
+
+    /** Persists whatever reward items are still sitting in the GUI when it's closed without finishing -- see {@code quest.QuestRewardMenu#removed}. Never mutates a non-awaiting instance (e.g. one that was juuust finalized the same tick the screen closed). */
+    public static void syncPendingRewardItems(ServerPlayer player, UUID instanceId, List<ItemStack> remaining) {
+        PlayerQuestData data = player.getData(ModAttachments.QUEST_DATA);
+        QuestInstance instance = data.quests().get(instanceId);
+        if (instance == null || instance.status() != QuestStatus.AWAITING_REWARD_PICKUP) {
+            return;
+        }
+        player.setData(ModAttachments.QUEST_DATA, data.withQuest(instance.withPendingRewardItems(remaining)));
     }
 
     /** Read-only check used by {@code QuestTurnIn} to tell "waiting on player" apart from "ready to complete" without consuming anything. */

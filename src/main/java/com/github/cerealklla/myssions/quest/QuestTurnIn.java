@@ -35,14 +35,18 @@ public final class QuestTurnIn {
 
         List<QuestGiverMenu.ActiveEntry> activeEntries = new ArrayList<>();
         for (QuestInstance instance : data.quests().values()) {
-            if (instance.status() != QuestStatus.IN_PROGRESS || !pool.contains(instance.definitionId())) {
+            boolean isActive = instance.status() == QuestStatus.IN_PROGRESS || instance.status() == QuestStatus.AWAITING_REWARD_PICKUP;
+            if (!isActive || !pool.contains(instance.definitionId())) {
                 continue;
             }
             QuestDefinition definition = QuestRegistry.get(instance.definitionId()).orElse(null);
             if (definition == null) {
                 continue;
             }
-            activeEntries.add(new QuestGiverMenu.ActiveEntry(instance.instanceId(), definition.name(), isReadyToComplete(player, definition, instance)));
+            // Already past its milestones and just waiting on reward pickup -- "ready" unconditionally,
+            // clicking Complete Quest reopens the reward GUI rather than re-checking anything.
+            boolean ready = instance.status() == QuestStatus.AWAITING_REWARD_PICKUP || isReadyToComplete(player, definition, instance);
+            activeEntries.add(new QuestGiverMenu.ActiveEntry(instance.instanceId(), definition.name(), ready));
         }
 
         Optional<QuestGiverMenu.NewOffer> newOffer = Optional.empty();
@@ -114,23 +118,24 @@ public final class QuestTurnIn {
 
     /**
      * Shift+right-click convenience (unchanged UX from before the chat-menu rework): try to
-     * complete the first ready in-progress quest from this issuer's pool; if none are ready but at
-     * least one is in progress, just say so; otherwise fall through to offering/accepting whatever's
-     * on the board.
+     * complete (or reopen the reward GUI for) the first active quest from this issuer's pool; if
+     * none are ready but at least one is in progress, just say so; otherwise fall through to
+     * offering/accepting whatever's on the board.
      */
     public static void quickInteract(ServerPlayer player, UUID plotId, String zoneTypeId) {
         List<Identifier> pool = IssuerQuestPools.poolFor(zoneTypeId);
         if (!pool.isEmpty()) {
             var data = player.getData(ModAttachments.QUEST_DATA);
-            List<QuestInstance> inProgress = data.quests().values().stream()
-                    .filter(i -> i.status() == QuestStatus.IN_PROGRESS && pool.contains(i.definitionId()))
+            List<QuestInstance> active = data.quests().values().stream()
+                    .filter(i -> (i.status() == QuestStatus.IN_PROGRESS || i.status() == QuestStatus.AWAITING_REWARD_PICKUP)
+                            && pool.contains(i.definitionId()))
                     .toList();
-            for (QuestInstance instance : inProgress) {
+            for (QuestInstance instance : active) {
                 if (QuestEngine.tryCompleteQuest(player, instance.instanceId())) {
                     return;
                 }
             }
-            if (!inProgress.isEmpty()) {
+            if (!active.isEmpty()) {
                 player.sendSystemMessage(Component.literal("Still working on that for me? Come back once you're done."));
                 return;
             }
