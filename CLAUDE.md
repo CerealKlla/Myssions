@@ -107,4 +107,19 @@ boot-smoke-tested clean with all 8 suite mods together. **Never rendered in a li
 Of the user's original ten points, only item 10 (party sharing, explicitly deferred until a party
 system exists anywhere in the suite) has no work started at all.
 
+**Scarce, midnight-generated quests, same day** (see
+[context/classes/IssuerQuestBoard.md](context/classes/IssuerQuestBoard.md)) — explicit follow-up
+once all ten original points existed, prompted by the user asking "is anything actually telling
+NPCs to generate quests yet?" (honest answer at the time: no, the 10 quests were a static,
+always-available pool). New `quest.IssuerQuestBoard` (persistent, one slot per plot) replaces
+"always offer the first quest you don't have" — an NPC/sign now only ever offers whatever's on its
+own board slot, nothing if empty, cleared the instant someone accepts so a second player finds
+nothing there. `bridge.QuestBoardMidnightTicker` rolls a 50% chance per empty slot once a day.
+`QuestEngine` now caps accepted quests at 5 — the "only 1 actively tracked" half needed zero code
+changes, `activeQuestId` was already a single value from the first slice. **Explicitly still not**
+"NPCs generating quests from their own real state" (a Shop's wishlist, a settlement wanting a road)
+— that's the original motivating idea for this whole mod, and it's still real, unbuilt follow-up
+work, now clearly separated from this scarcity refinement. `./gradlew build` green, boot-smoke-
+tested clean with all 8 suite mods together. **Never live-tested.**
+
 See [context/classes/](context/classes/) for per-class reference.
