@@ -46,7 +46,8 @@ public final class QuestTurnIn {
             // Already past its milestones and just waiting on reward pickup -- "ready" unconditionally,
             // clicking Complete Quest reopens the reward GUI rather than re-checking anything.
             boolean ready = instance.status() == QuestStatus.AWAITING_REWARD_PICKUP || isReadyToComplete(player, definition, instance);
-            activeEntries.add(new QuestGiverMenu.ActiveEntry(instance.instanceId(), definition.name(), ready));
+            boolean needsTalk = !ready && hasIncompleteTalkMilestone(definition, instance);
+            activeEntries.add(new QuestGiverMenu.ActiveEntry(instance.instanceId(), definition.name(), ready, needsTalk));
         }
 
         Optional<QuestGiverMenu.NewOffer> newOffer = Optional.empty();
@@ -74,6 +75,16 @@ public final class QuestTurnIn {
             return false;
         }
         return true;
+    }
+
+    /** True if any non-optional, not-yet-complete milestone of this instance is specifically a talk milestone -- see {@link QuestGiverMenu.ActiveEntry#needsTalk()}'s own doc. */
+    private static boolean hasIncompleteTalkMilestone(QuestDefinition definition, QuestInstance instance) {
+        for (QuestMilestone milestone : definition.milestones()) {
+            if (!milestone.optional() && !instance.isMilestoneComplete(milestone) && milestone.isTalkMilestone()) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**

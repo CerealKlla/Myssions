@@ -15,8 +15,16 @@ import net.minecraft.resources.Identifier;
  */
 public record QuestGiverMenu(List<ActiveEntry> activeQuests, Optional<NewOffer> newOffer) {
 
-    /** One of the player's own in-progress instances from this issuer's pool, by its hidden instanceId -- never the definition id, since two instances of the same definition are shown as two separate entries. */
-    public record ActiveEntry(UUID instanceId, String questName, boolean readyToComplete) {
+    /**
+     * One of the player's own in-progress instances from this issuer's pool, by its hidden
+     * instanceId -- never the definition id, since two instances of the same definition are shown
+     * as two separate entries. {@code needsTalk} (added 2026-10-11, for the issuer NPC's personal
+     * "!" head marker -- see {@code SettlemyntsMod#anchorHasUrgentPersonalBusiness}) is true when a
+     * non-optional, not-yet-complete milestone is specifically a talk milestone -- i.e. walking up
+     * and talking to this NPC is the player's actual next step, not just "this quest happens to be
+     * in progress."
+     */
+    public record ActiveEntry(UUID instanceId, String questName, boolean readyToComplete, boolean needsTalk) {
     }
 
     /** The plot's current (unclaimed) board offer, if any and if the player doesn't already have a record of it. */

@@ -121,6 +121,25 @@ public final class Myssions {
         return IssuerQuestBoard.get(server).get(plotId).isPresent();
     }
 
+    /**
+     * Player-specific check: does {@code player} have urgent, actionable business with this specific
+     * issuer right now -- an active quest with an incomplete talk milestone (walking up and talking
+     * is their actual next step), or one that's fully ready to turn in. Deliberately narrower than
+     * "has any active quest from this issuer at all" (which {@code getQuestGiverMenu} already covers
+     * for the Press-H prompt) -- used for the issuer NPC's personal "!" head marker (2026-10-11 user
+     * spec), which should only light up when there's something to actually walk over and do, not for
+     * every quest that merely happens to be in progress (e.g. "go kill 5 zombies," with nothing left
+     * to say to this NPC until that's done).
+     */
+    public static boolean hasUrgentPersonalBusiness(ServerPlayer player, UUID plotId, String zoneTypeId) {
+        for (QuestGiverMenu.ActiveEntry entry : getQuestGiverMenu(player, plotId, zoneTypeId).activeQuests()) {
+            if (entry.needsTalk() || entry.readyToComplete()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     // --- Inter-settlement road-connection quests (added 2026-10-11) -- see
     // quest.RoadQuestLogic/quest.RoadQuestRegistry's own doc. Settlements are identified by their
     // Cartographyr placeId, not any Settlemynts-specific id, since that's the one identity every
