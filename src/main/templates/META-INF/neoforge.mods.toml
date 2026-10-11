@@ -1,0 +1,64 @@
+license="${mod_license}"
+
+[[mods]] #mandatory
+
+modId="${mod_id}" #mandatory
+
+version="${mod_version}" #mandatory
+
+displayName="${mod_name}" #mandatory
+
+description='''
+Quest system: a player-facing quest log UI, Active Quest HUD, waypoint hints, and a public API
+(api.Myssions) letting other mods register quest definitions and assign/grant them to players.
+'''
+
+[[dependencies.${mod_id}]] #optional
+    modId="neoforge" #mandatory
+    type="required" #mandatory
+    versionRange="[${neo_version},)" #mandatory
+    ordering="NONE"
+    side="BOTH"
+
+[[dependencies.${mod_id}]]
+    modId="minecraft"
+    type="required"
+    versionRange="${minecraft_version_range}"
+    ordering="NONE"
+    side="BOTH"
+
+# Optional soft dependency -- waypoint hints (vague-location circles, auto-removed/recalculated
+# based on the player's own knowledge quality) are rendered through Cartographyr's minimap if
+# present; the mod works standalone without it, just with no map markers for quest locations.
+[[dependencies.${mod_id}]]
+    modId="cartographyr"
+    type="optional"
+    reason="Renders quest location waypoints (vague-circle hints) on the minimap if present."
+    ordering="NONE"
+    side="BOTH"
+
+# Optional soft dependency -- a settlement's Mayor is a natural future quest Issuer (e.g.
+# commissioning a road to a neighboring settlement); the mod works standalone without it.
+[[dependencies.${mod_id}]]
+    modId="settlemynts"
+    type="optional"
+    reason="Lets a settlement's Mayor act as a quest Issuer if present."
+    ordering="NONE"
+    side="BOTH"
+
+# Optional soft dependency -- a quest reward can grant Lyfe skill XP if present.
+[[dependencies.${mod_id}]]
+    modId="lyfe"
+    type="optional"
+    reason="Lets a quest reward grant Lyfe skill XP if present."
+    ordering="NONE"
+    side="BOTH"
+
+# Optional soft dependency -- a quest reward can grant gold (Gold Nuggets via Yconomics' economy)
+# if present.
+[[dependencies.${mod_id}]]
+    modId="yconomics"
+    type="optional"
+    reason="Lets a quest reward grant gold if present."
+    ordering="NONE"
+    side="BOTH"
