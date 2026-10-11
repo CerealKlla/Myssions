@@ -202,9 +202,10 @@ public final class QuestLogScreen extends Screen {
         rebuildActionButton();
     }
 
-    /** "Abandon Quest" (2026-10-11 explicit request) -- confirms first via vanilla's own {@code
-     * ConfirmScreen} (same dialog type used for e.g. "Delete World") since this is a real, one-click
-     * loss of in-progress quest state, not an easily-reversible action. */
+    /** "Abandon Quest" -- confirms first via vanilla's own {@code ConfirmScreen} (same dialog type
+     * used for e.g. "Delete World") since this is a real, irreversible deletion, not a status change
+     * (2026-10-11 correction: abandoning now fully deletes the instance -- see {@code
+     * QuestEngine#abandonQuest}'s own doc -- rather than parking it in Failed Quests/Retry). */
     private void confirmAbandon() {
         if (selectedId == null) {
             return;
@@ -222,12 +223,18 @@ public final class QuestLogScreen extends Screen {
                     }
                 },
                 Component.literal("Abandon Quest"),
-                Component.literal("Give up on \"" + questName + "\"? You can retry it later from Failed Quests.")));
+                Component.literal("Permanently give up on \"" + questName + "\"? This can't be undone, but you'll be free to accept it (or anything else) again.")));
     }
 
     private void abandon(UUID instanceId) {
         Minecraft.getInstance().getConnection().send(new ServerboundCustomPayloadPacket(new AbandonQuestPayload(instanceId)));
+        if (instanceId.equals(selectedId)) {
+            selectedId = null;
+        }
         rebuildListRows();
+        if (selectedId == null && !listRows.isEmpty()) {
+            listRows.stream().filter(r -> !r.isHeader()).findFirst().ifPresent(r -> selectedId = r.instanceId());
+        }
         rebuildActionButton();
     }
 

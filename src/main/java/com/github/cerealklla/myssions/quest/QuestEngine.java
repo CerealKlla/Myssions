@@ -604,11 +604,15 @@ public final class QuestEngine {
     }
 
     /**
-     * Player-initiated give-up, from {@code client.QuestLogScreen}'s new "Abandon Quest" button
-     * (2026-10-11 explicit request). Reuses {@link QuestStatus#FAILED} rather than adding a distinct
-     * status -- an abandoned quest should land in the exact same "Failed Quests" bucket a timed-out
-     * one does, with the same existing Retry path, rather than introducing a parallel UI/state story
-     * for what's functionally the same "not in progress anymore, but resumable" outcome.
+     * Player-initiated give-up, from {@code client.QuestLogScreen}'s new "Abandon Quest" button.
+     * Real correction, 2026-10-11, right after the first version shipped (which reused {@link
+     * QuestStatus#FAILED}, landing it in the still-visible Failed Quests list): "Abandoning a quest
+     * should fully abandon it. Meaning delete it from the player J menu, so they can replace it with
+     * a different quest. This also is a way to remove bugged quests without needing special server
+     * commands." A genuine full delete via {@link PlayerQuestData#withoutQuest} -- the one
+     * deliberate exception to that record's own "never removed" instance-retention rule -- not a
+     * third status alongside FAILED/COMPLETED. {@code failQuest} (deadline expiry) is untouched and
+     * still uses FAILED/Retry; this is a different, player-chosen "pretend this never happened" path.
      */
     public static void abandonQuest(ServerPlayer player, UUID instanceId) {
         PlayerQuestData data = player.getData(ModAttachments.QUEST_DATA);
@@ -625,11 +629,7 @@ public final class QuestEngine {
                 caravan.discard();
             }
         }
-        PlayerQuestData updatedData = data.withQuest(instance.withStatus(QuestStatus.FAILED));
-        if (updatedData.activeQuestId().map(instanceId::equals).orElse(false)) {
-            updatedData = updatedData.withActiveQuest(null);
-        }
-        player.setData(ModAttachments.QUEST_DATA, updatedData);
+        player.setData(ModAttachments.QUEST_DATA, data.withoutQuest(instanceId));
         QuestRegistry.get(instance.definitionId()).ifPresent(def ->
                 player.sendSystemMessage(Component.literal("Quest abandoned: " + def.name())));
     }
