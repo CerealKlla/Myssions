@@ -2,6 +2,7 @@ package com.github.cerealklla.myssions.quest;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -39,6 +40,24 @@ public final class QuestEngine {
             return Optional.empty();
         }
         PlayerQuestData data = player.getData(ModAttachments.QUEST_DATA);
+        // Auto-clean orphaned instances whose definition no longer exists at all (e.g. a quest type
+        // removed in a later update, like the six on-site kill quests deleted 2026-10-11) -- these
+        // used to sit invisible forever (QuestRegistry.get returns empty, so client.QuestLogScreen's
+        // own row-building silently drops them from the list) while still permanently occupying a
+        // slot against MAX_ACCEPTED_QUESTS, with no way for the player to ever see or abandon them.
+        // Real report, 2026-10-12: "I have 3 quests right now but got blocked... citing the limit was
+        // 5." Cleaned up here (the one place that actually cares about the real count) rather than
+        // added as a one-off manual fix, since any future quest removal can reproduce this the same way.
+        List<UUID> orphaned = data.quests().entrySet().stream()
+                .filter(e -> e.getValue().status() == QuestStatus.IN_PROGRESS && QuestRegistry.get(e.getValue().definitionId()).isEmpty())
+                .map(Map.Entry::getKey)
+                .toList();
+        for (UUID orphanId : orphaned) {
+            data = data.withoutQuest(orphanId);
+        }
+        if (!orphaned.isEmpty()) {
+            player.setData(ModAttachments.QUEST_DATA, data);
+        }
         boolean alreadyInProgress = data.quests().values().stream()
                 .anyMatch(i -> i.definitionId().equals(definitionId) && i.status() == QuestStatus.IN_PROGRESS);
         if (alreadyInProgress) {
