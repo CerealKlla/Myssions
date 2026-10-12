@@ -8,6 +8,7 @@ import com.github.cerealklla.cartographyr.api.Cartography;
 import com.github.cerealklla.cartographyr.geo.Classification;
 import com.github.cerealklla.cartographyr.geo.DisplayText;
 import com.github.cerealklla.cartographyr.geo.GeographicEntity;
+import com.github.cerealklla.cartographyr.geo.Layer;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceKey;
@@ -51,13 +52,30 @@ public final class CartographyrRegionBridge {
      */
     public static Optional<RegionTarget> pickWeightedNearby(ServerLevel level, BlockPos origin, double maxRadiusBlocks, RandomSource random) {
         List<GeographicEntity> candidates = new ArrayList<>();
-        candidates.addAll(Cartography.findEntities(level, Classification.NATURAL));
-        candidates.addAll(Cartography.findEntities(level, Classification.CONSTRUCTED));
+        // Layer-filtered, not a blanket Classification scan -- real live report, 2026-10-12: an
+        // unfiltered Classification.CONSTRUCTED query also matches every individual Settlemynts plot
+        // (its own zone layer), not just whole settlements, so a region-kill quest could pick a plot
+        // -- including one inside the issuing player's own settlement ("Kill 6 Zombies ... in
+        // Muffin's Home," a Private Residence plot) -- as its "real location" target. Zombies spawned
+        // there burned in daylight and were killed by town guards before the player could do
+        // anything, exactly the on-site-combat problem this quest shape was built to avoid in the
+        // first place (see design-document.md's taxonomy, and the 2026-10-11 removal of the original
+        // on-site kill quests). Only Region/Settlement-layer entities are real quest-target candidates.
+        candidates.addAll(Cartography.findEntities(level, Classification.NATURAL, Layer.REGION_ID));
+        candidates.addAll(Cartography.findEntities(level, Classification.CONSTRUCTED, Layer.SETTLEMENT_ID));
 
         List<GeographicEntity> inRange = new ArrayList<>();
         List<Double> distances = new ArrayList<>();
         for (GeographicEntity entity : candidates) {
             if (!entity.dimension().equals(level.dimension())) {
+                continue;
+            }
+            // A settlement's own center can easily sit more than MIN_DISTANCE_BLOCKS away from one
+            // particular NPC near its edge in a large settlement -- that minimum alone doesn't
+            // reliably exclude the issuing player's own settlement (see this method's own doc for the
+            // real report this came from). The robust check is whether the quest giver's own position
+            // falls inside this candidate's shape at all, regardless of distance-to-center.
+            if (entity.geometry().contains(origin.getX(), origin.getZ())) {
                 continue;
             }
             double dx = entity.geometry().centerBlockX() - origin.getX();
