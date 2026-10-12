@@ -66,4 +66,23 @@ public final class LyfeWaypointBridge {
             Lyfe.grantKnowledgeFactors(toPlayer, placeId, factors);
         }
     }
+
+    /**
+     * Grants direction/distance/name knowledge *anchored to a real reference point* (added
+     * 2026-10-12, replacing this mod's own now-removed static direction-phrase computation --
+     * {@code QuestHooks#registerRegionHook} used to build "to the northeast of Bramton" itself and
+     * cache it on the instance; Lyfe now owns deciding how much to reveal and how to phrase it, this
+     * mod only ever supplies the raw facts). See {@code api.Lyfe#grantPartialLocationKnowledge}'s
+     * own doc.
+     */
+    public static void grantPartialLocation(ServerPlayer player, long placeId, BlockPos referencePos, String referenceDimensionId,
+                                              String referenceDisplayName, boolean grantsName, boolean grantsDirection, boolean grantsDistance) {
+        Lyfe.grantPartialLocationKnowledge(player, placeId, referencePos, referenceDimensionId, referenceDisplayName,
+                grantsName, grantsDirection, grantsDistance);
+    }
+
+    /** Wraps {@code api.Lyfe#resolveLocationText} -- see that method's own doc. */
+    public static String resolveLocationText(ServerPlayer player, long placeId, String realName, BlockPos targetPos) {
+        return Lyfe.resolveLocationText(player, placeId, realName, targetPos);
+    }
 }

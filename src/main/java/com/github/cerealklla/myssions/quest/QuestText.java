@@ -46,15 +46,19 @@ public final class QuestText {
     }
 
     /**
-     * Same substitution as {@link #resolve}, but with {@code short_} set true, {@code {location}}
-     * resolves to just {@link QuestInstance#realLocationName()} once the player's knowledge has
-     * already upgraded {@link QuestInstance#locationName()} past its initial bare {@link
-     * QuestInstance#directionPhrase()} -- e.g. "The Boughs" instead of "to the northeast of
-     * Starterville, in The Boughs". Added 2026-10-12 for {@code client.ActiveQuestOverlay}'s own
-     * terse HUD line (real report: the full resolved phrase ran the active-quest box into the
-     * minimap) -- {@code client.QuestLogScreen}'s detail pane keeps the full phrase via plain {@link
-     * #resolve}. Still respects the knowledge gate: before the upgrade, shows the same (already
-     * short) direction phrase every other view shows -- never reveals the real name early.
+     * Same substitution as {@link #resolve}, but with {@code {location}} capped to a short form for
+     * a region quest: just the bare real place name once fully known, else a generic "somewhere"
+     * placeholder instead of Lyfe's full direction/distance phrase. Added 2026-10-12 for {@code
+     * client.ActiveQuestOverlay}'s own terse HUD line (real report: the full resolved phrase ran the
+     * active-quest box into the minimap) -- {@code client.QuestLogScreen}'s detail pane keeps the
+     * full live-resolved phrase via plain {@link #resolve}. Still respects the knowledge gate --
+     * never reveals the real name early.
+     *
+     * <p>Reworked 2026-10-12 alongside the Lyfe knowledge-ownership cleanup: used to detect "already
+     * upgraded" by comparing the displayed text against a cached {@code directionPhrase} field,
+     * which no longer exists now that Lyfe resolves direction/distance live rather than this mod
+     * caching a static phrase. Detects the same thing more directly now -- fully known means the
+     * displayed text already equals the bare real name outright.
      */
     public static String resolveShort(String template, QuestInstance instance) {
         return resolve(template, instance, true);
@@ -75,14 +79,13 @@ public final class QuestText {
 
     private static String shortLocationName(QuestInstance instance, boolean shortLocation) {
         String displayed = instance.locationName().orElse(FALLBACK);
-        if (!shortLocation) {
-            return displayed;
+        if (!shortLocation || instance.realLocationName().isEmpty()) {
+            return displayed; // Not a region quest (on-site/buy-item/plot-upgrade) -- always plain, never long.
         }
-        boolean alreadyUpgraded = instance.directionPhrase().isPresent() && !displayed.equals(instance.directionPhrase().get());
-        if (alreadyUpgraded && instance.realLocationName().isPresent()) {
-            return instance.realLocationName().get();
+        if (displayed.equals(instance.realLocationName().get())) {
+            return displayed; // Fully known -- Lyfe's resolution is already just the bare real name.
         }
-        return displayed;
+        return "somewhere"; // Partially known -- the full direction/distance phrase is too long for the HUD.
     }
 
     /** The resolved gold reward packed onto a buy-item milestone's own {@code locationName} -- see this class's own doc. Empty for any non-buy-item quest, or before acceptance has resolved one. */

@@ -87,13 +87,17 @@ public final class QuestWaypointTicker {
         double radius = MAX_RADIUS_BLOCKS - (MAX_RADIUS_BLOCKS - MIN_RADIUS_BLOCKS) * fraction;
         BlockPos center = seededOffset(truePos, placeId, radius);
 
-        // "the Milestone text could be upgraded from 'to the east of <Settlement>' to 'to the
-        // east of <Settlement>, in the Whispering Forest'" -- explicit user spec, 2026-10-11.
-        // Full knowledge (every factor) is this mod's own bar for "you genuinely know this
-        // place," same threshold the vague-circle math above already collapses to near-exact at.
-        if (knownFactors >= 3 && instance.realLocationName().isPresent() && instance.directionPhrase().isPresent()) {
-            String upgraded = instance.directionPhrase().get() + ", in " + instance.realLocationName().get();
-            QuestEngine.upgradeLocationName(player, instance.instanceId(), upgraded);
+        // Live-resolved display text (added 2026-10-12, replacing a one-shot "knownFactors >= 3"
+        // upgrade check this mod used to do itself) -- Lyfe now owns the whole "how much is known,
+        // how should it read" decision; this just pushes whatever Lyfe currently says into the
+        // synced field the client actually reads (client-side code has no way to ask Lyfe directly).
+        // Progressively updates now (direction-only, then direction+distance, then the real name)
+        // instead of the old binary "direction phrase, then direction phrase + real name" jump.
+        if (instance.realLocationName().isPresent()) {
+            String resolved = LyfeWaypointBridge.resolveLocationText(player, placeId, instance.realLocationName().get(), truePos);
+            if (!instance.locationName().map(resolved::equals).orElse(false)) {
+                QuestEngine.upgradeLocationName(player, instance.instanceId(), resolved);
+            }
         }
 
         LyfeWaypointBridge.setWaypoint(player, player.level().dimension(), center, radius);

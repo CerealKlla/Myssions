@@ -206,34 +206,22 @@ final class QuestHooks {
                         originLevel, origin.pos(), REGION_QUEST_MAX_RADIUS_BLOCKS, player.getRandom()
                 ).ifPresent(target -> {
                     String settlementName = origin.settlementName().isBlank() ? "here" : origin.settlementName();
-                    String direction = directionWord(origin.pos(), target.pos());
-                    String directionPhrase = "to the " + direction + " of " + settlementName;
 
-                    QuestEngine.setHint(player, instanceId, target.pos(), target.dimension().identifier().toString(),
-                            Optional.of(directionPhrase));
-                    QuestEngine.setRegionKnowledge(player, instanceId, target.placeId(), directionPhrase, target.displayName());
+                    QuestEngine.setHint(player, instanceId, target.pos(), target.dimension().identifier().toString(), Optional.empty());
+                    QuestEngine.setRegionKnowledge(player, instanceId, target.placeId(), target.displayName());
 
                     double fraction = Math.max(0.0, Math.min(1.0, target.distanceBlocks() / REGION_QUEST_MAX_RADIUS_BLOCKS));
                     double multiplier = REGION_REWARD_MIN_MULTIPLIER + (REGION_REWARD_MAX_MULTIPLIER - REGION_REWARD_MIN_MULTIPLIER) * fraction;
                     QuestEngine.setRewardMultiplier(player, instanceId, multiplier);
 
-                    // Temporary debug logging (2026-10-11, explicit user request while chasing a
-                    // "marker never showed up" report) -- remove once that's resolved and confirmed
-                    // live, not a standing feature.
-                    if (com.github.cerealklla.myssions.bridge.LyfeWaypointBridge.isLoaded()) {
-                        int priorFactors = com.github.cerealklla.myssions.bridge.LyfeWaypointBridge.knownFactorCount(player, target.placeId());
-                        com.github.cerealklla.myssions.bridge.LyfeWaypointBridge.grantKnowledge(player, target.placeId(), true, true, false);
-                        int afterFactors = com.github.cerealklla.myssions.bridge.LyfeWaypointBridge.knownFactorCount(player, target.placeId());
-                        MyssionsMod.LOGGER.info(
-                                "[QuestDebug] {} accepted region quest {} -- target '{}' (placeId={}), prior knowledge factors={}, after grant={}, direction='{}', activeQuestId will be {}",
-                                player.getGameProfile().name(), questId, target.displayName(), target.placeId(),
-                                priorFactors, afterFactors, directionPhrase,
-                                player.getData(com.github.cerealklla.myssions.registration.ModAttachments.QUEST_DATA).activeQuestId()
-                                        .map(Object::toString).orElse("<none set -- this quest's marker will NOT show until 'Set as Active Quest' is clicked>"));
-                    } else {
-                        MyssionsMod.LOGGER.info("[QuestDebug] {} accepted region quest {} -- Lyfe not loaded, no knowledge/waypoint possible",
-                                player.getGameProfile().name(), questId);
-                    }
+                    // Initial hint, anchored to where it was given from (the issuing plot) -- direction
+                    // and distance known immediately (matches the old static "to the <dir> of <X>"
+                    // phrase's always-visible-from-the-start behavior), name withheld until the
+                    // player's own knowledge crosses the full-reveal bar (QuestWaypointTicker/
+                    // Lyfe#resolveLocationText decide that live now, not a value cached here).
+                    com.github.cerealklla.myssions.bridge.LyfeWaypointBridge.grantPartialLocation(player, target.placeId(),
+                            origin.pos(), origin.dimension().identifier().toString(), settlementName, false, true, true);
+
                     player.sendSystemMessage(Component.literal("You get a rough idea where to look -- check your map."));
                 });
             });

@@ -98,11 +98,11 @@ public final class QuestEngine {
     }
 
     /** Wires a region quest up to real Cartographyr-backed knowledge -- see {@link QuestInstance#withRegionKnowledge}'s own doc. Called once, right after {@link #setHint}, from {@code NpcQuests#registerRegionHook}. */
-    public static void setRegionKnowledge(ServerPlayer player, UUID instanceId, long knowledgePlaceId, String directionPhrase, String realLocationName) {
+    public static void setRegionKnowledge(ServerPlayer player, UUID instanceId, long knowledgePlaceId, String realLocationName) {
         PlayerQuestData data = player.getData(ModAttachments.QUEST_DATA);
         QuestInstance instance = data.quests().get(instanceId);
         if (instance != null) {
-            player.setData(ModAttachments.QUEST_DATA, data.withQuest(instance.withRegionKnowledge(knowledgePlaceId, directionPhrase, realLocationName)));
+            player.setData(ModAttachments.QUEST_DATA, data.withQuest(instance.withRegionKnowledge(knowledgePlaceId, realLocationName)));
         }
     }
 

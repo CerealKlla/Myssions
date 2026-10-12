@@ -128,7 +128,7 @@ public final class RoadQuestLogic {
         Optional<GeographicEntity> destination = Cartography.getEntity(level, new EntityId(destinationPlaceId));
         String destinationName = destination.map(com.github.cerealklla.cartographyr.geo.DisplayText::shortForEntity).orElse("the other settlement");
         QuestEngine.setRoadQuestData(player, instanceId, originPlaceId, entry.minStakes(), entry.optimalStakeCap());
-        QuestEngine.setRegionKnowledge(player, instanceId, destinationPlaceId, "toward " + destinationName, destinationName);
+        QuestEngine.setRegionKnowledge(player, instanceId, destinationPlaceId, destinationName);
 
         grantDestinationKnowledge(level, player, entry, destinationPlaceId);
 

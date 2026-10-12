@@ -4,6 +4,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import com.github.cerealklla.myssions.quest.IssuerQuestBoard;
+import com.github.cerealklla.myssions.quest.IssuerQuestPools;
 import com.github.cerealklla.myssions.quest.QuestDefinition;
 import com.github.cerealklla.myssions.quest.QuestEngine;
 import com.github.cerealklla.myssions.quest.QuestGiverMenu;
@@ -28,6 +29,20 @@ import net.minecraft.server.level.ServerPlayer;
  * different NPCs), so the definition id alone can't name a specific one. {@link #assignQuest}
  * still takes the definition id (there's nothing to disambiguate when creating a new instance) and
  * hands back the new instance's id.
+ *
+ * <p><b>Adding a brand-new quest type from another mod, 2026-10-12</b> -- this was already almost
+ * entirely possible before this doc existed, it just wasn't written down anywhere as a supported
+ * path. The recipe: (1) build a {@link QuestDefinition} out of one or more {@code
+ * QuestMilestone#simple} milestones (a milestone with none of the built-in kind flags set --
+ * completed only by a direct {@link #reportMilestoneProgress}/{@link #completeMilestone} call, never
+ * by any of this mod's own detection listeners) -- your own mod is entirely responsible for deciding
+ * when progress happens and calling one of those methods; (2) {@link #registerQuestDefinition} it;
+ * (3) call {@link #registerQuestForZoneType} for whichever Zone Type(s) should actually offer it
+ * (your own, or an existing one this mod already serves -- registration is additive, never replaces
+ * what's already offered there); (4) once a player accepts it (via {@link #assignQuest} or the
+ * normal board-offer flow), call {@link #tryCompleteQuest} once every milestone is done. Reward
+ * kinds ({@code QuestReward}: Gold/Item/XP-into-any-skill-id) need no registration at all -- they're
+ * already fully generic.
  */
 public final class Myssions {
 
@@ -37,6 +52,24 @@ public final class Myssions {
     /** Registers a quest definition so it can later be assigned to a player. Safe to call repeatedly with the same id -- re-registers (overwrites) it. */
     public static void registerQuestDefinition(QuestDefinition definition) {
         QuestRegistry.register(definition);
+    }
+
+    /**
+     * Makes an already-registered quest definition offerable through the normal NPC/sign board flow
+     * for plots of the given Zone Type (e.g. {@code "settlemynts:town_hall"}, or your own mod's own
+     * Zone Type id) -- additive, never replaces another mod's (or this mod's own) existing offers for
+     * that type. See this class's own doc for the full recipe. No-ops with a logged warning if
+     * {@code questId} was never registered via {@link #registerQuestDefinition} -- a quest can't be
+     * offered if it doesn't exist.
+     */
+    public static void registerQuestForZoneType(String zoneTypeId, Identifier questId) {
+        if (QuestRegistry.get(questId).isEmpty()) {
+            com.github.cerealklla.myssions.MyssionsMod.LOGGER.warn(
+                    "registerQuestForZoneType({}, {}) called for a quest that was never registered via registerQuestDefinition -- ignoring.",
+                    zoneTypeId, questId);
+            return;
+        }
+        IssuerQuestPools.register(zoneTypeId, java.util.List.of(questId));
     }
 
     public static Optional<QuestDefinition> getQuestDefinition(Identifier definitionId) {
