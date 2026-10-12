@@ -84,6 +84,16 @@ public final class CartographyrRegionBridge {
             if (dist < MIN_DISTANCE_BLOCKS || dist > maxRadiusBlocks) {
                 continue;
             }
+            // Real report, 2026-10-12: "Pest Control Out Back" (kill 5 Spiders) landed its target
+            // dead center in open ocean ("The Shoals") -- a region/settlement's own centerBlockX/Z
+            // is just its geometric centroid, with no guarantee it's dry land, and this quest family
+            // guarantees mob completability by spawning directly at that point (see
+            // quest.QuestMobSpawnTicker), which is meaningless underwater for a land mob. Rejected
+            // outright rather than just down-weighted -- an impossible-to-complete quest is worse
+            // than a slightly smaller candidate pool.
+            if (isOpenWaterAt(level, entity.geometry().centerBlockX(), entity.geometry().centerBlockZ())) {
+                continue;
+            }
             inRange.add(entity);
             distances.add(dist);
         }
@@ -114,6 +124,12 @@ public final class CartographyrRegionBridge {
         int y = level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z);
         return Optional.of(new RegionTarget(new BlockPos(x, y, z), entity.dimension(), DisplayText.shortForEntity(entity),
                 distances.get(chosen), entity.id().value()));
+    }
+
+    /** True if the real surface at (x, z) is a fluid (ocean/river/lake), not dry ground -- see {@link #pickWeightedNearby}'s own doc for why this excludes a candidate outright. */
+    private static boolean isOpenWaterAt(ServerLevel level, int x, int z) {
+        int y = level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z);
+        return !level.getFluidState(new BlockPos(x, y - 1, z)).isEmpty();
     }
 
     /**
