@@ -22,11 +22,19 @@ public final class QuestDeadlineTicker {
 
     private static final int SCAN_INTERVAL_TICKS = 100; // 5 seconds.
     private static final long TICKS_PER_DAY = 24000L;
+    // Staggered 2026-10-12 -- real report: every mob near the player stutter-moving in lockstep.
+    // Root cause: this and seven other full-world-scanning tickers across Settlemynts/Lyfe all
+    // independently picked "every 100 ticks" with no offset, so every scan landed on the exact same
+    // tick and their costs compounded into one periodic spike every 5 seconds -- confirmed live via
+    // Settlemynts' own [LagDiagnostics] slow-tick logger, firing almost exactly every 5.00s. See
+    // Settlemynts' FarmerSpawnTicker for the full writeup; this offset just spreads this mod's own
+    // share of that same cost onto a different tick within the window.
+    private static final int TICK_OFFSET = 87;
 
     @SubscribeEvent
     public void onServerTick(ServerTickEvent.Post event) {
         MinecraftServer server = event.getServer();
-        if (server.getTickCount() % SCAN_INTERVAL_TICKS != 0) {
+        if ((server.getTickCount() + TICK_OFFSET) % SCAN_INTERVAL_TICKS != 0) {
             return;
         }
         long nowGameTime = server.overworld().getGameTime();
