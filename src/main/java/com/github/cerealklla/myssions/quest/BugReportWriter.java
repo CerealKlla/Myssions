@@ -41,6 +41,15 @@ import net.neoforged.fml.loading.FMLPaths;
  * level folder showing only reports still genuinely open, while the fixed ones stay around as a
  * dated record of what each report actually turned out to be. Purely a manual filing step done
  * alongside the normal fix-and-deploy work, not something this class itself automates.
+ *
+ * <p><b>Thanking the reporter (explicit user request, same day)</b> -- the reporter's identity is
+ * already captured above (name + UUID in the "Reporter" section), so no extra plumbing was needed
+ * for that part. The reward itself is Gold Nuggets, delivered via Yconomics' existing {@code
+ * /yconomics purse add <count> <player>} debug command (requires the target to be online -- no
+ * offline-queued delivery exists). The actual trigger/amount/automation for this is still an open
+ * design question (explicit user answer: "I'll figure that out later") -- for now, reward manually
+ * via that command as part of the same triage pass that marks a report fixed, once the reporter is
+ * next seen online.
  */
 public final class BugReportWriter {
 
