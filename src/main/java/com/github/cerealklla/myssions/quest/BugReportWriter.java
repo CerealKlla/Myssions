@@ -32,6 +32,15 @@ import net.neoforged.fml.loading.FMLPaths;
  * hand-picked subset -- a bug report is exactly the situation where an "unimportant" field (a raw
  * hint position, a reward multiplier, whether mobs were ever topped up) can turn out to be the one
  * fact that explains the report, and this is cheap to generate either way.
+ *
+ * <p><b>Triage workflow (explicit user request, 2026-10-12)</b>: a fresh report lands directly in
+ * {@code myssions/bugreports/}. Once its underlying bug is actually fixed and deployed, move the
+ * file into {@code myssions/bugreports/fixed/} and prepend a short {@code === FIXED ===} section
+ * naming the Build number it shipped in and a one-line root-cause summary (see that first subfolder
+ * entry, from this feature's own first real submission, for the exact shape) -- this keeps the top-
+ * level folder showing only reports still genuinely open, while the fixed ones stay around as a
+ * dated record of what each report actually turned out to be. Purely a manual filing step done
+ * alongside the normal fix-and-deploy work, not something this class itself automates.
  */
 public final class BugReportWriter {
 
