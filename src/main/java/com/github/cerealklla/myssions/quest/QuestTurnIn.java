@@ -119,10 +119,19 @@ public final class QuestTurnIn {
             return Optional.empty();
         }
         var data = player.getData(ModAttachments.QUEST_DATA);
-        if (data.quests().values().stream().anyMatch(i -> i.definitionId().equals(questId))) {
-            // Already has a record of it (in progress/completed/failed) -- the board offer is stale
-            // for this player specifically; leave it on the board for someone else.
-            player.sendSystemMessage(Component.literal("I don't have anything new for you right now."));
+        // Only blocks a genuinely still-active instance of this exact definition -- repeating a
+        // quest you've already completed/failed is allowed (explicit 2026-10-12 user choice: "Allow
+        // unlimited repeats"). The previous version blocked on ANY record at all (in progress,
+        // completed, OR failed), which meant a quest could only ever be accepted once per player,
+        // forever -- real report: with only ~11 quests per profession, a player who'd completed a
+        // handful kept hitting dead "I don't have anything new for you right now" offers whenever the
+        // nightly board-roll happened to pick something they'd already done, with no way to ever
+        // clear that.
+        boolean alreadyActive = data.quests().values().stream()
+                .anyMatch(i -> i.definitionId().equals(questId)
+                        && (i.status() == QuestStatus.IN_PROGRESS || i.status() == QuestStatus.AWAITING_REWARD_PICKUP));
+        if (alreadyActive) {
+            player.sendSystemMessage(Component.literal("You're already working on that one."));
             return Optional.empty();
         }
         Optional<UUID> instanceId = QuestEngine.assignQuest(player, questId);
