@@ -86,6 +86,7 @@ public class MyssionsMod {
         com.github.cerealklla.myssions.quest.BuildingSupplierQuests.registerAll();
         com.github.cerealklla.myssions.quest.StonemasonQuests.registerAll();
         com.github.cerealklla.myssions.quest.TavernQuests.registerAll();
+        com.github.cerealklla.myssions.quest.MinerQuests.registerAll();
         com.github.cerealklla.myssions.quest.RoadQuestDefinitions.registerAll();
         LOGGER.info("Myssions common setup");
     }
