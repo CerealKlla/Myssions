@@ -366,6 +366,17 @@ public final class QuestLogScreen extends Screen {
                     .orElse("Gold Nuggets (amount set once accepted)");
             y = drawWrapped(graphics, "- " + line, left, y, wrapWidth, TEXT_COLOR, lineHeight);
         }
+        // Same gap for a gather milestone's real reward -- goldPerUnit * requiredCount is already
+        // granted on completion (QuestEngine#addGatherReward), but both values are static per
+        // definition (unlike a buy milestone's per-instance resolve), so no instance lookup is
+        // needed here at all.
+        for (QuestMilestone milestone : definition.milestones()) {
+            if (milestone.isGatherMilestone() && milestone.bonusGoldPerProof() > 0) {
+                int gold = milestone.bonusGoldPerProof() * milestone.requiredCount();
+                String line = gold + " Gold Nugget" + (gold == 1 ? "" : "s");
+                y = drawWrapped(graphics, "- " + line, left, y, wrapWidth, TEXT_COLOR, lineHeight);
+            }
+        }
         for (QuestReward reward : definition.rewards()) {
             y = drawWrapped(graphics, "- " + reward.displayLine(), left, y, wrapWidth, TEXT_COLOR, lineHeight);
         }
