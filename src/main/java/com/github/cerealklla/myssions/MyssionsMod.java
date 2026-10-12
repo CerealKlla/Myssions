@@ -38,6 +38,8 @@ public class MyssionsMod {
         ModEntities.ENTITIES.register(modEventBus);
         ModAttachments.ATTACHMENT_TYPES.register(modEventBus);
         ModMenus.MENU_TYPES.register(modEventBus);
+        com.github.cerealklla.myssions.registration.ModBlocks.BLOCKS.register(modEventBus);
+        com.github.cerealklla.myssions.registration.ModBlockEntities.BLOCK_ENTITIES.register(modEventBus);
 
         modEventBus.addListener(this::commonSetup);
         modEventBus.addListener(this::registerPayloads);
@@ -46,6 +48,7 @@ public class MyssionsMod {
         NeoForge.EVENT_BUS.register(new QuestDeadlineTicker());
         NeoForge.EVENT_BUS.register(new QuestKillListener());
         NeoForge.EVENT_BUS.register(new com.github.cerealklla.myssions.quest.MobRegionTagListener());
+        NeoForge.EVENT_BUS.register(new com.github.cerealklla.myssions.marker.MarkerBreakListener());
         NeoForge.EVENT_BUS.register(new com.github.cerealklla.myssions.quest.QuestMobSpawnTicker());
         NeoForge.EVENT_BUS.register(new com.github.cerealklla.myssions.quest.QuestEscortTicker());
         NeoForge.EVENT_BUS.register(new com.github.cerealklla.myssions.quest.RoadQuestTicker());

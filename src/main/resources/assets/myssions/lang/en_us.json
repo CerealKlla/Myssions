@@ -1,5 +1,7 @@
 {
   "item.myssions.quest_proof": "Quest Proof",
+  "block.myssions.ground_marker": "Marker",
+  "block.myssions.wall_marker": "Marker",
   "key.myssions.open_quest_log": "Open Quest Log",
   "key.categories.myssions": "Myssions"
 }

@@ -72,6 +72,34 @@ public final class Myssions {
         IssuerQuestPools.register(zoneTypeId, java.util.List.of(questId));
     }
 
+    /**
+     * Places a ground "X marks the spot" marker at {@code pos} -- incorporeal (no collision),
+     * destroyed the instant its support block is removed, never drops/obtainable. {@code tag} is an
+     * entirely opaque string the caller controls (a quest id, a loot table id, whatever) -- read back
+     * by a {@link #registerMarkerTriggerListener} the moment a player breaks the block underneath it.
+     * See {@code marker.GroundMarkerBlock}'s own doc for the full design.
+     */
+    public static void placeGroundMarker(net.minecraft.server.level.ServerLevel level, net.minecraft.core.BlockPos pos, String tag) {
+        level.setBlock(pos, com.github.cerealklla.myssions.registration.ModBlocks.GROUND_MARKER.get().defaultBlockState(), 3);
+        if (level.getBlockEntity(pos) instanceof com.github.cerealklla.myssions.marker.IncorporealMarkerBlockEntity entity) {
+            entity.setTag(tag);
+        }
+    }
+
+    /** Wall-mounted sibling of {@link #placeGroundMarker} -- {@code facing} is the direction the marker faces outward (away from the wall it's mounted on), same convention as a vanilla wall torch. */
+    public static void placeWallMarker(net.minecraft.server.level.ServerLevel level, net.minecraft.core.BlockPos pos, net.minecraft.core.Direction facing, String tag) {
+        level.setBlock(pos, com.github.cerealklla.myssions.registration.ModBlocks.WALL_MARKER.get().defaultBlockState()
+                .setValue(com.github.cerealklla.myssions.marker.WallMarkerBlock.FACING, facing), 3);
+        if (level.getBlockEntity(pos) instanceof com.github.cerealklla.myssions.marker.IncorporealMarkerBlockEntity entity) {
+            entity.setTag(tag);
+        }
+    }
+
+    /** Registers a listener fired the instant a player breaks the block supporting any marker -- see {@code marker.MarkerEvents}' own doc. */
+    public static void registerMarkerTriggerListener(com.github.cerealklla.myssions.marker.MarkerEvents.TriggerListener listener) {
+        com.github.cerealklla.myssions.marker.MarkerEvents.register(listener);
+    }
+
     public static Optional<QuestDefinition> getQuestDefinition(Identifier definitionId) {
         return QuestRegistry.get(definitionId);
     }

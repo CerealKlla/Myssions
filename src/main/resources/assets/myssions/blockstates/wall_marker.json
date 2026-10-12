@@ -1,0 +1,8 @@
+{
+  "variants": {
+    "facing=north": { "model": "myssions:block/incorporeal_marker", "y": 180 },
+    "facing=south": { "model": "myssions:block/incorporeal_marker", "y": 0 },
+    "facing=west": { "model": "myssions:block/incorporeal_marker", "y": 90 },
+    "facing=east": { "model": "myssions:block/incorporeal_marker", "y": 270 }
+  }
+}
