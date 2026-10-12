@@ -42,9 +42,28 @@ public final class QuestText {
     }
 
     public static String resolve(String template, QuestInstance instance) {
+        return resolve(template, instance, false);
+    }
+
+    /**
+     * Same substitution as {@link #resolve}, but with {@code short_} set true, {@code {location}}
+     * resolves to just {@link QuestInstance#realLocationName()} once the player's knowledge has
+     * already upgraded {@link QuestInstance#locationName()} past its initial bare {@link
+     * QuestInstance#directionPhrase()} -- e.g. "The Boughs" instead of "to the northeast of
+     * Starterville, in The Boughs". Added 2026-10-12 for {@code client.ActiveQuestOverlay}'s own
+     * terse HUD line (real report: the full resolved phrase ran the active-quest box into the
+     * minimap) -- {@code client.QuestLogScreen}'s detail pane keeps the full phrase via plain {@link
+     * #resolve}. Still respects the knowledge gate: before the upgrade, shows the same (already
+     * short) direction phrase every other view shows -- never reveals the real name early.
+     */
+    public static String resolveShort(String template, QuestInstance instance) {
+        return resolve(template, instance, true);
+    }
+
+    private static String resolve(String template, QuestInstance instance, boolean shortLocation) {
         String result = template;
         if (result.contains(TOKEN)) {
-            result = result.replace(TOKEN, displayOnly(instance.locationName().orElse(FALLBACK)));
+            result = result.replace(TOKEN, displayOnly(shortLocationName(instance, shortLocation)));
         }
         if (result.contains(WOOD_TOKEN) || result.contains(STONE_TOKEN)) {
             PlotUpgradeAmounts amounts = resolvePlotUpgradeAmounts(instance).orElse(new PlotUpgradeAmounts(0, 0));
@@ -52,6 +71,18 @@ public final class QuestText {
                     .replace(STONE_TOKEN, String.valueOf(amounts.stoneNeeded()));
         }
         return result;
+    }
+
+    private static String shortLocationName(QuestInstance instance, boolean shortLocation) {
+        String displayed = instance.locationName().orElse(FALLBACK);
+        if (!shortLocation) {
+            return displayed;
+        }
+        boolean alreadyUpgraded = instance.directionPhrase().isPresent() && !displayed.equals(instance.directionPhrase().get());
+        if (alreadyUpgraded && instance.realLocationName().isPresent()) {
+            return instance.realLocationName().get();
+        }
+        return displayed;
     }
 
     /** The resolved gold reward packed onto a buy-item milestone's own {@code locationName} -- see this class's own doc. Empty for any non-buy-item quest, or before acceptance has resolved one. */

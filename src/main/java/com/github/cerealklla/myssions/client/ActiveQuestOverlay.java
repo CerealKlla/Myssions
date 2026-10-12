@@ -78,20 +78,37 @@ public final class ActiveQuestOverlay implements GuiLayer {
     }
 
     /**
-     * One milestone's HUD line, kept as succinct as possible (2026-10-11, real report: deliver-type
-     * milestone text was running off-screen) -- a live "(current/required)" count (same condition
-     * and format {@code client.QuestLogScreen} already uses) replaces spelling the target count out
-     * in prose, placed before "(optional)" so that's the last thing truncated if the line still
-     * doesn't fit.
+     * One milestone's HUD line, kept as succinct as possible. First shortened 2026-10-11 (a
+     * deliver-type milestone was running off-screen, fixed by moving the target count into a live
+     * "(current/required)" suffix instead of spelling it out in prose). Shortened further 2026-10-12
+     * (real report: a region-kill milestone's full resolved location phrase -- "near to the
+     * northeast of Starterville, in The Boughs" -- ran the whole box into the minimap): {@link
+     * QuestText#resolveShort} substitutes just the short real place name once it's actually known,
+     * instead of the full direction+name phrase {@code client.QuestLogScreen}'s detail pane still
+     * uses. The optional bonus-proof-delivery milestone every region-kill quest has (added
+     * 2026-10-11) gets its own even terser line -- "(Optional) Retrieve &lt;item&gt;" instead of
+     * "Deliver &lt;item&gt; for bonus gold ... (optional)" -- since its verbose prose form was the
+     * other half of the overflow on the exact quest reported.
      */
     private static String milestoneLine(QuestMilestone milestone, QuestInstance instance) {
-        String line = "- " + QuestText.resolve(milestone.description(), instance);
+        String line;
+        if (isBonusProofMilestone(milestone)) {
+            String proofName = milestone.proofId().flatMap(com.github.cerealklla.myssions.quest.ProofItemCatalog::getDisplayName).orElse("Proof");
+            line = "- (Optional) Retrieve " + proofName;
+        } else {
+            line = "- " + QuestText.resolveShort(milestone.description(), instance);
+        }
         if (milestone.requiredCount() > 1) {
             line += " (" + instance.milestoneProgress().getOrDefault(milestone.id(), 0) + "/" + milestone.requiredCount() + ")";
         }
-        if (milestone.optional()) {
+        if (milestone.optional() && !isBonusProofMilestone(milestone)) {
             line += " (optional)";
         }
         return line;
+    }
+
+    /** The region-kill quest taxonomy's own "bring back proof for bonus gold" milestone -- see {@code QuestHooks#registerRegionKillQuest}. */
+    private static boolean isBonusProofMilestone(QuestMilestone milestone) {
+        return milestone.isDeliverMilestone() && milestone.optional() && milestone.bonusGoldPerProof() > 0 && milestone.proofId().isPresent();
     }
 }

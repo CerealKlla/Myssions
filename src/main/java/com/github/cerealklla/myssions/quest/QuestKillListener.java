@@ -53,7 +53,19 @@ public final class QuestKillListener {
         String deadDimensionId = player.level().dimension().identifier().toString();
         var data = player.getData(ModAttachments.QUEST_DATA);
         for (QuestInstance instance : data.quests().values()) {
-            if (instance.status() != QuestStatus.IN_PROGRESS || !isWithinQuestArea(instance, deadDimensionId, deadPos)) {
+            if (instance.status() != QuestStatus.IN_PROGRESS) {
+                continue;
+            }
+            if (!isWithinQuestArea(instance, deadDimensionId, deadPos)) {
+                // Temporary diagnostic (2026-10-12, same report as the night-check log below) --
+                // only logged for a quest that actually has a real hint location set (a geofenced
+                // quest), so this doesn't spam for the "kill anywhere" quests that never geofence.
+                if (instance.hintPos().isPresent()) {
+                    com.github.cerealklla.myssions.MyssionsMod.LOGGER.info(
+                            "[NightKillDebug] player={} killed {} at {} -- rejected by geofence, instance {} hint={} in dim {}",
+                            player.getName().getString(), deadType, deadPos, instance.definitionId(),
+                            instance.hintPos().get(), instance.hintDimensionId().orElse("?"));
+                }
                 continue;
             }
             QuestRegistry.get(instance.definitionId()).ifPresent(definition -> {
@@ -62,6 +74,12 @@ public final class QuestKillListener {
                         continue;
                     }
                     if (milestone.nightOnly() && !player.level().isDarkOutside()) {
+                        // Temporary diagnostic (2026-10-12, real report: "not getting credit for
+                        // killing them in the area at night") -- remove once the real cause is
+                        // confirmed live.
+                        com.github.cerealklla.myssions.MyssionsMod.LOGGER.info(
+                                "[NightKillDebug] player={} killed {} at {} -- milestone={} nightOnly=true but isDarkOutside()=false",
+                                player.getName().getString(), deadType, deadPos, milestone.id());
                         continue;
                     }
                     int current = instance.milestoneProgress().getOrDefault(milestone.id(), 0);

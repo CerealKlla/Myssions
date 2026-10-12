@@ -29,4 +29,9 @@ public final class ProofItemCatalog {
         Entry entry = ENTRIES.getOrDefault(proofId, new Entry("Quest Proof", "Bring this back to whoever asked for it."));
         return QuestProofItem.createFor(proofId, entry.displayName(), entry.flavorText());
     }
+
+    /** Read-only lookup for {@code client.ActiveQuestOverlay}'s own terse HUD line -- same catalog, client-side-safe since it's populated identically on both physical sides at common setup. */
+    public static java.util.Optional<String> getDisplayName(String proofId) {
+        return java.util.Optional.ofNullable(ENTRIES.get(proofId)).map(Entry::displayName);
+    }
 }
