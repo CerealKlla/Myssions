@@ -260,4 +260,20 @@ in the same day: "A Useful Errand"'s gold reward is now sized around the real it
 mods) boot-smoke-tested clean, 110 quest ids registered with no duplicate-id conflicts. **Not yet
 live-tested or deployed.**
 
+**`QuestReward.Kind.INTANGIBLE` removed outright, 2026-10-12** (see
+[context/decisions.md](context/decisions.md)) -- real, repeated user frustration: a flavor-only
+"reward" line (e.g. "The new plate passes its first real test") kept showing up in the Rewards list
+right alongside real gold/item/XP, on effectively every quest, including as the *only* listed reward
+on roughly half of them. This had already been raised and supposedly fixed once before the 110-quest
+content-expansion pass (above) reintroduced it everywhere -- the capability itself was the problem,
+since it kept getting reused by each new content pass that didn't know not to. The `Kind`, its field,
+and its factory method are deleted from `QuestReward` entirely (not just stopped being called), and
+every `QuestReward.intangible(...)` call across all 11 quest-definition files is removed. Checked
+first, not assumed: every quest that had *only* an intangible "reward" already had a real mechanical
+reward the static list doesn't carry at all -- a gather milestone's `goldPerUnit` or a buy-item
+milestone's resolved price, both already rendered as their own dynamic Gold Nuggets line in
+`QuestLogScreen` independent of `definition.rewards()` -- so no quest lost its only real reward; the
+fix only ever removed the fake line. `./gradlew build` green, whole-suite (8 mods) rebuild clean.
+**Not yet live-tested.**
+
 See [context/classes/](context/classes/) for per-class reference.

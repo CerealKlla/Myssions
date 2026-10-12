@@ -34,7 +34,7 @@ public final class ArmorerQuests {
                 "Got three orders for plate armor and not nearly enough iron to fill them. Bring me a "
                         + "good stock and I'll make it worth your while.",
                 ARMORER_ZONE_TYPE, "Bring 16 Iron Ingots", mc("iron_ingot"), 16, 3,
-                List.of(QuestReward.intangible("Those armor orders can finally be filled")));
+                List.of());
     }
 
     private static Identifier leatherPadding() {
@@ -43,7 +43,7 @@ public final class ArmorerQuests {
                 "Can't make plate armor without the padding underneath, and I'm out of leather. "
                         + "Bring me what you can find.",
                 ARMORER_ZONE_TYPE, "Bring 12 Leather", mc("leather"), 12, 2,
-                List.of(QuestReward.intangible("The padding work can continue")));
+                List.of());
     }
 
     private static Identifier goldTrim() {
@@ -52,7 +52,7 @@ public final class ArmorerQuests {
                 "A noble customer wants gold trim on their new armor, and I'm not about to turn down "
                         + "that kind of coin. Bring me some gold.",
                 ARMORER_ZONE_TYPE, "Bring 6 Gold Ingots", mc("gold_ingot"), 6, 5,
-                List.of(QuestReward.intangible("The noble customer gets their gold trim")));
+                List.of());
     }
 
     private static Identifier fieldTestingZombies() {
@@ -63,7 +63,7 @@ public final class ArmorerQuests {
                 ARMORER_ZONE_TYPE, "Kill 6 Zombies near {location}", mc("zombie"), 6,
                 "dented_test_plating", "Dented Test Plating", "Scratched up but intact -- a good sign.",
                 false, 2,
-                List.of(QuestReward.gold(17), QuestReward.intangible("The new plate passes its first real test")));
+                List.of(QuestReward.gold(17)));
     }
 
     private static Identifier fieldTestingSkeletons() {
@@ -74,7 +74,7 @@ public final class ArmorerQuests {
                 ARMORER_ZONE_TYPE, "Kill 6 Skeletons near {location}", mc("skeleton"), 6,
                 "arrow_scored_plating", "Arrow-Scored Plating", "A few new scratches, nothing that went through.",
                 false, 2,
-                List.of(QuestReward.gold(17), QuestReward.intangible("The new plate holds up against arrows too")));
+                List.of(QuestReward.gold(17)));
     }
 
     private static Identifier fieldTestingSpiders() {
@@ -85,7 +85,7 @@ public final class ArmorerQuests {
                 ARMORER_ZONE_TYPE, "Kill 6 Spiders near {location}", mc("spider"), 6,
                 "bitten_test_padding", "Bitten Test Padding", "A few punctures, but nothing got through to skin.",
                 false, 2,
-                List.of(QuestReward.gold(17), QuestReward.intangible("The padding proves itself against poison")));
+                List.of(QuestReward.gold(17)));
     }
 
     private static Identifier diamondsForTheVanguard() {
@@ -94,7 +94,7 @@ public final class ArmorerQuests {
                 "The settlement's best guards deserve the best gear, and that means diamond. Bring me "
                         + "what you can find.",
                 ARMORER_ZONE_TYPE, "Bring 3 Diamonds", mc("diamond"), 3, 10,
-                List.of(QuestReward.intangible("The vanguard gets the gear they deserve")));
+                List.of());
     }
 
     private static Identifier netheriteScrapRequest() {
@@ -103,7 +103,7 @@ public final class ArmorerQuests {
                 "There's something from one of the other shops in town I need for a special "
                         + "commission. Fetch it for me and I'll make it worth your while.",
                 ARMORER_ZONE_TYPE,
-                List.of(QuestReward.intangible("The special commission can finally proceed")));
+                List.of());
     }
 
     private static Identifier chainmailLinks() {
@@ -112,7 +112,7 @@ public final class ArmorerQuests {
                 "Chainmail takes a lot more iron nuggets than most people realize, and I'm out. Bring "
                         + "me what you can find.",
                 ARMORER_ZONE_TYPE, "Bring 24 Iron Nuggets", mc("iron_nugget"), 24, 1,
-                List.of(QuestReward.intangible("The chainmail work can continue")));
+                List.of());
     }
 
     private static Identifier wingsInTheDark() {
@@ -123,7 +123,7 @@ public final class ArmorerQuests {
                 ARMORER_ZONE_TYPE, "Kill 4 Phantoms near {location} at night", mc("phantom"), 4,
                 "scored_phantom_membrane", "Scored Phantom Membrane", "Thin as paper, but the claw marks tell the real story.",
                 true, 3,
-                List.of(QuestReward.gold(21), QuestReward.intangible("The new set proves itself against the dark")));
+                List.of(QuestReward.gold(21)));
     }
 
     /** See {@code QuestHooks#registerPlotUpgradeQuest}'s own doc -- one per profession, per the standing instruction in design-document.md's "Plot Upgrade quest" section. */
@@ -133,7 +133,6 @@ public final class ArmorerQuests {
                 "I'd like to expand this armory, but I'm short on raw building materials. Bring me "
                         + "what's missing and I'll make it worth your while.",
                 ARMORER_ZONE_TYPE,
-                List.of(QuestReward.gold(25), QuestReward.xp("mayor", 50),
-                        QuestReward.intangible("The armory is ready to grow")));
+                List.of(QuestReward.gold(25), QuestReward.xp("mayor", 50)));
     }
 }

@@ -87,8 +87,7 @@ public final class NpcQuests {
                 LUMBERYARD_ZONE_TYPE, "Kill 4 Wolves near {location}", MINECRAFT("wolf"), 4,
                 "wolf_pelt_scraps", "Wolf Pelt Scraps", "Torn from a pelt, still smells like pine sap and old blood.",
                 false, 2,
-                List.of(QuestReward.gold(12), QuestReward.item(MINECRAFT("oak_log"), 16),
-                        QuestReward.intangible("The crews can work the north clearing again")));
+                List.of(QuestReward.gold(12), QuestReward.item(MINECRAFT("oak_log"), 16)));
     }
 
     private static Identifier webChokedGrove() {
@@ -100,8 +99,7 @@ public final class NpcQuests {
                 LUMBERYARD_ZONE_TYPE, "Kill 5 Spiders near {location}", MINECRAFT("spider"), 5,
                 "bundled_spider_silk", "Bundled Spider Silk", "A thick, sticky knot of webbing, still twitching faintly.",
                 false, 2,
-                List.of(QuestReward.gold(14), QuestReward.item(MINECRAFT("string"), 8),
-                        QuestReward.intangible("The grove is safe to fell again")));
+                List.of(QuestReward.gold(14), QuestReward.item(MINECRAFT("string"), 8)));
     }
 
     private static Identifier silverfishInTheSawdust() {
@@ -113,7 +111,7 @@ public final class NpcQuests {
                 LUMBERYARD_ZONE_TYPE, "Kill 6 Silverfish near {location}", MINECRAFT("silverfish"), 6,
                 "silverfish_mandibles", "Silverfish Mandibles", "Small, sharp, and still twitching.",
                 false, 1,
-                List.of(QuestReward.gold(13), QuestReward.intangible("The log stacks are sound again")));
+                List.of(QuestReward.gold(13)));
     }
 
     private static Identifier creepersInTheCoppice() {
@@ -124,7 +122,7 @@ public final class NpcQuests {
                 LUMBERYARD_ZONE_TYPE, "Kill 4 Creepers near {location}", MINECRAFT("creeper"), 4,
                 "creeper_fuse_caps", "Creeper Fuse Caps", "Still smells faintly of gunpowder.",
                 false, 2,
-                List.of(QuestReward.gold(16), QuestReward.intangible("The loading area is safe again")));
+                List.of(QuestReward.gold(16)));
     }
 
     private static Identifier honeyForTheSaws() {
@@ -133,7 +131,7 @@ public final class NpcQuests {
                 "The crew swears a bit of honey keeps the saw blades from binding up in sap. I don't "
                         + "fully buy it, but they won't shut up about it -- bring me some and we'll see.",
                 LUMBERYARD_ZONE_TYPE, "Bring 6 Honey Bottles", MINECRAFT("honey_bottle"), 6, 3,
-                List.of(QuestReward.intangible("The crew finally stops complaining about the saws")));
+                List.of());
     }
 
     private static Identifier freshSuppliesLumberjack() {
@@ -142,7 +140,7 @@ public final class NpcQuests {
                 "Running low on something I'd rather not walk into town for myself -- fetch it for me "
                         + "and I'll make it worth your while.",
                 LUMBERYARD_ZONE_TYPE,
-                List.of(QuestReward.intangible("One less thing to go fetch myself")));
+                List.of());
     }
 
     private static Identifier sticksForKindling() {
@@ -151,7 +149,7 @@ public final class NpcQuests {
                 "Simple enough -- bring me a bundle of sticks for kindling the yard's fire pit. Doesn't "
                         + "matter where they came from.",
                 LUMBERYARD_ZONE_TYPE, "Bring 32 Sticks", MINECRAFT("stick"), 32, 1,
-                List.of(QuestReward.intangible("The fire pit stays lit through the night")));
+                List.of());
     }
 
     private static Identifier theGrovesOldGuardian() {
@@ -163,7 +161,7 @@ public final class NpcQuests {
                 LUMBERYARD_ZONE_TYPE, "Kill 3 Endermen near {location} at night", MINECRAFT("enderman"), 3,
                 "warped_tree_bark", "Warped Tree Bark", "Bark that's been teleported through more times than wood should be.",
                 true, 3,
-                List.of(QuestReward.gold(22), QuestReward.intangible("The night crew finally stops refusing that stretch of grove")));
+                List.of(QuestReward.gold(22)));
     }
 
     private static Identifier applesForTheRoad() {
@@ -172,7 +170,7 @@ public final class NpcQuests {
                 "The crew goes through a lot of apples on a long haul out to the tree line. Bring me a "
                         + "basket's worth and I'll see you're paid for the trouble.",
                 LUMBERYARD_ZONE_TYPE, "Bring 10 Apples", MINECRAFT("apple"), 10, 2,
-                List.of(QuestReward.intangible("The crew has something to eat on the long hauls")));
+                List.of());
     }
 
     /**
@@ -187,7 +185,7 @@ public final class NpcQuests {
                 "There's something I could use from one of the shops in town -- fetch it for me and "
                         + "I'll make it worth your while.",
                 LUMBERYARD_ZONE_TYPE,
-                List.of(QuestReward.intangible("One less thing to go fetch myself")));
+                List.of());
     }
 
     /** See {@code QuestHooks#registerPlotUpgradeQuest}'s own doc -- one per profession, per the standing instruction in design-document.md's "Plot Upgrade quest" section. */
@@ -197,8 +195,7 @@ public final class NpcQuests {
                 "We're ready to expand this yard, but we're short on raw building materials. Bring me "
                         + "what's missing and I'll make it worth your while.",
                 LUMBERYARD_ZONE_TYPE,
-                List.of(QuestReward.gold(25), QuestReward.xp("mayor", 50),
-                        QuestReward.intangible("The yard is ready to grow")));
+                List.of(QuestReward.gold(25), QuestReward.xp("mayor", 50)));
     }
 
     private static Identifier expandingTheFarm() {
@@ -207,8 +204,7 @@ public final class NpcQuests {
                 "This farm could use more land under it, but we're short on raw building materials. "
                         + "Bring me what's missing and I'll make it worth your while.",
                 FARM_ZONE_TYPE,
-                List.of(QuestReward.gold(25), QuestReward.xp("mayor", 50),
-                        QuestReward.intangible("The farm is ready to grow")));
+                List.of(QuestReward.gold(25), QuestReward.xp("mayor", 50)));
     }
 
     private static Identifier growingTheTownHall() {
@@ -217,8 +213,7 @@ public final class NpcQuests {
                 "The town's ready for its next stage, but the Town Hall is short on raw building "
                         + "materials. Bring what's missing and I'll make it worth your while.",
                 TOWN_HALL_ZONE_TYPE,
-                List.of(QuestReward.gold(30), QuestReward.xp("mayor", 60),
-                        QuestReward.intangible("The town is ready to grow")));
+                List.of(QuestReward.gold(30), QuestReward.xp("mayor", 60)));
     }
 
     private static Identifier settingUpShop() {
@@ -227,8 +222,7 @@ public final class NpcQuests {
                 "I'd like to expand this stall, but I'm short on raw building materials. Bring me "
                         + "what's missing and I'll make it worth your while.",
                 TRAVELING_MERCHANT_ZONE_TYPE,
-                List.of(QuestReward.gold(25), QuestReward.xp("mayor", 50),
-                        QuestReward.intangible("The stall is ready to grow")));
+                List.of(QuestReward.gold(25), QuestReward.xp("mayor", 50)));
     }
 
     // ---- Farmer ----
@@ -239,7 +233,7 @@ public final class NpcQuests {
                 "Got a buyer in town looking for more wheat than my own stores can spare this week. "
                         + "Bring me a good haul and I'll split the difference with you.",
                 FARM_ZONE_TYPE, "Bring 24 Wheat", MINECRAFT("wheat"), 24, 1,
-                List.of(QuestReward.intangible("The buyer in town gets their order")));
+                List.of());
     }
 
     private static Identifier eggsForTheMarket() {
@@ -248,7 +242,7 @@ public final class NpcQuests {
                 "My own hens can't keep up with what the market stall wants this week. Bring me a "
                         + "basket of eggs from wherever you can find them.",
                 FARM_ZONE_TYPE, "Bring 16 Eggs", MINECRAFT("egg"), 16, 1,
-                List.of(QuestReward.intangible("The market stall stays stocked")));
+                List.of());
     }
 
     private static Identifier rootVegetables() {
@@ -261,7 +255,7 @@ public final class NpcQuests {
                         QuestMilestone.gather("gather_carrots", "Bring 12 Carrots", MINECRAFT("carrot"), 12, 1),
                         QuestMilestone.gather("gather_potatoes", "Bring 12 Potatoes", MINECRAFT("potato"), 12, 1)
                 ),
-                List.of(QuestReward.intangible("The root cellar is stocked for the week")),
+                List.of(),
                 QuestTimeLimit.NONE));
         return questId;
     }
@@ -272,7 +266,7 @@ public final class NpcQuests {
                 "Winter's coming and the settlement's going to want blankets. Bring me a good stock of "
                         + "wool and I'll see it's put to use.",
                 FARM_ZONE_TYPE, "Bring 10 Wool", MINECRAFT("white_wool"), 10, 2,
-                List.of(QuestReward.intangible("The settlement is ready for winter")));
+                List.of());
     }
 
     private static Identifier pumpkinsForTheFair() {
@@ -281,7 +275,7 @@ public final class NpcQuests {
                 "The settlement's putting on a fall fair and somebody's got to bring the pumpkins. "
                         + "Might as well be you.",
                 FARM_ZONE_TYPE, "Bring 8 Pumpkins", MINECRAFT("pumpkin"), 8, 2,
-                List.of(QuestReward.intangible("The fall fair has its pumpkins")));
+                List.of());
     }
 
     private static Identifier foxesInTheCornfield() {
@@ -292,7 +286,7 @@ public final class NpcQuests {
                 FARM_ZONE_TYPE, "Kill 5 Foxes near {location}", MINECRAFT("fox"), 5,
                 "tufts_of_fox_fur", "Tufts of Fox Fur", "Soft, reddish, and covered in cornstalk dust.",
                 false, 1,
-                List.of(QuestReward.gold(10), QuestReward.intangible("The cornfield is finally left alone")));
+                List.of(QuestReward.gold(10)));
     }
 
     private static Identifier wolvesAtTheFenceLine() {
@@ -303,7 +297,7 @@ public final class NpcQuests {
                 FARM_ZONE_TYPE, "Kill 4 Wolves near {location}", MINECRAFT("wolf"), 4,
                 "trampled_fence_rope", "Trampled Fence Rope", "Chewed through, not cut -- something with teeth did this.",
                 false, 2,
-                List.of(QuestReward.gold(12), QuestReward.intangible("The fence line holds again")));
+                List.of(QuestReward.gold(12)));
     }
 
     private static Identifier milkForTheCellar() {
@@ -312,7 +306,7 @@ public final class NpcQuests {
                 "Could use a good stock of fresh milk down in the cellar before it turns. Bring me a "
                         + "few buckets and I'll pay well for the trouble.",
                 FARM_ZONE_TYPE, "Bring 6 Milk Buckets", MINECRAFT("milk_bucket"), 6, 4,
-                List.of(QuestReward.intangible("The cellar stays stocked")));
+                List.of());
     }
 
     private static Identifier aSecondOpinionFarmer() {
@@ -321,7 +315,7 @@ public final class NpcQuests {
                 "There's something from one of the shops in town I keep meaning to pick up and never "
                         + "do. Fetch it for me and I'll make it worth your while.",
                 FARM_ZONE_TYPE,
-                List.of(QuestReward.intangible("One less thing to go fetch myself")));
+                List.of());
     }
 
     // ---- Mayor (issued via the Town Hall sign, no literal Mayor NPC exists -- see class doc) ----
@@ -335,7 +329,7 @@ public final class NpcQuests {
                 TOWN_HALL_ZONE_TYPE, "Kill 6 Zombies massing near {location}", MINECRAFT("zombie"), 6,
                 "warband_insignia_scraps", "Warband Insignia Scraps", "Crude, torn cloth -- whoever wore this won't be marching on the settlement.",
                 false, 2,
-                List.of(QuestReward.gold(30), QuestReward.intangible("The settlement's main road is safe to travel again")));
+                List.of(QuestReward.gold(30)));
     }
 
     private static Identifier clearTheCaves() {
@@ -347,7 +341,7 @@ public final class NpcQuests {
                 TOWN_HALL_ZONE_TYPE, "Kill 5 Skeletons near {location}", MINECRAFT("skeleton"), 5,
                 "bone_fragments", "Arrow-Notched Bone Fragments", "Splintered and grooved -- these didn't come from just walking around.",
                 false, 2,
-                List.of(QuestReward.gold(28), QuestReward.intangible("The trade road stays open")));
+                List.of(QuestReward.gold(28)));
     }
 
     private static Identifier raidersOnTheOldRoad() {
@@ -358,7 +352,7 @@ public final class NpcQuests {
                 TOWN_HALL_ZONE_TYPE, "Kill 6 Pillagers near {location}", MINECRAFT("pillager"), 6,
                 "raider_banners", "Torn Raider Banners", "Crude cloth, stitched with a symbol nobody here recognizes.",
                 false, 2,
-                List.of(QuestReward.gold(32), QuestReward.intangible("The old road is safe to travel again")));
+                List.of(QuestReward.gold(32)));
     }
 
     private static Identifier theWitchInTheSwamp() {
@@ -370,7 +364,7 @@ public final class NpcQuests {
                 TOWN_HALL_ZONE_TYPE, "Kill 3 Witches near {location}", MINECRAFT("witch"), 3,
                 "shattered_potion_glass", "Shattered Potion Glass", "Still smells faintly of something that shouldn't be inhaled.",
                 false, 3,
-                List.of(QuestReward.gold(26), QuestReward.intangible("Livestock around the settlement stop turning up sick")));
+                List.of(QuestReward.gold(26)));
     }
 
     private static Identifier drownedAtTheFord() {
@@ -382,7 +376,7 @@ public final class NpcQuests {
                 TOWN_HALL_ZONE_TYPE, "Kill 5 Drowned near {location}", MINECRAFT("drowned"), 5,
                 "waterlogged_trinkets", "Waterlogged Trinkets", "Corroded almost past recognizing.",
                 false, 2,
-                List.of(QuestReward.gold(24), QuestReward.intangible("The river crossing is safe again")));
+                List.of(QuestReward.gold(24)));
     }
 
     private static Identifier phantomsOverTheWalls() {
@@ -394,7 +388,7 @@ public final class NpcQuests {
                 TOWN_HALL_ZONE_TYPE, "Kill 4 Phantoms near {location} at night", MINECRAFT("phantom"), 4,
                 "tattered_phantom_membrane", "Tattered Phantom Membrane", "Papery and strange, like old parchment that was never quite alive.",
                 true, 3,
-                List.of(QuestReward.gold(27), QuestReward.intangible("The night watch can finally stand down")));
+                List.of(QuestReward.gold(27)));
     }
 
     // "2 miles" -- the user's own original phrasing for this quest style's search radius.
@@ -432,7 +426,7 @@ public final class NpcQuests {
         QuestRegistry.register(new QuestDefinition(questId, name, description,
                 TOWN_HALL_ZONE_TYPE,
                 List.of(QuestMilestone.talk("report_back", "Return and report what you found")),
-                List.of(QuestReward.gold(goldReward), QuestReward.intangible("The map grows a little less empty")),
+                List.of(QuestReward.gold(goldReward)),
                 QuestTimeLimit.NONE));
         QuestAssignmentHooks.register(questId, (player, instanceId, assignedId, plotId) -> {
             if (!(player.level() instanceof net.minecraft.server.level.ServerLevel level)
@@ -466,7 +460,7 @@ public final class NpcQuests {
                         + "Track him down and see what he has to say.",
                 TOWN_HALL_ZONE_TYPE, "Find and talk to Old Harlen", "Old Harlen", true,
                 "The Mayor gives you a rough idea where to look for Harlen -- check your map.",
-                List.of(QuestReward.gold(8), QuestReward.intangible("Old Harlen's thanks")));
+                List.of(QuestReward.gold(8)));
     }
 
     private static Identifier theHermitsApprentice() {
@@ -477,7 +471,7 @@ public final class NpcQuests {
                         + "to you.",
                 TOWN_HALL_ZONE_TYPE, "Find and talk to Dara", "Dara", false,
                 "The Mayor gives you a rough idea where to look for Dara -- check your map.",
-                List.of(QuestReward.gold(9), QuestReward.intangible("Dara's cautious thanks")));
+                List.of(QuestReward.gold(9)));
     }
 
     // ---- Traveling Merchant (caravan-raid quest style) ----
@@ -496,7 +490,7 @@ public final class NpcQuests {
                         + "light on guards never made it. Stay close the whole way -- if bandits don't see "
                         + "anyone watching the caravan, they'll hit it. Keep them off and see it through safely.",
                 TRAVELING_MERCHANT_ZONE_TYPE, 3, 3,
-                List.of(QuestReward.gold(20), QuestReward.intangible("The caravan reaches its destination safely")));
+                List.of(QuestReward.gold(20)));
     }
 
     private static Identifier aShortSupplyRun() {
@@ -505,7 +499,7 @@ public final class NpcQuests {
                 "Nothing fancy -- just a short hop out to resupply and back. Shouldn't take long, but "
                         + "an extra set of eyes never hurts.",
                 TRAVELING_MERCHANT_ZONE_TYPE, 2, 2,
-                List.of(QuestReward.gold(12), QuestReward.intangible("The short run goes off without a hitch")));
+                List.of(QuestReward.gold(12)));
     }
 
     private static Identifier theLongHaul() {
@@ -514,7 +508,7 @@ public final class NpcQuests {
                 "This is the big one -- a long haul out and back, further than I'd ever risk without "
                         + "someone watching the road. Stay close the whole way.",
                 TRAVELING_MERCHANT_ZONE_TYPE, 5, 4,
-                List.of(QuestReward.gold(35), QuestReward.intangible("The long haul reaches its destination safely")));
+                List.of(QuestReward.gold(35)));
     }
 
     private static Identifier theBackRoads() {
@@ -523,7 +517,7 @@ public final class NpcQuests {
                 "I'd rather take the back roads this time -- fewer eyes, but fewer friendly ones too if "
                         + "something goes wrong. Keep the caravan safe.",
                 TRAVELING_MERCHANT_ZONE_TYPE, 4, 3,
-                List.of(QuestReward.gold(26), QuestReward.intangible("The back roads prove safe enough, this time")));
+                List.of(QuestReward.gold(26)));
     }
 
     private static Identifier escortToTheCrossroads() {
@@ -532,7 +526,7 @@ public final class NpcQuests {
                 "Just need the caravan out to the crossroads and back -- not far, but it's exactly the "
                         + "kind of stretch bandits like to watch.",
                 TRAVELING_MERCHANT_ZONE_TYPE, 3, 3,
-                List.of(QuestReward.gold(20), QuestReward.intangible("The caravan reaches the crossroads and back safely")));
+                List.of(QuestReward.gold(20)));
     }
 
     private static Identifier aRiskyShortcut() {
@@ -541,7 +535,7 @@ public final class NpcQuests {
                 "There's a shortcut that'd save real time, but it's exactly the kind of stretch bandits "
                         + "love to watch. Worth it if you can keep the caravan safe.",
                 TRAVELING_MERCHANT_ZONE_TYPE, 2, 5,
-                List.of(QuestReward.gold(24), QuestReward.intangible("The shortcut pays off, this time")));
+                List.of(QuestReward.gold(24)));
     }
 
     private static Identifier stockBeforeTheRun() {
@@ -550,7 +544,7 @@ public final class NpcQuests {
                 "Can't head out again until I've restocked -- bring me a good haul of wheat and I'll "
                         + "make it worth the trouble.",
                 TRAVELING_MERCHANT_ZONE_TYPE, "Bring 16 Wheat", MINECRAFT("wheat"), 16, 1,
-                List.of(QuestReward.intangible("The caravan is stocked for the next run")));
+                List.of());
     }
 
     private static Identifier sparePartsForTheCart() {
@@ -559,7 +553,7 @@ public final class NpcQuests {
                 "The cart's seen better days -- could use some iron to shore it up before the next long "
                         + "haul. Bring me what you can.",
                 TRAVELING_MERCHANT_ZONE_TYPE, "Bring 8 Iron Ingots", MINECRAFT("iron_ingot"), 8, 3,
-                List.of(QuestReward.intangible("The cart is fit for the road again")));
+                List.of());
     }
 
     private static Identifier aTradeGoodRequest() {
@@ -568,7 +562,7 @@ public final class NpcQuests {
                 "There's something from one of the shops in town I'd like to carry on the next run -- "
                         + "fetch it for me and I'll make it worth your while.",
                 TRAVELING_MERCHANT_ZONE_TYPE,
-                List.of(QuestReward.intangible("The caravan carries one more good on its next run")));
+                List.of());
     }
 
     private static Identifier restockingSilver() {
@@ -577,6 +571,6 @@ public final class NpcQuests {
                 "Lost a buyer last trip because I didn't have the right goods on hand. Fetch me "
                         + "something from one of the shops in town so it doesn't happen again.",
                 TRAVELING_MERCHANT_ZONE_TYPE,
-                List.of(QuestReward.intangible("The caravan won't lose that buyer again")));
+                List.of());
     }
 }

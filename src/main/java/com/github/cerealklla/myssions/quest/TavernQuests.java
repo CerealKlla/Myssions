@@ -34,7 +34,7 @@ public final class TavernQuests {
                 "Can't brew a fresh batch without a good stock of wheat, and I'm running dry. Bring "
                         + "me what you can find.",
                 TAVERN_ZONE_TYPE, "Bring 20 Wheat", mc("wheat"), 20, 1,
-                List.of(QuestReward.intangible("The next batch of ale is brewing")));
+                List.of());
     }
 
     private static Identifier sweetsForTheBar() {
@@ -43,7 +43,7 @@ public final class TavernQuests {
                 "Honey mead's a house specialty, and I'm out of honey to make more. Bring me a good "
                         + "stock.",
                 TAVERN_ZONE_TYPE, "Bring 8 Honey Bottles", mc("honey_bottle"), 8, 2,
-                List.of(QuestReward.intangible("The honey mead is back on the menu")));
+                List.of());
     }
 
     private static Identifier meatForTheTable() {
@@ -52,7 +52,7 @@ public final class TavernQuests {
                 "The evening crowd wants a proper meal, and I'm out of beef for the stew. Bring me "
                         + "a good stock.",
                 TAVERN_ZONE_TYPE, "Bring 12 Beef", mc("beef"), 12, 2,
-                List.of(QuestReward.intangible("The evening stew is back on the menu")));
+                List.of());
     }
 
     private static Identifier aRoundForTheHouse() {
@@ -61,7 +61,7 @@ public final class TavernQuests {
                 "There's something from one of the other shops in town that'd round out tonight's "
                         + "specials. Fetch it for me and I'll make it worth your while.",
                 TAVERN_ZONE_TYPE,
-                List.of(QuestReward.intangible("Tonight's specials come together")));
+                List.of());
     }
 
     private static Identifier rowdyTravelers() {
@@ -72,7 +72,7 @@ public final class TavernQuests {
                 TAVERN_ZONE_TYPE, "Kill 5 Zombies near {location}", mc("zombie"), 5,
                 "torn_tavern_cloth", "Torn Tavern Cloth", "From someone's coat, probably. Best not to ask whose.",
                 false, 2,
-                List.of(QuestReward.gold(14), QuestReward.intangible("The back alley is quiet again")));
+                List.of(QuestReward.gold(14)));
     }
 
     private static Identifier wolvesHowlingPastClosing() {
@@ -83,7 +83,7 @@ public final class TavernQuests {
                 TAVERN_ZONE_TYPE, "Kill 4 Wolves near {location} at night", mc("wolf"), 4,
                 "howling_pack_fur", "Howling Pack Fur", "Still faintly damp with night dew.",
                 true, 2,
-                List.of(QuestReward.gold(16), QuestReward.intangible("Customers can leave in peace after closing")));
+                List.of(QuestReward.gold(16)));
     }
 
     private static Identifier theMissingBard() {
@@ -93,7 +93,7 @@ public final class TavernQuests {
                         + "showed. Word is he's still out there somewhere -- go track him down.",
                 TAVERN_ZONE_TYPE, "Find and talk to Finn", "Wandering Bard Finn", false,
                 "You get a rough idea of which way Finn might have gone -- check your map.",
-                List.of(QuestReward.gold(10), QuestReward.intangible("Finn finally makes it to the tavern")));
+                List.of(QuestReward.gold(10)));
     }
 
     private static Identifier breadForTheBoard() {
@@ -102,7 +102,7 @@ public final class TavernQuests {
                 "Can't set a proper table without bread, and the kitchen's run dry. Bring me a good "
                         + "stock.",
                 TAVERN_ZONE_TYPE, "Bring 10 Bread", mc("bread"), 10, 1,
-                List.of(QuestReward.intangible("The table is set properly again")));
+                List.of());
     }
 
     private static Identifier berriesForTheHouseBrew() {
@@ -111,7 +111,7 @@ public final class TavernQuests {
                 "The house brew gets its color from sweet berries, and I'm out. Bring me a good "
                         + "stock.",
                 TAVERN_ZONE_TYPE, "Bring 16 Sweet Berries", mc("sweet_berries"), 16, 1,
-                List.of(QuestReward.intangible("The house brew is back on tap")));
+                List.of());
     }
 
     private static Identifier aSecondRound() {
@@ -120,7 +120,7 @@ public final class TavernQuests {
                 "Lost a regular customer last week because I didn't have what they wanted on hand. "
                         + "Fetch me something from one of the other shops in town so it doesn't happen again.",
                 TAVERN_ZONE_TYPE,
-                List.of(QuestReward.intangible("That regular customer comes back")));
+                List.of());
     }
 
     /** See {@code QuestHooks#registerPlotUpgradeQuest}'s own doc -- one per profession, per the standing instruction in design-document.md's "Plot Upgrade quest" section. */
@@ -130,7 +130,6 @@ public final class TavernQuests {
                 "I'd like to expand this tavern, but I'm short on raw building materials. Bring me "
                         + "what's missing and I'll make it worth your while.",
                 TAVERN_ZONE_TYPE,
-                List.of(QuestReward.gold(25), QuestReward.xp("mayor", 50),
-                        QuestReward.intangible("The tavern is ready to grow")));
+                List.of(QuestReward.gold(25), QuestReward.xp("mayor", 50)));
     }
 }

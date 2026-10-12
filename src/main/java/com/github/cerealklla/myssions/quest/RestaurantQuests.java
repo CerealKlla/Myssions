@@ -34,7 +34,7 @@ public final class RestaurantQuests {
                 "The dinner rush is coming and the grill's running low. Bring me a good stock of beef "
                         + "and I'll make it worth your while.",
                 RESTAURANT_ZONE_TYPE, "Bring 12 Beef", mc("beef"), 12, 2,
-                List.of(QuestReward.intangible("The grill is stocked for the dinner rush")));
+                List.of());
     }
 
     private static Identifier freshCatch() {
@@ -43,7 +43,7 @@ public final class RestaurantQuests {
                 "Fish sells faster than anything else on the menu, and I'm out. Bring me a good "
                         + "catch and I'll pay fair for it.",
                 RESTAURANT_ZONE_TYPE, "Bring 10 Cod", mc("cod"), 10, 2,
-                List.of(QuestReward.intangible("The fish special is back on the menu")));
+                List.of());
     }
 
     private static Identifier sweetsForDessert() {
@@ -51,7 +51,7 @@ public final class RestaurantQuests {
         return QuestHooks.registerGatherQuest(questId, "Sweets for Dessert",
                 "Can't make dessert without sugar, and I'm completely out. Bring me a good stock.",
                 RESTAURANT_ZONE_TYPE, "Bring 12 Sugar", mc("sugar"), 12, 1,
-                List.of(QuestReward.intangible("Dessert is back on the menu")));
+                List.of());
     }
 
     private static Identifier eggsForBreakfast() {
@@ -60,7 +60,7 @@ public final class RestaurantQuests {
                 "The breakfast crowd wants eggs and I can't keep up with my own hens. Bring me a "
                         + "basket and I'll make it worth your while.",
                 RESTAURANT_ZONE_TYPE, "Bring 16 Eggs", mc("egg"), 16, 1,
-                List.of(QuestReward.intangible("Breakfast is back on the menu")));
+                List.of());
     }
 
     private static Identifier aPinchOfSpice() {
@@ -69,7 +69,7 @@ public final class RestaurantQuests {
                 "There's something from one of the other shops in town that'd really round out a "
                         + "new dish I'm working on. Fetch it for me and I'll make it worth your while.",
                 RESTAURANT_ZONE_TYPE,
-                List.of(QuestReward.intangible("The new dish finally comes together")));
+                List.of());
     }
 
     private static Identifier mushroomsForTheStew() {
@@ -78,7 +78,7 @@ public final class RestaurantQuests {
                 "Mushroom stew's a house favorite, and I'm out of mushrooms to make more. Bring me "
                         + "what you can find.",
                 RESTAURANT_ZONE_TYPE, "Bring 10 Red Mushrooms", mc("red_mushroom"), 10, 1,
-                List.of(QuestReward.intangible("The stew is back on the menu")));
+                List.of());
     }
 
     private static Identifier aHuntingTrip() {
@@ -89,7 +89,7 @@ public final class RestaurantQuests {
                 RESTAURANT_ZONE_TYPE, "Kill 6 Rabbits near {location}", mc("rabbit"), 6,
                 "rabbit_hide_scraps", "Rabbit Hide Scraps", "Soft and well cared-for, right up until now.",
                 false, 1,
-                List.of(QuestReward.gold(12), QuestReward.intangible("Rabbit stew is back on the menu")));
+                List.of(QuestReward.gold(12)));
     }
 
     private static Identifier melonForDessert() {
@@ -97,7 +97,7 @@ public final class RestaurantQuests {
         return QuestHooks.registerGatherQuest(questId, "Melon for Dessert",
                 "Chilled melon's a summer favorite here, and I'm fresh out. Bring me a good haul.",
                 RESTAURANT_ZONE_TYPE, "Bring 10 Melon Slices", mc("melon_slice"), 10, 1,
-                List.of(QuestReward.intangible("The summer dessert is back on the menu")));
+                List.of());
     }
 
     private static Identifier milkForTheKitchen() {
@@ -106,7 +106,7 @@ public final class RestaurantQuests {
                 "Half the recipes in this kitchen need fresh milk, and I'm completely out. Bring me "
                         + "a few buckets.",
                 RESTAURANT_ZONE_TYPE, "Bring 8 Milk Buckets", mc("milk_bucket"), 8, 3,
-                List.of(QuestReward.intangible("The kitchen is stocked again")));
+                List.of());
     }
 
     private static Identifier pestControlInThePantry() {
@@ -117,7 +117,7 @@ public final class RestaurantQuests {
                 RESTAURANT_ZONE_TYPE, "Kill 5 Silverfish near {location}", mc("silverfish"), 5,
                 "pantry_silverfish_husks", "Pantry Silverfish Husks", "Not exactly appetizing, but the problem's solved.",
                 false, 1,
-                List.of(QuestReward.gold(10), QuestReward.intangible("The pantry is pest-free again")));
+                List.of(QuestReward.gold(10)));
     }
 
     /** See {@code QuestHooks#registerPlotUpgradeQuest}'s own doc -- one per profession, per the standing instruction in design-document.md's "Plot Upgrade quest" section. */
@@ -127,7 +127,6 @@ public final class RestaurantQuests {
                 "I'd like to expand this kitchen, but I'm short on raw building materials. Bring me "
                         + "what's missing and I'll make it worth your while.",
                 RESTAURANT_ZONE_TYPE,
-                List.of(QuestReward.gold(25), QuestReward.xp("mayor", 50),
-                        QuestReward.intangible("The kitchen is ready to grow")));
+                List.of(QuestReward.gold(25), QuestReward.xp("mayor", 50)));
     }
 }

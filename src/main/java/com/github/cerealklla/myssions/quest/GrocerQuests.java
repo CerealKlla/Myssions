@@ -39,7 +39,7 @@ public final class GrocerQuests {
                 "Shelves are looking bare and the morning rush is coming. Bring me a good stock of "
                         + "bread and I'll make it worth your while.",
                 GROCER_ZONE_TYPE, "Bring 10 Bread", mc("bread"), 10, 2,
-                List.of(QuestReward.intangible("The shelves are stocked before the morning rush")));
+                List.of());
     }
 
     private static Identifier sweetsForTheCounter() {
@@ -48,7 +48,7 @@ public final class GrocerQuests {
                 "Kids keep asking for something sweet and I'm out of sugar to make more. Bring me a "
                         + "good stock and I'll see you paid.",
                 GROCER_ZONE_TYPE, "Bring 16 Sugar", mc("sugar"), 16, 1,
-                List.of(QuestReward.intangible("The sweets counter is stocked again")));
+                List.of());
     }
 
     private static Identifier aFreshBatchOfCookies() {
@@ -57,7 +57,7 @@ public final class GrocerQuests {
                 "Promised a fresh batch of cookies to half the settlement and I'm short. Bring me what "
                         + "you can find and I'll pay fair for it.",
                 GROCER_ZONE_TYPE, "Bring 12 Cookies", mc("cookie"), 12, 1,
-                List.of(QuestReward.intangible("The promised cookies actually show up")));
+                List.of());
     }
 
     private static Identifier fruitForTheStand() {
@@ -66,7 +66,7 @@ public final class GrocerQuests {
                 "The fruit stand's looking thin and customers have been asking. Bring me a basket of "
                         + "apples and I'll make it worth the trip.",
                 GROCER_ZONE_TYPE, "Bring 16 Apples", mc("apple"), 16, 1,
-                List.of(QuestReward.intangible("The fruit stand looks respectable again")));
+                List.of());
     }
 
     private static Identifier melonsForMarket() {
@@ -75,7 +75,7 @@ public final class GrocerQuests {
                 "Melon season doesn't last forever and I want to make the most of it. Bring me a good "
                         + "haul and I'll split the profit with you.",
                 GROCER_ZONE_TYPE, "Bring 12 Melon Slices", mc("melon_slice"), 12, 1,
-                List.of(QuestReward.intangible("The melon stock is ready for market")));
+                List.of());
     }
 
     private static Identifier beetrootSoupFixings() {
@@ -84,7 +84,7 @@ public final class GrocerQuests {
                 "Half the settlement's asking after beetroot soup and I'm out of beetroot. Bring me a "
                         + "good stock and I'll pay well for it.",
                 GROCER_ZONE_TYPE, "Bring 10 Beetroot", mc("beetroot"), 10, 1,
-                List.of(QuestReward.intangible("The soup fixings are stocked again")));
+                List.of());
     }
 
     private static Identifier aRareImport() {
@@ -93,7 +93,7 @@ public final class GrocerQuests {
                 "There's something from one of the other shops in town I keep meaning to stock and "
                         + "never get around to. Fetch it for me and I'll make it worth your while.",
                 GROCER_ZONE_TYPE,
-                List.of(QuestReward.intangible("The shelf finally has that one rare item")));
+                List.of());
     }
 
     private static Identifier anotherRareImport() {
@@ -102,7 +102,7 @@ public final class GrocerQuests {
                 "A customer's been asking for something I don't carry, but somebody else in town "
                         + "surely does. Fetch it for me and I'll make it worth your while.",
                 GROCER_ZONE_TYPE,
-                List.of(QuestReward.intangible("That customer finally gets what they wanted")));
+                List.of());
     }
 
     private static Identifier pestControlOutBack() {
@@ -113,7 +113,7 @@ public final class GrocerQuests {
                 GROCER_ZONE_TYPE, "Kill 5 Spiders near {location}", mc("spider"), 5,
                 "storeroom_web_scraps", "Storeroom Web Scraps", "Thick, dusty, and definitely not food-safe.",
                 false, 1,
-                List.of(QuestReward.gold(11), QuestReward.intangible("The storeroom is pest-free again")));
+                List.of(QuestReward.gold(11)));
     }
 
     private static Identifier honeycombForTheCounter() {
@@ -122,7 +122,7 @@ public final class GrocerQuests {
                 "Honeycomb sells faster than I can stock it. Bring me a good batch and I'll split the "
                         + "profit fairly.",
                 GROCER_ZONE_TYPE, "Bring 8 Honeycomb", mc("honeycomb"), 8, 2,
-                List.of(QuestReward.intangible("The counter has honeycomb again")));
+                List.of());
     }
 
     /** See {@code QuestHooks#registerPlotUpgradeQuest}'s own doc -- one per profession, per the standing instruction in design-document.md's "Plot Upgrade quest" section. */
@@ -132,7 +132,6 @@ public final class GrocerQuests {
                 "I'd like to expand this store, but I'm short on raw building materials. Bring me "
                         + "what's missing and I'll make it worth your while.",
                 GROCER_ZONE_TYPE,
-                List.of(QuestReward.gold(25), QuestReward.xp("mayor", 50),
-                        QuestReward.intangible("The store is ready to grow")));
+                List.of(QuestReward.gold(25), QuestReward.xp("mayor", 50)));
     }
 }

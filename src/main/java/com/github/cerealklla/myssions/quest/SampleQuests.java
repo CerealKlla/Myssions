@@ -33,8 +33,7 @@ public final class SampleQuests {
                 ),
                 List.of(
                         QuestReward.gold(10),
-                        QuestReward.item(Identifier.fromNamespaceAndPath("minecraft", "bread"), 4),
-                        QuestReward.intangible("A little good will around town")
+                        QuestReward.item(Identifier.fromNamespaceAndPath("minecraft", "bread"), 4)
                 ),
                 QuestTimeLimit.NONE
         ));

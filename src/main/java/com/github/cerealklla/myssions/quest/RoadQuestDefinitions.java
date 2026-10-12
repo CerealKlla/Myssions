@@ -24,7 +24,7 @@ public final class RoadQuestDefinitions {
                         QuestMilestone.simple("connect_road", "Connect the two settlements with a road"),
                         QuestMilestone.simple("efficient_road", "Build it efficiently (bonus reward)", true)
                 ),
-                List.of(QuestReward.gold(20), QuestReward.intangible("The road sinks in, tying the two settlements together")),
+                List.of(QuestReward.gold(20)),
                 QuestTimeLimit.withinTicksOfAssignment(6L * 60 * 60 * 20)
         ));
     }

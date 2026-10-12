@@ -34,7 +34,7 @@ public final class BlacksmithQuests {
                 "The forge is hungry and my own stock won't last the week. Bring me a good haul of "
                         + "iron and I'll pay fair for it.",
                 BLACKSMITH_ZONE_TYPE, "Bring 12 Iron Ingots", mc("iron_ingot"), 12, 3,
-                List.of(QuestReward.intangible("The forge stays fed for another week")));
+                List.of());
     }
 
     private static Identifier coalForTheFire() {
@@ -43,7 +43,7 @@ public final class BlacksmithQuests {
                 "Can't keep the forge lit without fuel, and I'm burning through coal faster than I can "
                         + "dig it myself. Bring me a good stock.",
                 BLACKSMITH_ZONE_TYPE, "Bring 24 Coal", mc("coal"), 24, 1,
-                List.of(QuestReward.intangible("The forge stays lit")));
+                List.of());
     }
 
     private static Identifier goldForFineWork() {
@@ -52,7 +52,7 @@ public final class BlacksmithQuests {
                 "Got a commission for some fine gold work and not nearly enough gold on hand. Bring me "
                         + "what you can find.",
                 BLACKSMITH_ZONE_TYPE, "Bring 6 Gold Ingots", mc("gold_ingot"), 6, 5,
-                List.of(QuestReward.intangible("The fine-work commission can proceed")));
+                List.of());
     }
 
     private static Identifier copperStock() {
@@ -61,7 +61,7 @@ public final class BlacksmithQuests {
                 "Copper's been selling faster than I can smelt it. Bring me a good stock of ingots and "
                         + "I'll make it worth your while.",
                 BLACKSMITH_ZONE_TYPE, "Bring 12 Copper Ingots", mc("copper_ingot"), 12, 2,
-                List.of(QuestReward.intangible("The copper stock is replenished")));
+                List.of());
     }
 
     private static Identifier flintForTools() {
@@ -70,7 +70,7 @@ public final class BlacksmithQuests {
                 "Need a good stock of flint for some of the finer tool work. Bring me what you can "
                         + "find and I'll pay fair for it.",
                 BLACKSMITH_ZONE_TYPE, "Bring 16 Flint", mc("flint"), 16, 1,
-                List.of(QuestReward.intangible("The tool work can proceed")));
+                List.of());
     }
 
     private static Identifier theMinersTunnel() {
@@ -81,7 +81,7 @@ public final class BlacksmithQuests {
                 BLACKSMITH_ZONE_TYPE, "Kill 5 Zombies near {location}", mc("zombie"), 5,
                 "tunnel_scrap_metal", "Tunnel Scrap Metal", "Rusted and bent, pulled off something that used to be useful.",
                 false, 2,
-                List.of(QuestReward.gold(18), QuestReward.intangible("The miners go back to work")));
+                List.of(QuestReward.gold(18)));
     }
 
     private static Identifier caveSpidersUnderfoot() {
@@ -92,7 +92,7 @@ public final class BlacksmithQuests {
                 BLACKSMITH_ZONE_TYPE, "Kill 5 Cave Spiders near {location}", mc("cave_spider"), 5,
                 "venom_sac_fragments", "Venom Sac Fragments", "Best handled with gloves on.",
                 false, 2,
-                List.of(QuestReward.gold(19), QuestReward.intangible("The mine shaft is safe to work again")));
+                List.of(QuestReward.gold(19)));
     }
 
     private static Identifier rawOreRun() {
@@ -101,7 +101,7 @@ public final class BlacksmithQuests {
                 "Rather smelt it myself than buy finished ingots -- bring me raw iron ore and I'll "
                         + "handle the rest.",
                 BLACKSMITH_ZONE_TYPE, "Bring 16 Raw Iron", mc("raw_iron"), 16, 2,
-                List.of(QuestReward.intangible("The forge has plenty to smelt")));
+                List.of());
     }
 
     private static Identifier aSpecialOrderBlacksmith() {
@@ -110,7 +110,7 @@ public final class BlacksmithQuests {
                 "There's something from one of the other shops in town I need for a commission. "
                         + "Fetch it for me and I'll make it worth your while.",
                 BLACKSMITH_ZONE_TYPE,
-                List.of(QuestReward.intangible("The commission can finally proceed")));
+                List.of());
     }
 
     private static Identifier leatherForHilts() {
@@ -119,7 +119,7 @@ public final class BlacksmithQuests {
                 "Every sword needs a good grip, and I'm out of leather for the hilts. Bring me what "
                         + "you can find.",
                 BLACKSMITH_ZONE_TYPE, "Bring 10 Leather", mc("leather"), 10, 2,
-                List.of(QuestReward.intangible("The hilt-wrapping work can continue")));
+                List.of());
     }
 
     /** See {@code QuestHooks#registerPlotUpgradeQuest}'s own doc -- one per profession, per the standing instruction in design-document.md's "Plot Upgrade quest" section. */
@@ -129,7 +129,6 @@ public final class BlacksmithQuests {
                 "I'd like to expand this forge, but I'm short on raw building materials. Bring me "
                         + "what's missing and I'll make it worth your while.",
                 BLACKSMITH_ZONE_TYPE,
-                List.of(QuestReward.gold(25), QuestReward.xp("mayor", 50),
-                        QuestReward.intangible("The forge is ready to grow")));
+                List.of(QuestReward.gold(25), QuestReward.xp("mayor", 50)));
     }
 }

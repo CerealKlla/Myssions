@@ -34,7 +34,7 @@ public final class StonemasonQuests {
                 "Every carving starts as a plain block of stone, and I'm running low. Bring me a "
                         + "good stockpile.",
                 STONEMASON_ZONE_TYPE, "Bring 40 Stone", mc("stone"), 40, 1,
-                List.of(QuestReward.intangible("The stockpile is replenished")));
+                List.of());
     }
 
     private static Identifier graniteSupply() {
@@ -43,7 +43,7 @@ public final class StonemasonQuests {
                 "A customer wants a granite facade and I'm completely out. Bring me what you can "
                         + "find.",
                 STONEMASON_ZONE_TYPE, "Bring 24 Granite", mc("granite"), 24, 1,
-                List.of(QuestReward.intangible("The granite facade order can proceed")));
+                List.of());
     }
 
     private static Identifier dioriteSupply() {
@@ -51,7 +51,7 @@ public final class StonemasonQuests {
         return QuestHooks.registerGatherQuest(questId, "Diorite Supply",
                 "Diorite's popular for trim work lately, and I'm fresh out. Bring me a good stock.",
                 STONEMASON_ZONE_TYPE, "Bring 24 Diorite", mc("diorite"), 24, 1,
-                List.of(QuestReward.intangible("The trim work can proceed")));
+                List.of());
     }
 
     private static Identifier andesiteStock() {
@@ -59,7 +59,7 @@ public final class StonemasonQuests {
         return QuestHooks.registerGatherQuest(questId, "Andesite Stock",
                 "Need a good stock of andesite for a wall commission. Bring me what you can find.",
                 STONEMASON_ZONE_TYPE, "Bring 24 Andesite", mc("andesite"), 24, 1,
-                List.of(QuestReward.intangible("The wall commission can proceed")));
+                List.of());
     }
 
     private static Identifier deepslateForFineCarving() {
@@ -68,7 +68,7 @@ public final class StonemasonQuests {
                 "Deepslate holds a much finer edge than regular stone, and I'm out. Bring me a good "
                         + "stock.",
                 STONEMASON_ZONE_TYPE, "Bring 24 Deepslate", mc("deepslate"), 24, 2,
-                List.of(QuestReward.intangible("The fine carving work can proceed")));
+                List.of());
     }
 
     private static Identifier quartzForAccents() {
@@ -77,7 +77,7 @@ public final class StonemasonQuests {
                 "A commission calls for bright quartz accents, and I'm out of the raw stuff. Bring "
                         + "me what you can find.",
                 STONEMASON_ZONE_TYPE, "Bring 12 Quartz", mc("quartz"), 12, 2,
-                List.of(QuestReward.intangible("The commission's accents can proceed")));
+                List.of());
     }
 
     private static Identifier clearingTheQuarry() {
@@ -88,7 +88,7 @@ public final class StonemasonQuests {
                 STONEMASON_ZONE_TYPE, "Kill 5 Zombies near {location}", mc("zombie"), 5,
                 "quarry_grave_dust", "Quarry Grave Dust", "Fine and pale, nothing like the stone dust down there usually looks like.",
                 false, 2,
-                List.of(QuestReward.gold(18), QuestReward.intangible("The crew goes back to the quarry")));
+                List.of(QuestReward.gold(18)));
     }
 
     private static Identifier caveSpidersInThePit() {
@@ -99,7 +99,7 @@ public final class StonemasonQuests {
                 STONEMASON_ZONE_TYPE, "Kill 5 Cave Spiders near {location}", mc("cave_spider"), 5,
                 "pit_venom_sacs", "Pit Venom Sacs", "Best carried carefully.",
                 false, 2,
-                List.of(QuestReward.gold(19), QuestReward.intangible("The deeper pit is safe to work again")));
+                List.of(QuestReward.gold(19)));
     }
 
     private static Identifier aRareStone() {
@@ -108,7 +108,7 @@ public final class StonemasonQuests {
                 "There's a particular stone from one of the other shops in town I need for a "
                         + "commission. Fetch it for me and I'll make it worth your while.",
                 STONEMASON_ZONE_TYPE,
-                List.of(QuestReward.intangible("The commission can finally proceed")));
+                List.of());
     }
 
     private static Identifier amethystForAccents() {
@@ -117,7 +117,7 @@ public final class StonemasonQuests {
                 "A wealthy customer wants amethyst accents worked into their new facade. Bring me "
                         + "what you can find.",
                 STONEMASON_ZONE_TYPE, "Bring 8 Amethyst Shards", mc("amethyst_shard"), 8, 3,
-                List.of(QuestReward.intangible("The wealthy customer gets their accents")));
+                List.of());
     }
 
     /** See {@code QuestHooks#registerPlotUpgradeQuest}'s own doc -- one per profession, per the standing instruction in design-document.md's "Plot Upgrade quest" section. */
@@ -127,7 +127,6 @@ public final class StonemasonQuests {
                 "I'd like to expand this quarry, but I'm short on raw building materials. Bring me "
                         + "what's missing and I'll make it worth your while.",
                 STONEMASON_ZONE_TYPE,
-                List.of(QuestReward.gold(25), QuestReward.xp("mayor", 50),
-                        QuestReward.intangible("The quarry is ready to grow")));
+                List.of(QuestReward.gold(25), QuestReward.xp("mayor", 50)));
     }
 }

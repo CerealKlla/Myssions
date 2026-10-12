@@ -34,7 +34,7 @@ public final class BuildingSupplierQuests {
                 "The yard's running low on raw logs and I've got orders to fill. Bring me a good "
                         + "haul and I'll make it worth your while.",
                 BUILDING_SUPPLIER_ZONE_TYPE, "Bring 32 Oak Logs", mc("oak_log"), 32, 1,
-                List.of(QuestReward.intangible("The yard's log stock is replenished")));
+                List.of());
     }
 
     private static Identifier stoneStockpile() {
@@ -43,7 +43,7 @@ public final class BuildingSupplierQuests {
                 "Can't fill a building order without stone, and I'm down to scraps. Bring me a good "
                         + "stockpile.",
                 BUILDING_SUPPLIER_ZONE_TYPE, "Bring 48 Stone", mc("stone"), 48, 1,
-                List.of(QuestReward.intangible("The stone stockpile is replenished")));
+                List.of());
     }
 
     private static Identifier sandForGlass() {
@@ -51,7 +51,7 @@ public final class BuildingSupplierQuests {
         return QuestHooks.registerGatherQuest(questId, "Sand for Glass",
                 "Glass orders are piling up and I'm out of sand to melt down. Bring me a good haul.",
                 BUILDING_SUPPLIER_ZONE_TYPE, "Bring 32 Sand", mc("sand"), 32, 1,
-                List.of(QuestReward.intangible("The glass orders can finally be filled")));
+                List.of());
     }
 
     private static Identifier clayForBricks() {
@@ -59,7 +59,7 @@ public final class BuildingSupplierQuests {
         return QuestHooks.registerGatherQuest(questId, "Clay for Bricks",
                 "Brick orders need clay, and I'm fresh out. Bring me what you can find.",
                 BUILDING_SUPPLIER_ZONE_TYPE, "Bring 24 Clay Balls", mc("clay_ball"), 24, 1,
-                List.of(QuestReward.intangible("The brick orders can finally be filled")));
+                List.of());
     }
 
     private static Identifier woolForInsulation() {
@@ -68,7 +68,7 @@ public final class BuildingSupplierQuests {
                 "Winter builds need good insulation, and wool's the easiest way to get it. Bring me "
                         + "a good stock.",
                 BUILDING_SUPPLIER_ZONE_TYPE, "Bring 12 Wool", mc("white_wool"), 12, 2,
-                List.of(QuestReward.intangible("The winter builds get their insulation")));
+                List.of());
     }
 
     private static Identifier glassPanes() {
@@ -77,7 +77,7 @@ public final class BuildingSupplierQuests {
                 "A customer wants a whole wall of windows, and I don't have nearly enough glass on "
                         + "hand. Bring me a good stock.",
                 BUILDING_SUPPLIER_ZONE_TYPE, "Bring 24 Glass", mc("glass"), 24, 1,
-                List.of(QuestReward.intangible("The window order can finally be filled")));
+                List.of());
     }
 
     private static Identifier gravelRun() {
@@ -86,7 +86,7 @@ public final class BuildingSupplierQuests {
                 "Need a good stock of gravel for some roadwork the settlement's planning. Bring me "
                         + "what you can find.",
                 BUILDING_SUPPLIER_ZONE_TYPE, "Bring 32 Gravel", mc("gravel"), 32, 1,
-                List.of(QuestReward.intangible("The roadwork can proceed")));
+                List.of());
     }
 
     private static Identifier aSpecialOrderSupplier() {
@@ -95,7 +95,7 @@ public final class BuildingSupplierQuests {
                 "There's something from one of the other shops in town a customer's been asking "
                         + "after. Fetch it for me and I'll make it worth your while.",
                 BUILDING_SUPPLIER_ZONE_TYPE,
-                List.of(QuestReward.intangible("That customer finally gets their special order")));
+                List.of());
     }
 
     private static Identifier aNetherBrickRequest() {
@@ -104,7 +104,7 @@ public final class BuildingSupplierQuests {
                 "A customer wants something I can't exactly dig up myself -- probably best found at "
                         + "one of the other shops in town. Fetch it for me and I'll make it worth your while.",
                 BUILDING_SUPPLIER_ZONE_TYPE,
-                List.of(QuestReward.intangible("The unusual request gets filled after all")));
+                List.of());
     }
 
     private static Identifier terracottaForTrim() {
@@ -113,7 +113,7 @@ public final class BuildingSupplierQuests {
                 "A builder wants terracotta trim on their new place, and I'm out. Bring me what you "
                         + "can find.",
                 BUILDING_SUPPLIER_ZONE_TYPE, "Bring 16 Terracotta", mc("terracotta"), 16, 1,
-                List.of(QuestReward.intangible("The trim order can finally be filled")));
+                List.of());
     }
 
     /** See {@code QuestHooks#registerPlotUpgradeQuest}'s own doc -- one per profession, per the standing instruction in design-document.md's "Plot Upgrade quest" section. */
@@ -123,7 +123,6 @@ public final class BuildingSupplierQuests {
                 "I'd like to expand this yard, but I'm short on raw building materials myself. Bring "
                         + "me what's missing and I'll make it worth your while.",
                 BUILDING_SUPPLIER_ZONE_TYPE,
-                List.of(QuestReward.gold(25), QuestReward.xp("mayor", 50),
-                        QuestReward.intangible("The yard is ready to grow")));
+                List.of(QuestReward.gold(25), QuestReward.xp("mayor", 50)));
     }
 }

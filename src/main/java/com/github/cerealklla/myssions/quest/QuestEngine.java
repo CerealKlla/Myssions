@@ -267,7 +267,6 @@ public final class QuestEngine {
             if (reward.kind() == QuestReward.Kind.XP && LyfeXpBridge.isLoaded()) {
                 LyfeXpBridge.grantXp(player, reward.skillId(), scaledAmount(reward.amount(), multiplier));
             }
-            // INTANGIBLE: no mechanical effect yet (see QuestReward's own doc), nothing to apply.
         }
     }
 
@@ -284,7 +283,7 @@ public final class QuestEngine {
                     }
                 }
                 default -> {
-                    // XP/INTANGIBLE have no physical item -- handled by applyImmediateRewards instead.
+                    // XP has no physical item -- handled by applyImmediateRewards instead.
                 }
             }
         }
