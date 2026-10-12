@@ -94,6 +94,23 @@ public final class CartographyrRegionBridge {
             if (isOpenWaterAt(level, entity.geometry().centerBlockX(), entity.geometry().centerBlockZ())) {
                 continue;
             }
+            // Real report, 2026-10-12: a player stood at the quest's own named location and the
+            // name shown didn't match, and kills there weren't counting. Root cause -- this method
+            // trusts a candidate's own centerBlockX/Z to be real, on-the-ground proof of "this is
+            // where that place is," but it never checks whether that exact point actually resolves
+            // back to the SAME entity through a live point-in-polygon lookup. Region and Settlement
+            // geometry can overlap (a settlement sits inside its surrounding region by design), so a
+            // candidate's centroid can land inside a *different* overlapping entity than itself --
+            // e.g. a Region candidate whose own center happens to fall inside a smaller Settlement
+            // nested within it. Both {@code MobRegionTagListener} (tags a spawned mob by a live
+            // lookup at its spawn position) and Lyfe's own on-site "Location:" HUD line resolve
+            // whatever's actually found at that exact point, which is this candidate's own id only
+            // if the two agree -- rejecting any candidate where they don't guarantees the quest's
+            // advertised name, the live HUD name, and the kill-credit tag id all describe the same
+            // place.
+            if (!resolvesToSelf(level, entity)) {
+                continue;
+            }
             inRange.add(entity);
             distances.add(dist);
         }
@@ -130,6 +147,21 @@ public final class CartographyrRegionBridge {
     private static boolean isOpenWaterAt(ServerLevel level, int x, int z) {
         int y = level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z);
         return !level.getFluidState(new BlockPos(x, y - 1, z)).isEmpty();
+    }
+
+    /**
+     * True if looking {@code entity} back up by its own centroid, through the exact same lookup
+     * {@link #findRegionOrSettlementPlaceIdAt} uses (and that {@code MobRegionTagListener} tags a
+     * spawned mob with), resolves to {@code entity} itself -- see {@link #pickWeightedNearby}'s own
+     * doc for why a mismatch here is the real root cause worth rejecting a candidate over. Reuses
+     * that method rather than re-implementing the lookup, so "does this candidate own its own
+     * center" can never silently drift from what a mob spawned there would actually be tagged with.
+     */
+    private static boolean resolvesToSelf(ServerLevel level, GeographicEntity entity) {
+        BlockPos center = new BlockPos(entity.geometry().centerBlockX(), 0, entity.geometry().centerBlockZ());
+        return findRegionOrSettlementPlaceIdAt(level, center)
+                .map(placeId -> placeId == entity.id().value())
+                .orElse(false);
     }
 
     /**

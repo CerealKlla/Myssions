@@ -111,8 +111,24 @@ public final class QuestKillListener {
     }
 
     private static boolean isWithinQuestArea(QuestInstance instance, String deadDimensionId, BlockPos deadPos, Long deadTaggedPlaceId) {
-        if (instance.knowledgePlaceId().isPresent() && deadTaggedPlaceId != null) {
-            return deadTaggedPlaceId.longValue() == instance.knowledgePlaceId().get();
+        // Real report, 2026-10-12: a kill made right at the quest's own real target didn't count.
+        // Root cause -- the tag match used to be the *only* check whenever both ids were present,
+        // returning false outright on any mismatch instead of falling back to the distance check
+        // below. A mismatch is a real, expected case, not just a hypothetical: the mob's tag comes
+        // from a fresh, live point-in-polygon lookup at its own spawn position
+        // (CartographyrRegionBridge#findRegionOrSettlementPlaceIdAt), which can resolve to a
+        // *different* overlapping Region/Settlement than the one pickWeightedNearby originally chose
+        // for this quest -- e.g. a Settlement entity and its surrounding natural Region both contain
+        // the exact same point, and whichever happens to be first in that lookup's iteration order
+        // wins, independent of which one the quest actually named. Same reasoning extends to the
+        // player simply standing a few blocks off the true center (the waypoint is a vague circle,
+        // never an exact pin) and fighting mobs that wandered slightly -- a tag mismatch there is
+        // normal, not disqualifying. The tag is now only ever a fast-path short-circuit for a
+        // confirmed match; anything else still gets the real distance check a plain "kill near here"
+        // quest always relied on.
+        if (instance.knowledgePlaceId().isPresent() && deadTaggedPlaceId != null
+                && deadTaggedPlaceId.longValue() == instance.knowledgePlaceId().get()) {
+            return true;
         }
         if (instance.hintPos().isEmpty() || instance.hintDimensionId().isEmpty()) {
             return true; // No real location set for this quest -- "kill anywhere" is the deliberate behavior.
