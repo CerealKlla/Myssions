@@ -70,6 +70,18 @@ public final class QuestLogScreen extends Screen {
     // a redundant repeat of the first that just happened to land after the real sync caught up.
     private UUID optimisticActiveQuestId;
 
+    // Same stale-attachment race as optimisticActiveQuestId above, for "Abandon Quest" instead of
+    // "Set as Active Quest" -- real 2026-10-12 report: an abandoned quest stayed visible in the list
+    // (clicking it showed a blank details pane once the real sync eventually landed). Root cause:
+    // abandon() used to rebuild the list by re-reading the still-stale client attachment immediately
+    // after sending the request packet, so the just-abandoned instance's row was regenerated right
+    // back into the list; nothing ever re-rebuilds the list later when the real resync actually
+    // arrives, so the stale row just sat there until the screen was closed and reopened. Every id
+    // added here is filtered out of rebuildListRows() regardless of what the (possibly still-stale)
+    // attachment says -- never needs clearing, since this whole screen instance is discarded and
+    // recreated fresh each time the Quest Log is reopened.
+    private final java.util.Set<UUID> optimisticallyAbandoned = new java.util.HashSet<>();
+
     public QuestLogScreen() {
         super(Component.literal("Quests"));
     }
@@ -107,6 +119,9 @@ public final class QuestLogScreen extends Screen {
         List<QuestInstance> completed = new ArrayList<>();
         List<QuestInstance> failed = new ArrayList<>();
         for (QuestInstance instance : data.quests().values()) {
+            if (optimisticallyAbandoned.contains(instance.instanceId())) {
+                continue;
+            }
             switch (instance.status()) {
                 case FAILED -> failed.add(instance);
                 // Grouped to the bottom with Failed, 2026-10-11 user request -- previously mixed in
@@ -218,6 +233,7 @@ public final class QuestLogScreen extends Screen {
 
     private void abandon(UUID instanceId) {
         Minecraft.getInstance().getConnection().send(new ServerboundCustomPayloadPacket(new AbandonQuestPayload(instanceId)));
+        optimisticallyAbandoned.add(instanceId);
         if (instanceId.equals(selectedId)) {
             selectedId = null;
         }
