@@ -117,6 +117,25 @@ public final class CartographyrRegionBridge {
     }
 
     /**
+     * The real Region/Settlement (never a Settlemynts plot or other finer-grained layer -- same
+     * layer filter as {@link #pickWeightedNearby}'s own doc explains, since this must agree with
+     * what a region-kill quest's {@code knowledgePlaceId} was actually resolved from) whose shape
+     * contains {@code pos}, if any -- added 2026-10-12 for {@code quest.MobRegionTagListener}, which
+     * tags a freshly-spawned hostile mob with this value at spawn time so {@code QuestKillListener}
+     * can check a simple tag match instead of a kill-time distance/geometry check. Uses {@code
+     * Cartography.getEntitiesAt} (grid-indexed, O(1)-ish) rather than a {@code findEntities} scan --
+     * this runs once per mob spawn, so it needs to stay cheap.
+     */
+    public static Optional<Long> findRegionOrSettlementPlaceIdAt(ServerLevel level, BlockPos pos) {
+        for (GeographicEntity entity : Cartography.getEntitiesAt(level, pos.getX(), pos.getZ())) {
+            if (entity.layerId().equals(Layer.REGION_ID) || entity.layerId().equals(Layer.SETTLEMENT_ID)) {
+                return Optional.of(entity.id().value());
+            }
+        }
+        return Optional.empty();
+    }
+
+    /**
      * Wraps {@code Cartography.findOrPredictSettlementNear} for the "unborn town" quest style
      * (added 2026-10-11) -- see that method's own doc. Deliberately never calls {@code
      * ServerLevel#getHeight} for a {@link com.github.cerealklla.cartographyr.geo.LifecycleState#PLANNED}

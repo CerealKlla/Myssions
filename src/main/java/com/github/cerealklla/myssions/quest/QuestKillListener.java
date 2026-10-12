@@ -30,6 +30,17 @@ import net.neoforged.neoforge.event.entity.living.LivingDeathEvent;
  * real location to fence against, so those are deliberately left as "kill anywhere" -- unchanged,
  * not an oversight.
  *
+ * <p><b>Region-tag fast path, 2026-10-12</b> -- a region-kill quest (one with a real {@link
+ * QuestInstance#knowledgePlaceId()}, i.e. an off-site quest whose target is a real Cartographyr
+ * Region/Settlement) now checks {@code MobRegionTagListener}'s own spawn-time tag first: if the
+ * dead entity was tagged with the same place id, it counts regardless of its *current* distance
+ * from the quest's hint point. This is both cheaper (a persistent-data read instead of a distance
+ * calculation) and more correct than the old pure-distance check -- a mob that wanders or chases the
+ * player outside the hint radius after spawning still correctly counts as "from" that region, which
+ * the distance check alone could never express. An untagged dead entity (spawned before this
+ * feature existed, or Cartographyr not loaded, or the spawn point wasn't inside any real
+ * Region/Settlement) falls back to the original distance check unchanged.
+ *
  * <p><b>Night-only milestones, 2026-10-11</b> -- a kill against a {@link QuestMilestone#nightOnly()}
  * milestone only counts while {@code level.isDarkOutside()} (same call {@code QuestNpcEntity}'s own
  * day/night gating already uses), so a quest that claims "this only happens at night" actually
@@ -51,12 +62,13 @@ public final class QuestKillListener {
         Identifier deadType = BuiltInRegistries.ENTITY_TYPE.getKey(event.getEntity().getType());
         BlockPos deadPos = event.getEntity().blockPosition();
         String deadDimensionId = player.level().dimension().identifier().toString();
+        Long deadTaggedPlaceId = event.getEntity().getPersistentData().getLong(MobRegionTagListener.TAG_KEY).orElse(null);
         var data = player.getData(ModAttachments.QUEST_DATA);
         for (QuestInstance instance : data.quests().values()) {
             if (instance.status() != QuestStatus.IN_PROGRESS) {
                 continue;
             }
-            if (!isWithinQuestArea(instance, deadDimensionId, deadPos)) {
+            if (!isWithinQuestArea(instance, deadDimensionId, deadPos, deadTaggedPlaceId)) {
                 // Temporary diagnostic (2026-10-12, same report as the night-check log below) --
                 // only logged for a quest that actually has a real hint location set (a geofenced
                 // quest), so this doesn't spam for the "kill anywhere" quests that never geofence.
@@ -98,7 +110,10 @@ public final class QuestKillListener {
         }
     }
 
-    private static boolean isWithinQuestArea(QuestInstance instance, String deadDimensionId, BlockPos deadPos) {
+    private static boolean isWithinQuestArea(QuestInstance instance, String deadDimensionId, BlockPos deadPos, Long deadTaggedPlaceId) {
+        if (instance.knowledgePlaceId().isPresent() && deadTaggedPlaceId != null) {
+            return deadTaggedPlaceId.longValue() == instance.knowledgePlaceId().get();
+        }
         if (instance.hintPos().isEmpty() || instance.hintDimensionId().isEmpty()) {
             return true; // No real location set for this quest -- "kill anywhere" is the deliberate behavior.
         }

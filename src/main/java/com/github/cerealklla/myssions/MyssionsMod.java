@@ -45,6 +45,7 @@ public class MyssionsMod {
 
         NeoForge.EVENT_BUS.register(new QuestDeadlineTicker());
         NeoForge.EVENT_BUS.register(new QuestKillListener());
+        NeoForge.EVENT_BUS.register(new com.github.cerealklla.myssions.quest.MobRegionTagListener());
         NeoForge.EVENT_BUS.register(new com.github.cerealklla.myssions.quest.QuestMobSpawnTicker());
         NeoForge.EVENT_BUS.register(new com.github.cerealklla.myssions.quest.QuestEscortTicker());
         NeoForge.EVENT_BUS.register(new com.github.cerealklla.myssions.quest.RoadQuestTicker());
