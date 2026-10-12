@@ -111,5 +111,19 @@ public class MyssionsMod {
                         Myssions.abandonQuest(player, payload.instanceId());
                     }
                 });
+
+        registrar.playToServer(com.github.cerealklla.myssions.net.SubmitBugReportPayload.TYPE,
+                com.github.cerealklla.myssions.net.SubmitBugReportPayload.STREAM_CODEC,
+                (payload, context) -> {
+                    if (!(context.player() instanceof ServerPlayer player)) {
+                        return;
+                    }
+                    var instance = player.getData(com.github.cerealklla.myssions.registration.ModAttachments.QUEST_DATA).quests().get(payload.instanceId());
+                    if (instance == null) {
+                        return;
+                    }
+                    com.github.cerealklla.myssions.quest.QuestRegistry.get(instance.definitionId()).ifPresent(definition ->
+                            com.github.cerealklla.myssions.quest.BugReportWriter.write(player, instance, definition, payload.reportText()));
+                });
     }
 }

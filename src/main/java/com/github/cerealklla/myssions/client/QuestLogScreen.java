@@ -59,6 +59,7 @@ public final class QuestLogScreen extends Screen {
     private int detailsScroll;
     private Button actionButton;
     private Button abandonButton;
+    private Button reportBugButton;
 
     // Set the instant "Set as Active Quest" is clicked, read in place of the (possibly still-stale)
     // synced attachment until it catches up -- fixes a real 2026-10-11 user report ("I have to click
@@ -164,6 +165,10 @@ public final class QuestLogScreen extends Screen {
             removeWidget(abandonButton);
             abandonButton = null;
         }
+        if (reportBugButton != null) {
+            removeWidget(reportBugButton);
+            reportBugButton = null;
+        }
         if (selectedId == null) {
             return;
         }
@@ -191,6 +196,15 @@ public final class QuestLogScreen extends Screen {
             }
         }
         // A FAILED instance gets no action button at all -- no in-UI retry, see this class's own doc.
+
+        // "Report Bug" (explicit user request, 2026-10-12) -- unlike the buttons above, offered
+        // regardless of quest status, since a report could just as easily be about a completed or
+        // failed quest's own past behavior as an in-progress one.
+        UUID instanceId = selectedId;
+        String questName = QuestRegistry.get(instance.definitionId()).map(QuestDefinition::name).orElse("this quest");
+        reportBugButton = addRenderableWidget(Button.builder(Component.literal("Report Bug"),
+                        b -> Minecraft.getInstance().setScreen(new BugReportScreen(this, instanceId, questName)))
+                .bounds(detailsLeft + 320, buttonY, 100, 20).build());
     }
 
     private void setActive() {
