@@ -94,7 +94,7 @@ public final class MinerQuests {
     private static Identifier caveInBelow() {
         Identifier questId = id("cave_in_below");
         return QuestHooks.registerRegionKillQuest(questId, "Cave-In Below",
-                "A nest of cave spiders has moved into a side tunnel near {location}, and the poison's "
+                "A nest of cave spiders has moved into a side tunnel, and the poison's "
                         + "keeping my crew from working it. Clear them out.",
                 MINESHAFT_ZONE_TYPE, "Kill 5 Cave Spiders near {location}", mc("cave_spider"), 5,
                 "shaft_chitin_fragments", "Shaft Chitin Fragments", "Brittle and pale -- these never saw daylight.",
@@ -105,7 +105,7 @@ public final class MinerQuests {
     private static Identifier somethingInTheDark() {
         Identifier questId = id("something_in_the_dark");
         return QuestHooks.registerRegionKillQuest(questId, "Something in the Dark",
-                "Something's been shambling up out of the deep tunnels near {location} after dark and "
+                "Something's been shambling up out of the deep tunnels after dark and "
                         + "spooking the night shift. Go deal with it.",
                 MINESHAFT_ZONE_TYPE, "Kill 4 Zombies near {location} at night", mc("zombie"), 4,
                 "tunnel_grave_dust", "Tunnel Grave Dust", "Fine, pale, and nothing like the rock dust that usually settles down there.",

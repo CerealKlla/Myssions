@@ -47,7 +47,15 @@ final class QuestHooks {
         return questId;
     }
 
-    /** A real-location/distance-scaled kill quest (plus an optional bonus-paying proof delivery), reusing {@link #registerRegionHook}. */
+    /**
+     * A real-location/distance-scaled kill quest (plus an optional bonus-paying proof delivery),
+     * reusing {@link #registerRegionHook}. {@code killMilestoneText} may use the {@code {location}}
+     * token (resolved per-instance once accepted, via {@link QuestText#resolve}) -- {@code
+     * description} must NOT: a board offer is previewed via {@code QuestTurnIn#getMenu} before any
+     * instance exists to resolve the token against, so it would render as the literal, unresolved
+     * string "{location}" right in the Accept Quest screen (real user report, 2026-10-12, "Something
+     * in the Dark"). Keep location color in the milestone text only.
+     */
     static Identifier registerRegionKillQuest(Identifier questId, String name, String description, String zoneType,
                                                 String killMilestoneText, Identifier mobType, int count,
                                                 String proofId, String proofName, String proofFlavor,
