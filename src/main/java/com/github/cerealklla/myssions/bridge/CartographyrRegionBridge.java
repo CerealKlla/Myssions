@@ -44,25 +44,28 @@ public final class CartographyrRegionBridge {
     private static final double MIN_DISTANCE_BLOCKS = 48.0;
 
     /**
-     * Weighted-random real Region/Settlement within {@code maxRadiusBlocks} of {@code origin}, in
-     * the same dimension, favoring closer candidates ("higher odds of closer than further from the
-     * starting point" -- explicit user spec) via a linear falloff with a small floor so even the
-     * farthest in-range candidate still has *some* chance. Empty if nothing qualifies (including
-     * when Cartographyr simply hasn't discovered anything out there yet).
+     * Weighted-random real Region within {@code maxRadiusBlocks} of {@code origin}, in the same
+     * dimension, favoring closer candidates ("higher odds of closer than further from the starting
+     * point" -- explicit user spec) via a linear falloff with a small floor so even the farthest
+     * in-range candidate still has *some* chance. Empty if nothing qualifies (including when
+     * Cartographyr simply hasn't discovered anything out there yet).
+     *
+     * <p><b>Natural Regions only, never a Settlement</b> -- real live report, 2026-10-12 (twice): an
+     * earlier version of this method also matched every individual Settlemynts plot (its own zone
+     * layer) as a candidate, letting a region-kill quest pick a plot inside the issuing player's own
+     * settlement ("Kill 6 Zombies ... in Muffin's Home"), where town guards killed the mobs before the
+     * player could do anything -- fixed that day by narrowing candidates to whole Region/Settlement
+     * entities only. That fix was incomplete: a whole *Settlement* has the identical problem one level
+     * up, confirmed live the same way ("Raiders on the Old Road" landed inside "Percot," an existing
+     * settlement, with "their guards would certainly interfere... when I got there there actually were
+     * no pillagers at all" -- submitted via the new in-game Report Bug button). No region-kill quest's
+     * mobs can ever survive guarded settlement turf regardless of flavor text, so Settlement-layer
+     * entities are no longer a candidate kind at all here -- every quest using this method targets
+     * open wilderness exclusively now, matching the user's own fix suggestion directly ("needs to be
+     * based on a location of a road between settlements, not within one").
      */
     public static Optional<RegionTarget> pickWeightedNearby(ServerLevel level, BlockPos origin, double maxRadiusBlocks, RandomSource random) {
-        List<GeographicEntity> candidates = new ArrayList<>();
-        // Layer-filtered, not a blanket Classification scan -- real live report, 2026-10-12: an
-        // unfiltered Classification.CONSTRUCTED query also matches every individual Settlemynts plot
-        // (its own zone layer), not just whole settlements, so a region-kill quest could pick a plot
-        // -- including one inside the issuing player's own settlement ("Kill 6 Zombies ... in
-        // Muffin's Home," a Private Residence plot) -- as its "real location" target. Zombies spawned
-        // there burned in daylight and were killed by town guards before the player could do
-        // anything, exactly the on-site-combat problem this quest shape was built to avoid in the
-        // first place (see design-document.md's taxonomy, and the 2026-10-11 removal of the original
-        // on-site kill quests). Only Region/Settlement-layer entities are real quest-target candidates.
-        candidates.addAll(Cartography.findEntities(level, Classification.NATURAL, Layer.REGION_ID));
-        candidates.addAll(Cartography.findEntities(level, Classification.CONSTRUCTED, Layer.SETTLEMENT_ID));
+        List<GeographicEntity> candidates = new ArrayList<>(Cartography.findEntities(level, Classification.NATURAL, Layer.REGION_ID));
 
         List<GeographicEntity> inRange = new ArrayList<>();
         List<Double> distances = new ArrayList<>();
