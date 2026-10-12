@@ -208,7 +208,8 @@ final class QuestHooks {
             String itemName = net.minecraft.core.registries.BuiltInRegistries.ITEM.get(itemId)
                     .map(ref -> new ItemStack(ref.value()).getHoverName().getString())
                     .orElse("something from the shops");
-            QuestEngine.setHint(player, instanceId, player.blockPosition(), level.dimension().identifier().toString(), Optional.of(itemName));
+            QuestEngine.setHint(player, instanceId, player.blockPosition(), level.dimension().identifier().toString(),
+                    Optional.of(QuestText.packBuyItemHint(itemName, goldReward)));
             player.sendSystemMessage(Component.literal(
                     "What I could really use is " + itemName + " -- someone in town sells it."));
         });

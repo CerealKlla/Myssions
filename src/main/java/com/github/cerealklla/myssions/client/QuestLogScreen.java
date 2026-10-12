@@ -350,6 +350,16 @@ public final class QuestLogScreen extends Screen {
         y += 4;
 
         y = drawWrapped(graphics, "Rewards:", left, y, wrapWidth, HEADER_COLOR, lineHeight);
+        // A buy-item milestone's real reward is a per-instance resolved gold amount (the item's own
+        // vendor price + 15%, set at acceptance) -- never part of the static definition.rewards()
+        // list below, which for this quest kind is flavor text only. See QuestText's own doc (real
+        // user report, 2026-10-12: the list showed only that flavor line, no real reward at all).
+        if (definition.milestones().stream().anyMatch(QuestMilestone::isBuyMilestone)) {
+            String line = com.github.cerealklla.myssions.quest.QuestText.resolveBuyItemGoldReward(instance)
+                    .map(gold -> gold + " Gold Nugget" + (gold == 1 ? "" : "s"))
+                    .orElse("Gold Nuggets (amount set once accepted)");
+            y = drawWrapped(graphics, "- " + line, left, y, wrapWidth, TEXT_COLOR, lineHeight);
+        }
         for (QuestReward reward : definition.rewards()) {
             y = drawWrapped(graphics, "- " + reward.displayLine(), left, y, wrapWidth, TEXT_COLOR, lineHeight);
         }
