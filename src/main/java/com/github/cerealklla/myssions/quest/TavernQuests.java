@@ -24,7 +24,7 @@ public final class TavernQuests {
         List<Identifier> quests = List.of(
                 aleIngredients(), sweetsForTheBar(), meatForTheTable(), aRoundForTheHouse(), rowdyTravelers(),
                 wolvesHowlingPastClosing(), theMissingBard(), breadForTheBoard(), berriesForTheHouseBrew(),
-                aSecondRound());
+                aSecondRound(), expandingTheTavern());
         IssuerQuestPools.register(TAVERN_ZONE_TYPE, quests);
     }
 
@@ -121,5 +121,16 @@ public final class TavernQuests {
                         + "Fetch me something from one of the other shops in town so it doesn't happen again.",
                 TAVERN_ZONE_TYPE,
                 List.of(QuestReward.intangible("That regular customer comes back")));
+    }
+
+    /** See {@code QuestHooks#registerPlotUpgradeQuest}'s own doc -- one per profession, per the standing instruction in design-document.md's "Plot Upgrade quest" section. */
+    private static Identifier expandingTheTavern() {
+        Identifier questId = id("expanding_the_tavern");
+        return QuestHooks.registerPlotUpgradeQuest(questId, "Expanding the Tavern",
+                "I'd like to expand this tavern, but I'm short on raw building materials. Bring me "
+                        + "what's missing and I'll make it worth your while.",
+                TAVERN_ZONE_TYPE,
+                List.of(QuestReward.gold(25), QuestReward.xp("mayor", 50),
+                        QuestReward.intangible("The tavern is ready to grow")));
     }
 }

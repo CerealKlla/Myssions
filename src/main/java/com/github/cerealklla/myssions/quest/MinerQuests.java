@@ -23,7 +23,8 @@ public final class MinerQuests {
     public static void registerAll() {
         List<Identifier> quests = List.of(
                 retainingWallStone(), coalForTheLanterns(), copperForThePipes(), ironOreRun(), aGlimmerOfGold(),
-                redstoneForTheRigging(), lapisForTheSurveyor(), caveInBelow(), somethingInTheDark(), aUsefulErrandMiner());
+                redstoneForTheRigging(), lapisForTheSurveyor(), caveInBelow(), somethingInTheDark(), aUsefulErrandMiner(),
+                expandingTheShaft());
         IssuerQuestPools.register(MINESHAFT_ZONE_TYPE, quests);
     }
 
@@ -119,5 +120,16 @@ public final class MinerQuests {
                         + "Fetch it for me and I'll make it worth your while.",
                 MINESHAFT_ZONE_TYPE,
                 List.of(QuestReward.intangible("The shaft gets what it needed")));
+    }
+
+    /** See {@code QuestHooks#registerPlotUpgradeQuest}'s own doc -- one per profession, per the standing instruction in design-document.md's "Plot Upgrade quest" section. */
+    private static Identifier expandingTheShaft() {
+        Identifier questId = id("expanding_the_shaft");
+        return QuestHooks.registerPlotUpgradeQuest(questId, "Expanding the Shaft",
+                "We're ready to sink this shaft deeper, but we're short on raw building materials. "
+                        + "Bring me what's missing and I'll make it worth your while.",
+                MINESHAFT_ZONE_TYPE,
+                List.of(QuestReward.gold(25), QuestReward.xp("mayor", 50),
+                        QuestReward.intangible("The shaft is ready to grow")));
     }
 }

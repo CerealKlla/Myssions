@@ -23,7 +23,8 @@ public final class BuildingSupplierQuests {
     public static void registerAll() {
         List<Identifier> quests = List.of(
                 logsForTheYard(), stoneStockpile(), sandForGlass(), clayForBricks(), woolForInsulation(),
-                glassPanes(), gravelRun(), aSpecialOrderSupplier(), aNetherBrickRequest(), terracottaForTrim());
+                glassPanes(), gravelRun(), aSpecialOrderSupplier(), aNetherBrickRequest(), terracottaForTrim(),
+                expandingTheYard());
         IssuerQuestPools.register(BUILDING_SUPPLIER_ZONE_TYPE, quests);
     }
 
@@ -113,5 +114,16 @@ public final class BuildingSupplierQuests {
                         + "can find.",
                 BUILDING_SUPPLIER_ZONE_TYPE, "Bring 16 Terracotta", mc("terracotta"), 16, 1,
                 List.of(QuestReward.intangible("The trim order can finally be filled")));
+    }
+
+    /** See {@code QuestHooks#registerPlotUpgradeQuest}'s own doc -- one per profession, per the standing instruction in design-document.md's "Plot Upgrade quest" section. */
+    private static Identifier expandingTheYard() {
+        Identifier questId = id("expanding_the_supplier_yard");
+        return QuestHooks.registerPlotUpgradeQuest(questId, "Expanding the Yard",
+                "I'd like to expand this yard, but I'm short on raw building materials myself. Bring "
+                        + "me what's missing and I'll make it worth your while.",
+                BUILDING_SUPPLIER_ZONE_TYPE,
+                List.of(QuestReward.gold(25), QuestReward.xp("mayor", 50),
+                        QuestReward.intangible("The yard is ready to grow")));
     }
 }

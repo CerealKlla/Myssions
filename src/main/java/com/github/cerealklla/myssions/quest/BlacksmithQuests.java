@@ -23,7 +23,8 @@ public final class BlacksmithQuests {
     public static void registerAll() {
         List<Identifier> quests = List.of(
                 ironForTheForge(), coalForTheFire(), goldForFineWork(), copperStock(), flintForTools(),
-                theMinersTunnel(), caveSpidersUnderfoot(), rawOreRun(), aSpecialOrderBlacksmith(), leatherForHilts());
+                theMinersTunnel(), caveSpidersUnderfoot(), rawOreRun(), aSpecialOrderBlacksmith(), leatherForHilts(),
+                expandingTheForge());
         IssuerQuestPools.register(BLACKSMITH_ZONE_TYPE, quests);
     }
 
@@ -119,5 +120,16 @@ public final class BlacksmithQuests {
                         + "you can find.",
                 BLACKSMITH_ZONE_TYPE, "Bring 10 Leather", mc("leather"), 10, 2,
                 List.of(QuestReward.intangible("The hilt-wrapping work can continue")));
+    }
+
+    /** See {@code QuestHooks#registerPlotUpgradeQuest}'s own doc -- one per profession, per the standing instruction in design-document.md's "Plot Upgrade quest" section. */
+    private static Identifier expandingTheForge() {
+        Identifier questId = id("expanding_the_forge");
+        return QuestHooks.registerPlotUpgradeQuest(questId, "Expanding the Forge",
+                "I'd like to expand this forge, but I'm short on raw building materials. Bring me "
+                        + "what's missing and I'll make it worth your while.",
+                BLACKSMITH_ZONE_TYPE,
+                List.of(QuestReward.gold(25), QuestReward.xp("mayor", 50),
+                        QuestReward.intangible("The forge is ready to grow")));
     }
 }

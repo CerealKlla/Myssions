@@ -24,7 +24,7 @@ public final class ArmorerQuests {
         List<Identifier> quests = List.of(
                 ironForArmor(), leatherPadding(), goldTrim(), fieldTestingZombies(), fieldTestingSkeletons(),
                 fieldTestingSpiders(), diamondsForTheVanguard(), netheriteScrapRequest(), chainmailLinks(),
-                wingsInTheDark());
+                wingsInTheDark(), expandingTheArmory());
         IssuerQuestPools.register(ARMORER_ZONE_TYPE, quests);
     }
 
@@ -124,5 +124,16 @@ public final class ArmorerQuests {
                 "scored_phantom_membrane", "Scored Phantom Membrane", "Thin as paper, but the claw marks tell the real story.",
                 true, 3,
                 List.of(QuestReward.gold(21), QuestReward.intangible("The new set proves itself against the dark")));
+    }
+
+    /** See {@code QuestHooks#registerPlotUpgradeQuest}'s own doc -- one per profession, per the standing instruction in design-document.md's "Plot Upgrade quest" section. */
+    private static Identifier expandingTheArmory() {
+        Identifier questId = id("expanding_the_armory");
+        return QuestHooks.registerPlotUpgradeQuest(questId, "Expanding the Armory",
+                "I'd like to expand this armory, but I'm short on raw building materials. Bring me "
+                        + "what's missing and I'll make it worth your while.",
+                ARMORER_ZONE_TYPE,
+                List.of(QuestReward.gold(25), QuestReward.xp("mayor", 50),
+                        QuestReward.intangible("The armory is ready to grow")));
     }
 }

@@ -20,21 +20,38 @@ import java.util.Optional;
  * -- {@link #resolve} strips the suffix for every normal (`{location}`) use, and {@link
  * #resolveBuyItemGoldReward} parses it back out for the Rewards list. A bare `#` is never otherwise
  * valid in a resolved location/item display name, so this is unambiguous.
+ *
+ * <p>A plot-upgrade milestone ({@code QuestMilestone#isPlotUpgradeMilestone()}, added 2026-10-12)
+ * reuses the same field a third way, for the same reason (per-instance data, no spare
+ * {@link QuestInstance} field): packed as {@code "PU:<woodNeeded>,<stoneNeeded>"} (the {@code PU:}
+ * prefix keeps it unambiguous against the buy-item scheme above, and against a real place name,
+ * which never starts with it). {@link #resolve} substitutes {@code {wood}}/{@code {stone}} tokens
+ * from it; this quest kind's own flavor/milestone text never uses {@code {location}}, so the two
+ * schemes never collide on the same instance.
  */
 public final class QuestText {
 
     private static final String TOKEN = "{location}";
+    private static final String WOOD_TOKEN = "{wood}";
+    private static final String STONE_TOKEN = "{stone}";
     private static final String FALLBACK = "the area";
     private static final char GOLD_SUFFIX_DELIMITER = '#';
+    private static final String PLOT_UPGRADE_PREFIX = "PU:";
 
     private QuestText() {
     }
 
     public static String resolve(String template, QuestInstance instance) {
-        if (!template.contains(TOKEN)) {
-            return template;
+        String result = template;
+        if (result.contains(TOKEN)) {
+            result = result.replace(TOKEN, displayOnly(instance.locationName().orElse(FALLBACK)));
         }
-        return template.replace(TOKEN, displayOnly(instance.locationName().orElse(FALLBACK)));
+        if (result.contains(WOOD_TOKEN) || result.contains(STONE_TOKEN)) {
+            PlotUpgradeAmounts amounts = resolvePlotUpgradeAmounts(instance).orElse(new PlotUpgradeAmounts(0, 0));
+            result = result.replace(WOOD_TOKEN, String.valueOf(amounts.woodNeeded()))
+                    .replace(STONE_TOKEN, String.valueOf(amounts.stoneNeeded()));
+        }
+        return result;
     }
 
     /** The resolved gold reward packed onto a buy-item milestone's own {@code locationName} -- see this class's own doc. Empty for any non-buy-item quest, or before acceptance has resolved one. */
@@ -55,6 +72,29 @@ public final class QuestText {
     /** Packs a buy-item milestone's resolved item name and gold reward into one {@code locationName} string -- see {@code QuestHooks#registerBuyItemHook}. */
     public static String packBuyItemHint(String itemName, int goldReward) {
         return itemName + GOLD_SUFFIX_DELIMITER + goldReward;
+    }
+
+    public record PlotUpgradeAmounts(int woodNeeded, int stoneNeeded) {
+    }
+
+    /** The resolved Wood/Stone amounts packed onto a plot-upgrade quest's own {@code locationName} -- see this class's own doc. Empty for any other quest kind, or before acceptance has resolved one. */
+    public static Optional<PlotUpgradeAmounts> resolvePlotUpgradeAmounts(QuestInstance instance) {
+        return instance.locationName().filter(s -> s.startsWith(PLOT_UPGRADE_PREFIX)).flatMap(raw -> {
+            String[] parts = raw.substring(PLOT_UPGRADE_PREFIX.length()).split(",", 2);
+            if (parts.length != 2) {
+                return Optional.empty();
+            }
+            try {
+                return Optional.of(new PlotUpgradeAmounts(Integer.parseInt(parts[0]), Integer.parseInt(parts[1])));
+            } catch (NumberFormatException e) {
+                return Optional.empty();
+            }
+        });
+    }
+
+    /** Packs a plot-upgrade quest's resolved per-instance shortfall into one {@code locationName} string -- see {@code QuestHooks#registerPlotUpgradeHook}. */
+    public static String packPlotUpgradeHint(int woodNeeded, int stoneNeeded) {
+        return PLOT_UPGRADE_PREFIX + woodNeeded + "," + stoneNeeded;
     }
 
     private static String displayOnly(String rawLocationName) {

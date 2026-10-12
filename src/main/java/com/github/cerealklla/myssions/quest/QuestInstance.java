@@ -187,7 +187,19 @@ public record QuestInstance(UUID instanceId, Identifier definitionId, QuestStatu
                 new RoadQuestData(Optional.of(newRoadOriginPlaceId), newRoadMinStakes, newRoadOptimalStakeCap));
     }
 
+    /**
+     * A plot-upgrade milestone's real required amount is resolved per-instance (the plot's live
+     * shortfall at acceptance time), not the static {@link QuestMilestone#requiredCount()} the
+     * record itself carries only as a meaningless placeholder for this kind -- see {@code
+     * QuestText}'s own doc for how it's packed onto {@link #locationName()}.
+     */
     public boolean isMilestoneComplete(QuestMilestone milestone) {
-        return milestoneProgress.getOrDefault(milestone.id(), 0) >= milestone.requiredCount();
+        int required = milestone.isPlotUpgradeMilestone() ? plotUpgradeRequiredAmount(milestone) : milestone.requiredCount();
+        return milestoneProgress.getOrDefault(milestone.id(), 0) >= required;
+    }
+
+    private int plotUpgradeRequiredAmount(QuestMilestone milestone) {
+        QuestText.PlotUpgradeAmounts amounts = QuestText.resolvePlotUpgradeAmounts(this).orElse(new QuestText.PlotUpgradeAmounts(0, 0));
+        return "stone".equals(milestone.proofId().orElse("")) ? amounts.stoneNeeded() : amounts.woodNeeded();
     }
 }

@@ -396,13 +396,20 @@ public final class QuestEngine {
         if (milestone.isGatherMilestone() && gatherItemId.isEmpty()) {
             return false; // Malformed/missing item id on the definition itself -- nothing to deliver.
         }
-        if (!milestone.isBuyMilestone() && !milestone.isGatherMilestone() && milestone.proofId().isEmpty()) {
+        Optional<Identifier> plotUpgradeItemId = milestone.isPlotUpgradeMilestone()
+                ? milestone.proofId().map(QuestEngine::plotUpgradeRepresentativeItemId) : Optional.empty();
+        if (milestone.isPlotUpgradeMilestone() && plotUpgradeItemId.isEmpty()) {
+            return false; // Malformed/missing resource key on the definition itself -- nothing to deliver.
+        }
+        if (!milestone.isBuyMilestone() && !milestone.isGatherMilestone() && !milestone.isPlotUpgradeMilestone() && milestone.proofId().isEmpty()) {
             return false;
         }
 
-        int remaining = milestone.requiredCount() - instance.milestoneProgress().getOrDefault(milestoneId, 0);
+        int requiredCount = milestone.isPlotUpgradeMilestone() ? plotUpgradeRequiredAmount(instance, milestone) : milestone.requiredCount();
+        int remaining = requiredCount - instance.milestoneProgress().getOrDefault(milestoneId, 0);
         int held = milestone.isBuyMilestone() ? countRealItem(player, buyItemId.get())
                 : milestone.isGatherMilestone() ? countRealItem(player, gatherItemId.get())
+                : milestone.isPlotUpgradeMilestone() ? countRealItem(player, plotUpgradeItemId.get())
                 : countProof(player, milestone.proofId().get());
 
         int toDeliver;
@@ -412,20 +419,32 @@ public final class QuestEngine {
                 return false;
             }
         } else {
-            if (held < remaining) {
+            if (remaining <= 0 || held < remaining) {
                 return false;
             }
             toDeliver = remaining;
         }
         if (milestone.isBuyMilestone()) {
             consumeRealItem(player, buyItemId.get(), toDeliver);
-        } else if (milestone.isGatherMilestone()) {
-            consumeRealItem(player, gatherItemId.get(), toDeliver);
+        } else if (milestone.isGatherMilestone() || milestone.isPlotUpgradeMilestone()) {
+            consumeRealItem(player, (milestone.isGatherMilestone() ? gatherItemId : plotUpgradeItemId).get(), toDeliver);
         } else {
             consumeProof(player, milestone.proofId().get(), toDeliver);
         }
         reportMilestoneProgress(player, instanceId, milestoneId, toDeliver);
         return true;
+    }
+
+    /** {@code "wood"} -> Oak Log, {@code "stone"} -> Cobblestone -- the same representative concrete items Blueprynts' own {@code GenericResource} enum uses for these two categories, hardcoded here rather than taking a compile dependency on Blueprynts just for two item ids. */
+    private static Identifier plotUpgradeRepresentativeItemId(String resourceKey) {
+        return "stone".equals(resourceKey)
+                ? Identifier.fromNamespaceAndPath("minecraft", "cobblestone")
+                : Identifier.fromNamespaceAndPath("minecraft", "oak_log");
+    }
+
+    private static int plotUpgradeRequiredAmount(QuestInstance instance, QuestMilestone milestone) {
+        QuestText.PlotUpgradeAmounts amounts = QuestText.resolvePlotUpgradeAmounts(instance).orElse(new QuestText.PlotUpgradeAmounts(0, 0));
+        return "stone".equals(milestone.proofId().orElse("")) ? amounts.stoneNeeded() : amounts.woodNeeded();
     }
 
     /**

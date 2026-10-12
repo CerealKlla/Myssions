@@ -55,17 +55,20 @@ public final class NpcQuests {
         Identifier usefulErrand = aUsefulErrand();
         List<Identifier> lumberjackQuests = List.of(
                 timberWolves(), webChokedGrove(), usefulErrand, silverfishInTheSawdust(), creepersInTheCoppice(),
-                honeyForTheSaws(), freshSuppliesLumberjack(), sticksForKindling(), theGrovesOldGuardian(), applesForTheRoad());
+                honeyForTheSaws(), freshSuppliesLumberjack(), sticksForKindling(), theGrovesOldGuardian(), applesForTheRoad(),
+                growingTheYard());
         List<Identifier> farmerQuests = List.of(
                 usefulErrand, aBiggerHarvest(), eggsForTheMarket(), rootVegetables(), woolForWinter(),
-                pumpkinsForTheFair(), foxesInTheCornfield(), wolvesAtTheFenceLine(), milkForTheCellar(), aSecondOpinionFarmer());
+                pumpkinsForTheFair(), foxesInTheCornfield(), wolvesAtTheFenceLine(), milkForTheCellar(), aSecondOpinionFarmer(),
+                expandingTheFarm());
         List<Identifier> mayorQuests = List.of(
                 warbandAtTheGates(), clearTheCaves(), findOldHarlen(), scoutTheFrontier(),
                 raidersOnTheOldRoad(), theWitchInTheSwamp(), beyondTheKnownMap(), theHermitsApprentice(),
-                phantomsOverTheWalls(), drownedAtTheFord());
+                phantomsOverTheWalls(), drownedAtTheFord(), growingTheTownHall());
         List<Identifier> travelingMerchantQuests = List.of(
                 merchantCaravanEscort(), aShortSupplyRun(), theLongHaul(), theBackRoads(), stockBeforeTheRun(),
-                aTradeGoodRequest(), escortToTheCrossroads(), sparePartsForTheCart(), aRiskyShortcut(), restockingSilver());
+                aTradeGoodRequest(), escortToTheCrossroads(), sparePartsForTheCart(), aRiskyShortcut(), restockingSilver(),
+                settingUpShop());
 
         IssuerQuestPools.register(LUMBERYARD_ZONE_TYPE, lumberjackQuests);
         IssuerQuestPools.register(FARM_ZONE_TYPE, farmerQuests);
@@ -185,6 +188,47 @@ public final class NpcQuests {
                         + "I'll make it worth your while.",
                 LUMBERYARD_ZONE_TYPE,
                 List.of(QuestReward.intangible("One less thing to go fetch myself")));
+    }
+
+    /** See {@code QuestHooks#registerPlotUpgradeQuest}'s own doc -- one per profession, per the standing instruction in design-document.md's "Plot Upgrade quest" section. */
+    private static Identifier growingTheYard() {
+        Identifier questId = id("growing_the_yard");
+        return QuestHooks.registerPlotUpgradeQuest(questId, "Growing the Yard",
+                "We're ready to expand this yard, but we're short on raw building materials. Bring me "
+                        + "what's missing and I'll make it worth your while.",
+                LUMBERYARD_ZONE_TYPE,
+                List.of(QuestReward.gold(25), QuestReward.xp("mayor", 50),
+                        QuestReward.intangible("The yard is ready to grow")));
+    }
+
+    private static Identifier expandingTheFarm() {
+        Identifier questId = id("expanding_the_farm");
+        return QuestHooks.registerPlotUpgradeQuest(questId, "Expanding the Farm",
+                "This farm could use more land under it, but we're short on raw building materials. "
+                        + "Bring me what's missing and I'll make it worth your while.",
+                FARM_ZONE_TYPE,
+                List.of(QuestReward.gold(25), QuestReward.xp("mayor", 50),
+                        QuestReward.intangible("The farm is ready to grow")));
+    }
+
+    private static Identifier growingTheTownHall() {
+        Identifier questId = id("growing_the_town_hall");
+        return QuestHooks.registerPlotUpgradeQuest(questId, "Growing the Town",
+                "The town's ready for its next stage, but the Town Hall is short on raw building "
+                        + "materials. Bring what's missing and I'll make it worth your while.",
+                TOWN_HALL_ZONE_TYPE,
+                List.of(QuestReward.gold(30), QuestReward.xp("mayor", 60),
+                        QuestReward.intangible("The town is ready to grow")));
+    }
+
+    private static Identifier settingUpShop() {
+        Identifier questId = id("setting_up_shop");
+        return QuestHooks.registerPlotUpgradeQuest(questId, "Setting Up Shop",
+                "I'd like to expand this stall, but I'm short on raw building materials. Bring me "
+                        + "what's missing and I'll make it worth your while.",
+                TRAVELING_MERCHANT_ZONE_TYPE,
+                List.of(QuestReward.gold(25), QuestReward.xp("mayor", 50),
+                        QuestReward.intangible("The stall is ready to grow")));
     }
 
     // ---- Farmer ----

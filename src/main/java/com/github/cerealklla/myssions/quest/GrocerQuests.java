@@ -29,7 +29,7 @@ public final class GrocerQuests {
         List<Identifier> quests = List.of(
                 stockingTheShelves(), sweetsForTheCounter(), aFreshBatchOfCookies(), fruitForTheStand(),
                 melonsForMarket(), beetrootSoupFixings(), aRareImport(), anotherRareImport(),
-                pestControlOutBack(), honeycombForTheCounter());
+                pestControlOutBack(), honeycombForTheCounter(), expandingTheStore());
         IssuerQuestPools.register(GROCER_ZONE_TYPE, quests);
     }
 
@@ -123,5 +123,16 @@ public final class GrocerQuests {
                         + "profit fairly.",
                 GROCER_ZONE_TYPE, "Bring 8 Honeycomb", mc("honeycomb"), 8, 2,
                 List.of(QuestReward.intangible("The counter has honeycomb again")));
+    }
+
+    /** See {@code QuestHooks#registerPlotUpgradeQuest}'s own doc -- one per profession, per the standing instruction in design-document.md's "Plot Upgrade quest" section. */
+    private static Identifier expandingTheStore() {
+        Identifier questId = id("expanding_the_store");
+        return QuestHooks.registerPlotUpgradeQuest(questId, "Expanding the Store",
+                "I'd like to expand this store, but I'm short on raw building materials. Bring me "
+                        + "what's missing and I'll make it worth your while.",
+                GROCER_ZONE_TYPE,
+                List.of(QuestReward.gold(25), QuestReward.xp("mayor", 50),
+                        QuestReward.intangible("The store is ready to grow")));
     }
 }

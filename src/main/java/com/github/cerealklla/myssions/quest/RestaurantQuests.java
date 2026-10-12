@@ -23,7 +23,8 @@ public final class RestaurantQuests {
     public static void registerAll() {
         List<Identifier> quests = List.of(
                 meatForTheGrill(), freshCatch(), sweetsForDessert(), eggsForBreakfast(), aPinchOfSpice(),
-                mushroomsForTheStew(), aHuntingTrip(), melonForDessert(), milkForTheKitchen(), pestControlInThePantry());
+                mushroomsForTheStew(), aHuntingTrip(), melonForDessert(), milkForTheKitchen(), pestControlInThePantry(),
+                expandingTheKitchen());
         IssuerQuestPools.register(RESTAURANT_ZONE_TYPE, quests);
     }
 
@@ -117,5 +118,16 @@ public final class RestaurantQuests {
                 "pantry_silverfish_husks", "Pantry Silverfish Husks", "Not exactly appetizing, but the problem's solved.",
                 false, 1,
                 List.of(QuestReward.gold(10), QuestReward.intangible("The pantry is pest-free again")));
+    }
+
+    /** See {@code QuestHooks#registerPlotUpgradeQuest}'s own doc -- one per profession, per the standing instruction in design-document.md's "Plot Upgrade quest" section. */
+    private static Identifier expandingTheKitchen() {
+        Identifier questId = id("expanding_the_kitchen");
+        return QuestHooks.registerPlotUpgradeQuest(questId, "Expanding the Kitchen",
+                "I'd like to expand this kitchen, but I'm short on raw building materials. Bring me "
+                        + "what's missing and I'll make it worth your while.",
+                RESTAURANT_ZONE_TYPE,
+                List.of(QuestReward.gold(25), QuestReward.xp("mayor", 50),
+                        QuestReward.intangible("The kitchen is ready to grow")));
     }
 }

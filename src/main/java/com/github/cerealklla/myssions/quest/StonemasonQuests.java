@@ -23,7 +23,8 @@ public final class StonemasonQuests {
     public static void registerAll() {
         List<Identifier> quests = List.of(
                 stoneForTheChisel(), graniteSupply(), dioriteSupply(), andesiteStock(), deepslateForFineCarving(),
-                quartzForAccents(), clearingTheQuarry(), caveSpidersInThePit(), aRareStone(), amethystForAccents());
+                quartzForAccents(), clearingTheQuarry(), caveSpidersInThePit(), aRareStone(), amethystForAccents(),
+                expandingTheQuarry());
         IssuerQuestPools.register(STONEMASON_ZONE_TYPE, quests);
     }
 
@@ -117,5 +118,16 @@ public final class StonemasonQuests {
                         + "what you can find.",
                 STONEMASON_ZONE_TYPE, "Bring 8 Amethyst Shards", mc("amethyst_shard"), 8, 3,
                 List.of(QuestReward.intangible("The wealthy customer gets their accents")));
+    }
+
+    /** See {@code QuestHooks#registerPlotUpgradeQuest}'s own doc -- one per profession, per the standing instruction in design-document.md's "Plot Upgrade quest" section. */
+    private static Identifier expandingTheQuarry() {
+        Identifier questId = id("expanding_the_quarry");
+        return QuestHooks.registerPlotUpgradeQuest(questId, "Expanding the Quarry",
+                "I'd like to expand this quarry, but I'm short on raw building materials. Bring me "
+                        + "what's missing and I'll make it worth your while.",
+                STONEMASON_ZONE_TYPE,
+                List.of(QuestReward.gold(25), QuestReward.xp("mayor", 50),
+                        QuestReward.intangible("The quarry is ready to grow")));
     }
 }

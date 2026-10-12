@@ -73,6 +73,72 @@ final class QuestHooks {
         return questId;
     }
 
+    /**
+     * A "help upgrade this plot" quest (added 2026-10-12, explicit user spec) -- any plot NPC can
+     * offer it; the target is always the issuing plot's own real current Wood/Stone shortfall for
+     * raising its Tier cap by one (not a Blueprint's building cost -- see {@code api.Settlemynts
+     * #getPlotUpgradeShortfall}'s own doc for that distinction), resolved fresh at acceptance time
+     * via {@link #registerPlotUpgradeHook}. {@code rewards} should include both a {@code
+     * QuestReward#gold} and a {@code QuestReward#xp("mayor", ...)} entry, per the user's own spec
+     * ("The reward will include gold, but also a decent amount of Mayor xp") -- both are scaled by
+     * the real upgrade's own size via {@link QuestEngine#setRewardMultiplier}, same mechanism the
+     * region-kill quests already use for distance scaling.
+     *
+     * <p><b>Standing instruction</b> (added to design-document.md the same day): every new plot
+     * profession/Zone Type added to this suite from now on should get one of these registered
+     * alongside its other quests -- see that doc's own "Plot Upgrade quest" section for the full
+     * checklist, so this isn't silently forgotten for the next new plot type.
+     */
+    static Identifier registerPlotUpgradeQuest(Identifier questId, String name, String description, String zoneType, List<QuestReward> rewards) {
+        QuestRegistry.register(new QuestDefinition(questId, name, description, zoneType,
+                List.of(
+                        QuestMilestone.plotUpgradeResource("deliver_wood", "Bring {wood} Logs", "wood"),
+                        QuestMilestone.plotUpgradeResource("deliver_stone", "Bring {stone} Stone", "stone")
+                ),
+                rewards, QuestTimeLimit.NONE));
+        registerPlotUpgradeHook(questId);
+        registerPlotUpgradeEligibility(questId);
+        return questId;
+    }
+
+    /**
+     * Resolves the issuing plot's real current Tier-upgrade shortfall at acceptance time and packs
+     * it onto the instance's own hint (see {@code QuestText}'s own doc), plus sizes {@link
+     * QuestInstance#rewardMultiplier()} by how big the upgrade itself is ({@code max(1, nextTier -
+     * 1)}, the same multiplier formula {@code construction.PlotTierUpgradeCost} itself uses). Must
+     * accompany {@link #registerPlotUpgradeEligibility}, same pairing convention as every other
+     * dynamically-resolved quest shape in this file.
+     */
+    static void registerPlotUpgradeHook(Identifier questId) {
+        QuestAssignmentHooks.register(questId, (player, instanceId, assignedId, plotId) -> {
+            if (!(player.level() instanceof ServerLevel level)
+                    || !com.github.cerealklla.myssions.bridge.SettlemyntsPlotUpgradeBridge.isLoaded()) {
+                return;
+            }
+            com.github.cerealklla.myssions.bridge.SettlemyntsPlotUpgradeBridge.resolveShortfall(level, plotId).ifPresent(shortfall -> {
+                if (!shortfall.anyShortfall()) {
+                    player.sendSystemMessage(Component.literal(
+                            "Actually, never mind -- this plot already has everything it needs for its next upgrade."));
+                    return;
+                }
+                QuestEngine.setHint(player, instanceId, player.blockPosition(), level.dimension().identifier().toString(),
+                        Optional.of(QuestText.packPlotUpgradeHint(shortfall.woodNeeded(), shortfall.stoneNeeded())));
+                QuestEngine.setRewardMultiplier(player, instanceId, Math.max(1, shortfall.nextTier() - 1));
+                player.sendSystemMessage(Component.literal(
+                        "This plot needs more building materials to grow -- bring me what's missing and I'll make it worth your while."));
+            });
+        });
+    }
+
+    /** Must accompany every {@link #registerPlotUpgradeHook} call -- never offer the quest when the plot has no real shortfall to fill. */
+    static void registerPlotUpgradeEligibility(Identifier questId) {
+        QuestEligibility.register(questId, (level, plotId) ->
+                com.github.cerealklla.myssions.bridge.SettlemyntsPlotUpgradeBridge.isLoaded()
+                        && com.github.cerealklla.myssions.bridge.SettlemyntsPlotUpgradeBridge.resolveShortfall(level, plotId)
+                                .map(com.github.cerealklla.myssions.bridge.SettlemyntsPlotUpgradeBridge.Shortfall::anyShortfall)
+                                .orElse(false));
+    }
+
     /** An escort/caravan-raid quest, reusing {@link #registerEscortHook}. */
     static Identifier registerEscortQuest(Identifier questId, String name, String description, String zoneType,
                                             int waypointCount, int maxBanditEncounters, List<QuestReward> rewards) {
@@ -80,7 +146,7 @@ final class QuestHooks {
                 List.of(
                         new QuestMilestone("fend_off_bandits", "Fend off any Bandits that attack the caravan",
                                 true, maxBanditEncounters, Optional.of(Identifier.fromNamespaceAndPath("minecraft", "pillager")),
-                                Optional.empty(), false, false, false, 0, false, false, false),
+                                Optional.empty(), false, false, false, 0, false, false, false, false),
                         QuestMilestone.escort("escort_caravan", "Escort the caravan safely to the end of the road")
                 ),
                 rewards, QuestTimeLimit.NONE));
