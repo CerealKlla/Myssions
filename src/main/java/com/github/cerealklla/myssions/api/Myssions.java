@@ -48,11 +48,6 @@ public final class Myssions {
         return QuestEngine.assignQuest(player, definitionId);
     }
 
-    /** Re-assigns a previously-failed instance fresh, returning its new instanceId. Empty if {@code instanceId} isn't a failed instance they actually have. */
-    public static Optional<UUID> retryQuest(ServerPlayer player, UUID instanceId) {
-        return QuestEngine.retryQuest(player, instanceId);
-    }
-
     public static Optional<QuestInstance> getQuestInstance(ServerPlayer player, UUID instanceId) {
         return QuestEngine.getInstance(player, instanceId);
     }

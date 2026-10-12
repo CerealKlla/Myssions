@@ -16,8 +16,10 @@ import net.minecraft.core.UUIDUtil;
  * each instance's own hidden {@link QuestInstance#instanceId()} (not its definition -- see that
  * class's own doc for why a shared definition key can't represent two independent acceptances).
  * Completed/failed instances are deliberately kept (never removed) so "Failed Quests" at the bottom
- * of the Quest Log has something to show and "Retry" has state to reset -- the one exception is a
- * player-initiated {@link #withoutQuest}, see {@code QuestEngine#abandonQuest}'s own doc for why
+ * of the Quest Log has something to show -- there's no in-UI retry path at all (removed 2026-10-12,
+ * explicit user instruction: "I don't want such a capability"; the issuing NPC offering the same
+ * quest again is the only way back in), it's purely a record. The one exception to "never removed"
+ * is a player-initiated {@link #withoutQuest}, see {@code QuestEngine#abandonQuest}'s own doc for why
  * that specific path really does delete the instance instead. {@code activeQuestId} is which
  * instance (if any) shows on the Active Quest HUD. {@code completedCountByIssuer} is the running
  * per-issuer total the user's own spec asks for, for a future karma/reputation system to build on.

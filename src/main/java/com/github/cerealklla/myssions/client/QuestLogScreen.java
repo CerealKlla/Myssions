@@ -6,7 +6,6 @@ import java.util.Optional;
 import java.util.UUID;
 
 import com.github.cerealklla.myssions.net.AbandonQuestPayload;
-import com.github.cerealklla.myssions.net.RetryQuestPayload;
 import com.github.cerealklla.myssions.net.SetActiveQuestPayload;
 import com.github.cerealklla.myssions.quest.QuestDefinition;
 import com.github.cerealklla.myssions.quest.QuestInstance;
@@ -27,7 +26,9 @@ import net.minecraft.network.protocol.common.ServerboundCustomPayloadPacket;
  * The Quest Log (design doc item 1) -- opened via {@code MyssionsModClient#OPEN_QUEST_LOG}. Two
  * independently-scrollable columns: a left list (~30% width, quest names, Failed Quests grouped at
  * the bottom per item 6) and a right details pane (~60% width, full quest info + "Set as Active
- * Quest"/"Retry"). Reads its quest list entirely from client-local state -- {@link QuestRegistry}
+ * Quest"). A failed quest has no in-UI retry path at all (removed 2026-10-12, explicit user
+ * instruction: "I don't want such a capability" -- the only way to get it again is the issuing NPC
+ * offering it fresh). Reads its quest list entirely from client-local state -- {@link QuestRegistry}
  * (identical content on both physical sides, see {@code MyssionsMod#commonSetup}'s own doc) joined
  * against the local player's own synced {@code quest.PlayerQuestData} attachment -- no network
  * round trip needed just to open this screen.
@@ -173,10 +174,8 @@ public final class QuestLogScreen extends Screen {
                 abandonButton = addRenderableWidget(Button.builder(Component.literal("Abandon Quest"), b -> confirmAbandon())
                         .bounds(detailsLeft + 160, buttonY, 150, 20).build());
             }
-        } else if (instance.status() == QuestStatus.FAILED) {
-            actionButton = addRenderableWidget(Button.builder(Component.literal("Retry"), b -> retry())
-                    .bounds(detailsLeft, buttonY, 150, 20).build());
         }
+        // A FAILED instance gets no action button at all -- no in-UI retry, see this class's own doc.
     }
 
     private void setActive() {
@@ -189,15 +188,6 @@ public final class QuestLogScreen extends Screen {
         // still-stale attachment, so the button never visually updated until the server's resync
         // round-tripped back, making the first click look like it had done nothing.
         optimisticActiveQuestId = selectedId;
-        rebuildListRows();
-        rebuildActionButton();
-    }
-
-    private void retry() {
-        if (selectedId == null) {
-            return;
-        }
-        Minecraft.getInstance().getConnection().send(new ServerboundCustomPayloadPacket(new RetryQuestPayload(selectedId)));
         rebuildListRows();
         rebuildActionButton();
     }

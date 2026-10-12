@@ -55,23 +55,6 @@ public final class QuestEngine {
         return Optional.of(instance.instanceId());
     }
 
-    /** Retries a previously-failed instance -- resets its progress and re-assigns it fresh under a brand-new instanceId (its own hint/location, if any, is forgotten; a quest's own assignment hook re-runs to set fresh ones). Returns the new instanceId, or empty if it's not a failed instance the player actually has, or they're at the quest cap. */
-    public static Optional<UUID> retryQuest(ServerPlayer player, UUID instanceId) {
-        PlayerQuestData data = player.getData(ModAttachments.QUEST_DATA);
-        QuestInstance existing = data.quests().get(instanceId);
-        if (existing == null || existing.status() != QuestStatus.FAILED) {
-            return Optional.empty();
-        }
-        long acceptedCount = data.quests().values().stream().filter(i -> i.status() == QuestStatus.IN_PROGRESS).count();
-        if (acceptedCount >= MAX_ACCEPTED_QUESTS) {
-            player.sendSystemMessage(Component.literal("You can't accept any more quests right now (max " + MAX_ACCEPTED_QUESTS + " at once)."));
-            return Optional.empty();
-        }
-        QuestInstance fresh = QuestInstance.freshlyAssigned(existing.definitionId(), player.level().getGameTime());
-        player.setData(ModAttachments.QUEST_DATA, data.withQuest(fresh));
-        return Optional.of(fresh.instanceId());
-    }
-
     /** Sets an in-progress instance's hidden true hint position -- see {@link QuestInstance#hintPos()}'s own doc. */
     public static void setHint(ServerPlayer player, UUID instanceId, net.minecraft.core.BlockPos pos, String dimensionId) {
         setHint(player, instanceId, pos, dimensionId, Optional.empty());

@@ -2,7 +2,6 @@ package com.github.cerealklla.myssions;
 
 import com.github.cerealklla.myssions.api.Myssions;
 import com.github.cerealklla.myssions.debug.DebugCommands;
-import com.github.cerealklla.myssions.net.RetryQuestPayload;
 import com.github.cerealklla.myssions.net.SetActiveQuestPayload;
 import com.github.cerealklla.myssions.quest.QuestDeadlineTicker;
 import com.github.cerealklla.myssions.quest.QuestKillListener;
@@ -98,13 +97,6 @@ public class MyssionsMod {
                 (payload, context) -> {
                     if (context.player() instanceof ServerPlayer player) {
                         Myssions.setActiveQuest(player, payload.instanceId());
-                    }
-                });
-
-        registrar.playToServer(RetryQuestPayload.TYPE, RetryQuestPayload.STREAM_CODEC,
-                (payload, context) -> {
-                    if (context.player() instanceof ServerPlayer player) {
-                        Myssions.retryQuest(player, payload.instanceId());
                     }
                 });
 
