@@ -41,4 +41,31 @@ public record QuestTimeLimit(Kind kind, long ticksFromAssignment, long realWorld
     public boolean hasLimit() {
         return kind != Kind.NONE;
     }
+
+    private static final long TICKS_PER_DAY = 24000L;
+
+    /**
+     * The game-time instant this instance actually expires at, for {@link Kind#GAME_TICKS_FROM_ASSIGNMENT}/
+     * {@link Kind#NEXT_GAME_DAY_BOUNDARY} only -- the one shared formula {@code QuestDeadlineTicker}'s
+     * own expiry check and {@code client.ActiveQuestOverlay}'s countdown bar both call, added
+     * 2026-10-13 specifically so the two can never silently drift apart. Meaningless ({@code
+     * Long.MAX_VALUE}, "never") for {@link Kind#NONE}/{@link Kind#REAL_WORLD_DATE} -- the latter has
+     * its own absolute {@link #realWorldEpochMillis()} instead, not anchored to game time at all.
+     */
+    public long deadlineGameTime(long assignedAtGameTime) {
+        return switch (kind) {
+            case GAME_TICKS_FROM_ASSIGNMENT -> assignedAtGameTime + ticksFromAssignment;
+            case NEXT_GAME_DAY_BOUNDARY -> ((assignedAtGameTime / TICKS_PER_DAY) + 1) * TICKS_PER_DAY;
+            default -> Long.MAX_VALUE;
+        };
+    }
+
+    /** The real total game-time span this instance's deadline was given (varies per-instance for {@link Kind#NEXT_GAME_DAY_BOUNDARY}, since it depends where in the day it was assigned) -- the countdown bar's own denominator. {@code -1} ("no meaningful total") for {@link Kind#NONE}/{@link Kind#REAL_WORLD_DATE}. */
+    public long totalGameTicks(long assignedAtGameTime) {
+        return switch (kind) {
+            case GAME_TICKS_FROM_ASSIGNMENT -> ticksFromAssignment;
+            case NEXT_GAME_DAY_BOUNDARY -> deadlineGameTime(assignedAtGameTime) - assignedAtGameTime;
+            default -> -1L;
+        };
+    }
 }

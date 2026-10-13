@@ -6,6 +6,7 @@ import com.github.cerealklla.myssions.quest.QuestMilestone;
 import com.github.cerealklla.myssions.quest.QuestRegistry;
 import com.github.cerealklla.myssions.quest.QuestStatus;
 import com.github.cerealklla.myssions.quest.QuestText;
+import com.github.cerealklla.myssions.quest.QuestTimeLimit;
 import com.github.cerealklla.myssions.registration.ModAttachments;
 
 import net.minecraft.ChatFormatting;
@@ -13,6 +14,7 @@ import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.util.Mth;
 import net.neoforged.neoforge.client.gui.GuiLayer;
 
 /**
@@ -32,10 +34,19 @@ public final class ActiveQuestOverlay implements GuiLayer {
     private static final int DONE_COLOR = 0xFFA0A0A0;
     private static final int BACKGROUND_COLOR = 0x80101010;
 
+    // Time-remaining countdown bar (2026-10-13, explicit user spec: "starts Green becomes red...
+    // slides from 100% down to 0%"). Only shown for a time-limited quest whose deadline is anchored
+    // to game time (GAME_TICKS_FROM_ASSIGNMENT/NEXT_GAME_DAY_BOUNDARY, see QuestTimeLimit#deadlineGameTime's
+    // own doc) -- REAL_WORLD_DATE has no stored "started at" real timestamp to normalize a fraction
+    // against, and no quest in this mod actually uses that kind today.
+    private static final int BAR_HEIGHT = 4;
+    private static final int BAR_GAP_ABOVE = 3;
+    private static final int BAR_TRACK_COLOR = 0xFF303030;
+
     @Override
     public void render(GuiGraphicsExtractor graphics, DeltaTracker deltaTracker) {
         Minecraft minecraft = Minecraft.getInstance();
-        if (minecraft.player == null || minecraft.screen != null) {
+        if (minecraft.player == null || minecraft.screen != null || minecraft.level == null) {
             return;
         }
         var data = minecraft.player.getData(ModAttachments.QUEST_DATA);
@@ -51,16 +62,36 @@ public final class ActiveQuestOverlay implements GuiLayer {
             return;
         }
 
+        QuestTimeLimit limit = definition.timeLimit();
+        boolean showCountdown = limit.hasLimit() && limit.kind() != QuestTimeLimit.Kind.REAL_WORLD_DATE
+                && instance.status() == QuestStatus.IN_PROGRESS;
+        float remainingFraction = 0f;
+        String remainingText = "";
+        if (showCountdown) {
+            long now = minecraft.level.getGameTime();
+            long deadline = limit.deadlineGameTime(instance.assignedAtGameTime());
+            long total = limit.totalGameTicks(instance.assignedAtGameTime());
+            long remaining = deadline - now;
+            remainingFraction = total > 0 ? Mth.clamp((float) remaining / total, 0f, 1f) : 0f;
+            remainingText = "Time Remaining: " + formatTicks(Math.max(0, remaining));
+        }
+
         Font font = minecraft.font;
         int maxTextWidth = font.width(definition.name());
         for (QuestMilestone milestone : definition.milestones()) {
             maxTextWidth = Math.max(maxTextWidth, font.width(milestoneLine(milestone, instance)));
+        }
+        if (showCountdown) {
+            maxTextWidth = Math.max(maxTextWidth, font.width(remainingText));
         }
         int lineCount = 1 + definition.milestones().size();
         int left = MARGIN;
         int top = MARGIN;
         int right = left + maxTextWidth + PADDING * 2;
         int bottom = top + font.lineHeight * lineCount + PADDING * 2;
+        if (showCountdown) {
+            bottom += font.lineHeight + BAR_GAP_ABOVE + BAR_HEIGHT;
+        }
 
         graphics.fill(left, top, right, bottom, BACKGROUND_COLOR);
         int y = top + PADDING;
@@ -75,6 +106,39 @@ public final class ActiveQuestOverlay implements GuiLayer {
             graphics.text(font, line, left + PADDING, y, complete ? DONE_COLOR : TEXT_COLOR);
             y += font.lineHeight;
         }
+        if (showCountdown) {
+            graphics.text(font, remainingText, left + PADDING, y, TEXT_COLOR);
+            y += font.lineHeight + BAR_GAP_ABOVE;
+            int barLeft = left + PADDING;
+            int barRight = right - PADDING;
+            graphics.fill(barLeft, y, barRight, y + BAR_HEIGHT, BAR_TRACK_COLOR);
+            int filledRight = barLeft + Math.round((barRight - barLeft) * remainingFraction);
+            if (filledRight > barLeft) {
+                graphics.fill(barLeft, y, filledRight, y + BAR_HEIGHT, 0xFF000000 | countdownColor(remainingFraction));
+            }
+        }
+    }
+
+    /** Green at full time remaining, sliding to red as the deadline approaches -- plain linear RGB interpolation, no need for anything fancier at this size. */
+    private static int countdownColor(float remainingFraction) {
+        int red = Math.round((1f - remainingFraction) * 255f);
+        int green = Math.round(remainingFraction * 255f);
+        return (red << 16) | (green << 8);
+    }
+
+    /** "5h 32m" / "47m" / "12s" -- whichever units are actually relevant, never more than two. */
+    private static String formatTicks(long ticks) {
+        long totalSeconds = ticks / 20L;
+        long hours = totalSeconds / 3600L;
+        long minutes = (totalSeconds % 3600L) / 60L;
+        long seconds = totalSeconds % 60L;
+        if (hours > 0) {
+            return hours + "h " + minutes + "m";
+        }
+        if (minutes > 0) {
+            return minutes + "m " + seconds + "s";
+        }
+        return seconds + "s";
     }
 
     /**

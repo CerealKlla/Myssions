@@ -21,7 +21,6 @@ import net.neoforged.neoforge.event.tick.ServerTickEvent;
 public final class QuestDeadlineTicker {
 
     private static final int SCAN_INTERVAL_TICKS = 100; // 5 seconds.
-    private static final long TICKS_PER_DAY = 24000L;
     // Staggered 2026-10-12 -- real report: every mob near the player stutter-moving in lockstep.
     // Root cause: this and seven other full-world-scanning tickers across Settlemynts/Lyfe all
     // independently picked "every 100 ticks" with no offset, so every scan landed on the exact same
@@ -58,13 +57,12 @@ public final class QuestDeadlineTicker {
     }
 
     private boolean isExpired(QuestTimeLimit limit, QuestInstance instance, long nowGameTime, long nowEpochMillis) {
+        // GAME_TICKS_FROM_ASSIGNMENT/NEXT_GAME_DAY_BOUNDARY now share QuestTimeLimit#deadlineGameTime
+        // with client.ActiveQuestOverlay's own countdown bar (added 2026-10-13) -- one formula, so
+        // the two can never silently drift apart.
         return switch (limit.kind()) {
             case NONE -> false;
-            case GAME_TICKS_FROM_ASSIGNMENT -> nowGameTime >= instance.assignedAtGameTime() + limit.ticksFromAssignment();
-            case NEXT_GAME_DAY_BOUNDARY -> {
-                long nextBoundary = ((instance.assignedAtGameTime() / TICKS_PER_DAY) + 1) * TICKS_PER_DAY;
-                yield nowGameTime >= nextBoundary;
-            }
+            case GAME_TICKS_FROM_ASSIGNMENT, NEXT_GAME_DAY_BOUNDARY -> nowGameTime >= limit.deadlineGameTime(instance.assignedAtGameTime());
             case REAL_WORLD_DATE -> nowEpochMillis >= limit.realWorldEpochMillis();
         };
     }
