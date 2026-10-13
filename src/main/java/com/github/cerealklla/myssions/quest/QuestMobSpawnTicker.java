@@ -50,7 +50,17 @@ public final class QuestMobSpawnTicker {
     private void tickPlayer(ServerPlayer player) {
         var data = player.getData(ModAttachments.QUEST_DATA);
         for (QuestInstance instance : data.quests().values()) {
-            if (instance.status() != QuestStatus.IN_PROGRESS || instance.mobsSpawned()
+            // Real live report, 2026-10-12 ("I'm at this location for a quest to kill pillagers and
+            // there aren't any") -- this used to be a true one-shot (gated on instance.mobsSpawned(),
+            // never checked again once it fired). Topping up once is NOT actually a completability
+            // guarantee: the spawned mobs can wander off, get killed by something else entirely (a
+            // guard, another mob, fall damage), or naturally despawn long before the player gets back
+            // to the target -- confirmed live, zero pillagers existed anywhere on the server despite
+            // this player standing right at the quest's own hint position. Now re-checks/tops up every
+            // time a player is in range for as long as the milestone is incomplete, same cheap
+            // "alreadyAlive vs. stillNeeded" shortfall math as before -- never spawns extra once enough
+            // are already alive, so a player who's actively fighting isn't flooded with reinforcements.
+            if (instance.status() != QuestStatus.IN_PROGRESS
                     || instance.hintPos().isEmpty() || instance.hintDimensionId().isEmpty()) {
                 continue;
             }
@@ -65,7 +75,9 @@ public final class QuestMobSpawnTicker {
             }
 
             QuestRegistry.get(instance.definitionId()).ifPresent(definition -> ensureMobsForDefinition(level, instance, definition, truePos));
-            QuestEngine.markMobsSpawned(player, instance.instanceId());
+            if (!instance.mobsSpawned()) {
+                QuestEngine.markMobsSpawned(player, instance.instanceId());
+            }
         }
     }
 
