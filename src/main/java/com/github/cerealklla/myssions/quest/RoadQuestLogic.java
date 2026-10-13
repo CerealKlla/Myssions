@@ -42,8 +42,10 @@ public final class RoadQuestLogic {
     // "An 'optimal' road would not require more than 30% more stakes than the minimum."
     private static final double OPTIMAL_STAKE_SLACK_FACTOR = 1.3;
     // The granted stack: minimum + full allowance for failing every efficiency milestone (the
-    // optimal cap itself) + a further 10% buffer, per the user's own formula.
-    private static final double GRANTED_STACK_BUFFER_FACTOR = 1.10;
+    // optimal cap itself) + a further buffer on top, per the user's own formula -- raised 10% -> 50%,
+    // 2026-10-13, explicit request: "add 50% more stakes to the base calculated number" (the optimal
+    // cap is the "base calculated number" the buffer applies to).
+    private static final double GRANTED_STACK_BUFFER_FACTOR = 1.50;
 
     public static final String REQUIRED_SKILL_ID = "expeditionist";
     public static final int REQUIRED_SKILL_LEVEL = 1; // Deliberately low for now -- tune once this is live-tested.
