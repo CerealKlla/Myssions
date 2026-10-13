@@ -67,12 +67,24 @@ public final class RoadQuestTicker {
     private void finalizeConnection(ServerLevel level, ServerPlayer player, QuestInstance instance, long originPlaceId, long destinationPlaceId, int stakeCount) {
         RoadQuestRegistry.get(level.getServer()).markConnected(originPlaceId, destinationPlaceId, stakeCount);
 
-        // Flat bonus gold (see RoadQuestDefinitions' own doc, "500 base + 300 more max") now pays
-        // through the normal reward-pickup path (QuestEngine#addPlainMilestoneBonus) once this
-        // milestone's own completion is reported -- no reward-multiplier needed here anymore.
-        boolean efficient = stakeCount <= instance.roadQuest().optimalStakeCap();
-        if (efficient) {
-            QuestEngine.reportMilestoneProgress(player, instance.instanceId(), "efficient_road", 1);
+        // Three cascading efficiency tiers (see RoadQuestDefinitions' own doc, "500 base + 300 more
+        // max, spread across" slightly/more/very efficient) -- each tier's own flat bonus gold pays
+        // through the normal reward-pickup path (QuestEngine#addPlainMilestoneBonus) once its
+        // milestone's completion is reported here. Tier 2's threshold is the real midpoint between
+        // the minimum possible stake count and the original "efficient" cap, so a road built right
+        // at the theoretical minimum satisfies all three tiers (the full 300) and one built just
+        // under the loose cap only satisfies the first.
+        int minStakes = instance.roadQuest().minStakes();
+        int optimalCap = instance.roadQuest().optimalStakeCap();
+        int midpoint = Math.round((minStakes + optimalCap) / 2.0f);
+        if (stakeCount <= optimalCap) {
+            QuestEngine.reportMilestoneProgress(player, instance.instanceId(), "efficient_road_tier1", 1);
+        }
+        if (stakeCount <= midpoint) {
+            QuestEngine.reportMilestoneProgress(player, instance.instanceId(), "efficient_road_tier2", 1);
+        }
+        if (stakeCount <= minStakes) {
+            QuestEngine.reportMilestoneProgress(player, instance.instanceId(), "efficient_road_tier3", 1);
         }
         QuestEngine.reportMilestoneProgress(player, instance.instanceId(), "connect_road", 1);
 

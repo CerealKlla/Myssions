@@ -33,14 +33,24 @@ public final class RoadQuestDefinitions {
                 "road_quest_board",
                 List.of(
                         QuestMilestone.simple("connect_road", "Connect the two settlements with a road"),
-                        // Explicit user spec, 2026-10-13: "500 base + 300 more max from the optional
-                        // milestones" -- replaces the original 10%-reward-multiplier bonus with a
-                        // flat, understandable amount, same "QuestEngine#addPlainMilestoneBonus" shape
-                        // the deliver/gather quest styles already use for their own bonus gold.
-                        // bonusGoldPerProof (10th field) set directly via the canonical constructor --
-                        // QuestMilestone#simple's own factory always hardcodes this to 0.
-                        new QuestMilestone("efficient_road", "Build it efficiently (bonus reward)", true, 1,
-                                java.util.Optional.empty(), java.util.Optional.empty(), false, false, false, 300, false, false, false, false)
+                        // Explicit user spec, 2026-10-13 (correcting an earlier, wrong flat-bonus
+                        // read of the same spec): three cascading efficiency tiers, not one -- "a
+                        // road can be slightly efficient, slightly more efficient, and very
+                        // efficient, and the bonus paid would make sense based on that... spread
+                        // across those levels." Each tier pays a flat 100 (300 total "max") via
+                        // QuestEngine#addPlainMilestoneBonus; RoadQuestTicker#finalizeConnection
+                        // reports ALL tiers whose threshold the real stake count qualifies for, not
+                        // just the single tightest one -- achieving the hardest tier (very
+                        // efficient) always also satisfies the two looser ones, since the
+                        // thresholds nest (tier3 <= tier2 <= tier1). bonusGoldPerProof (10th field)
+                        // set directly via the canonical constructor -- QuestMilestone#simple's own
+                        // factory always hardcodes this to 0.
+                        new QuestMilestone("efficient_road_tier1", "Build it efficiently (bonus reward)", true, 1,
+                                java.util.Optional.empty(), java.util.Optional.empty(), false, false, false, 100, false, false, false, false),
+                        new QuestMilestone("efficient_road_tier2", "Build it more efficiently (bigger bonus)", true, 1,
+                                java.util.Optional.empty(), java.util.Optional.empty(), false, false, false, 100, false, false, false, false),
+                        new QuestMilestone("efficient_road_tier3", "Build it very efficiently (max bonus)", true, 1,
+                                java.util.Optional.empty(), java.util.Optional.empty(), false, false, false, 100, false, false, false, false)
                 ),
                 List.of(QuestReward.gold(500)),
                 QuestTimeLimit.withinTicksOfAssignment(6L * 60 * 60 * 20),

@@ -415,11 +415,12 @@ public final class QuestEngine {
     /**
      * Flat bonus gold for a plain milestone (none of deliver/gather/buy/plot-upgrade, each of which
      * already has its own dedicated bonus-payment method above) that's both optional and complete --
-     * added 2026-10-13 for the road-connection quest's "efficient_road" bonus (explicit user spec:
-     * "500 base + 300 more max from the optional milestones"). {@code requiredCount()} is always 1
-     * for this kind of milestone (a plain done-or-not completion, no partial-delivery concept), so
-     * this pays a flat {@code bonusGoldPerProof} once, same shape as {@link #addGatherReward}'s own
-     * "flat amount if complete" logic -- just without restricting to one specific milestone kind.
+     * added 2026-10-13 for the road-connection quest's three cascading "efficient_road_tier1/2/3"
+     * bonuses (explicit user spec: "500 base + 300 more max from the optional milestones... spread
+     * across" three efficiency levels, 100 each). {@code requiredCount()} is always 1 for this kind
+     * of milestone (a plain done-or-not completion, no partial-delivery concept), so this pays a
+     * flat {@code bonusGoldPerProof} once per qualifying tier, same shape as {@link #addGatherReward}'s
+     * own "flat amount if complete" logic -- just without restricting to one specific milestone kind.
      */
     private static void addPlainMilestoneBonus(List<ItemStack> rewardItems, QuestDefinition definition, QuestInstance updated, double multiplier) {
         for (QuestMilestone milestone : definition.milestones()) {
