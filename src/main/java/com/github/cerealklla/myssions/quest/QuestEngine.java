@@ -453,6 +453,43 @@ public final class QuestEngine {
         return true;
     }
 
+    /**
+     * Read-only pre-check for {@link #tryCompleteQuest} -- see that method's own doc for why this
+     * exists. Mirrors {@link #tryDeliverProof}'s own held/required resolution exactly, but never
+     * consumes anything; returns one human-readable line (via {@link QuestText#resolve} against the
+     * milestone's own description, so a plot-upgrade milestone reads "Bring 12 Logs" rather than a
+     * raw item id) per required-and-not-yet-complete deliver milestone the player can't fully afford
+     * right now, skipping any optional bonus-paying one.
+     */
+    private static List<String> findMissingRequiredDeliverables(ServerPlayer player, QuestInstance instance, QuestDefinition definition) {
+        List<String> missing = new ArrayList<>();
+        for (QuestMilestone milestone : definition.milestones()) {
+            if (!milestone.isDeliverMilestone() || instance.isMilestoneComplete(milestone)
+                    || (milestone.optional() && milestone.bonusGoldPerProof() > 0)) {
+                continue;
+            }
+            Optional<Identifier> buyItemId = milestone.isBuyMilestone()
+                    ? BuyItemTargets.get(player.level().getServer()).get(instance.instanceId()).map(BuyItemTargets.Target::itemId) : Optional.empty();
+            Optional<Identifier> gatherItemId = milestone.isGatherMilestone()
+                    ? milestone.proofId().flatMap(s -> Optional.ofNullable(Identifier.tryParse(s))) : Optional.empty();
+            Optional<Identifier> plotUpgradeItemId = milestone.isPlotUpgradeMilestone()
+                    ? milestone.proofId().map(QuestEngine::plotUpgradeRepresentativeItemId) : Optional.empty();
+            int requiredCount = milestone.isPlotUpgradeMilestone() ? plotUpgradeRequiredAmount(instance, milestone) : milestone.requiredCount();
+            int remaining = requiredCount - instance.milestoneProgress().getOrDefault(milestone.id(), 0);
+            if (remaining <= 0) {
+                continue;
+            }
+            int held = milestone.isBuyMilestone() ? buyItemId.map(id -> countRealItem(player, id)).orElse(0)
+                    : milestone.isGatherMilestone() ? gatherItemId.map(id -> countRealItem(player, id)).orElse(0)
+                    : milestone.isPlotUpgradeMilestone() ? plotUpgradeItemId.map(id -> countRealItem(player, id)).orElse(0)
+                    : milestone.proofId().map(id -> countProof(player, id)).orElse(0);
+            if (held < remaining) {
+                missing.add(QuestText.resolve(milestone.description(), instance));
+            }
+        }
+        return missing;
+    }
+
     /** {@code "wood"} -> Oak Log, {@code "stone"} -> Cobblestone -- the same representative concrete items Blueprynts' own {@code GenericResource} enum uses for these two categories, hardcoded here rather than taking a compile dependency on Blueprynts just for two item ids. */
     private static Identifier plotUpgradeRepresentativeItemId(String resourceKey) {
         return "stone".equals(resourceKey)
@@ -497,7 +534,32 @@ public final class QuestEngine {
         if (definitionOpt.isEmpty()) {
             return false;
         }
-        for (QuestMilestone milestone : definitionOpt.get().milestones()) {
+        QuestDefinition definition = definitionOpt.get();
+
+        // Real live report, 2026-10-12: "it seems to take the materials, but then leaves the quest
+        // active and doesn't upgrade the plot." A quest with more than one REQUIRED deliver
+        // milestone (e.g. a Plot Upgrade quest's wood + stone) used to consume whatever the player
+        // held for whichever milestone they could afford, even when another required milestone
+        // couldn't be met at all -- the player lost real materials for a quest that stayed stuck
+        // IN_PROGRESS with no explanation of what was still missing. Required milestones are now
+        // all-or-nothing as a GROUP: nothing is consumed for any of them unless every one of them can
+        // be fully delivered this call. An *optional* bonus-paying deliver milestone (e.g. "return
+        // Phantom Membranes for bonus gold") is deliberately excluded from this check -- partial
+        // delivery there is a real, intended feature (see tryDeliverProof's own doc), not something
+        // that should block or be blocked by the quest's actual completion.
+        List<String> missing = findMissingRequiredDeliverables(player, instance, definition);
+        if (!missing.isEmpty()) {
+            player.sendSystemMessage(Component.literal("Still missing: " + String.join("; ", missing)));
+            for (QuestMilestone milestone : definition.milestones()) {
+                if (milestone.isDeliverMilestone() && milestone.optional() && milestone.bonusGoldPerProof() > 0
+                        && !instance.isMilestoneComplete(milestone)) {
+                    tryDeliverProof(player, instanceId, milestone.id());
+                }
+            }
+            return false;
+        }
+
+        for (QuestMilestone milestone : definition.milestones()) {
             if (milestone.isDeliverMilestone() && !instance.isMilestoneComplete(milestone)) {
                 tryDeliverProof(player, instanceId, milestone.id());
             }

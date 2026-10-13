@@ -102,7 +102,24 @@ public class QuestNpcEntity extends Villager {
                 }
             }
         }
-        if (!completedAnything) {
+        if (completedAnything) {
+            // Real live report, 2026-10-12: "Harlen didn't actually have any dialog for me so it was
+            // kind of a weird quest" -- the talk milestone completed entirely silently, even though
+            // the quest's own description promises "see what he has to say." No per-NPC dialogue
+            // content system exists (every quest NPC here is generic, no authored line table), so
+            // this is a deliberately minimal fix: always say SOMETHING on the interaction that
+            // actually completes the milestone, rather than nothing at all. A real dialogue system is
+            // a much bigger feature, not in scope for closing out this report.
+            player.sendSystemMessage(Component.literal(npcName + ": \"Ah, you found me. Glad you made it.\""));
+            // Same live report asked "Does he ever de-spawn?" -- he didn't, there was no cleanup at
+            // all once the talk milestone was done, so a personally-spawned (owner-only) quest NPC
+            // would sit there forever with nothing left to say. A shared/public NPC (ownerPlayerId
+            // null) is left alone here -- no current quest uses one, but discarding on the FIRST
+            // player to talk would wrongly remove it for everyone else who hasn't yet.
+            if (ownerPlayerId != null) {
+                discard();
+            }
+        } else {
             player.sendSystemMessage(Component.literal(npcName + ": \"Nothing more for you right now.\""));
         }
         return true;
