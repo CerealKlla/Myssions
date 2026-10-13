@@ -179,20 +179,25 @@ public final class QuestLogScreen extends Screen {
         }
         int detailsLeft = width * LIST_WIDTH_FRACTION_NUM / FRACTION_DEN + MARGIN * 2;
         int buttonY = MARGIN;
+        UUID instanceId = selectedId;
+        String questName = QuestRegistry.get(instance.definitionId()).map(QuestDefinition::name).orElse("this quest");
+
+        // Button set varies by quest status (see comments below), so widths/positions are computed
+        // dynamically from whichever buttons actually apply, rather than fixed offsets -- fixed
+        // offsets (150/150/100 wide, hardcoded x) ran off the right edge of the details pane on
+        // narrower windows (real 2026-10-12 report: "doesn't fit on my normal resolution").
+        record Spec(String label, int preferredWidth, Runnable action) {
+        }
+        List<Spec> specs = new ArrayList<>();
         if (instance.status() == QuestStatus.IN_PROGRESS || instance.status() == QuestStatus.AWAITING_REWARD_PICKUP) {
             boolean isActiveQuest = selectedId.equals(effectiveActiveQuestId(data));
-            actionButton = addRenderableWidget(Button.builder(
-                            Component.literal(isActiveQuest ? "Active Quest" : "Set as Active Quest"),
-                            b -> setActive())
-                    .bounds(detailsLeft, buttonY, 150, 20).build());
-            actionButton.active = !isActiveQuest;
+            specs.add(new Spec(isActiveQuest ? "Active Quest" : "Set as Active Quest", 150, this::setActive));
             // Only while genuinely IN_PROGRESS, 2026-10-11 explicit request -- an AWAITING_REWARD_PICKUP
             // instance already has a real reward waiting; abandoning it would just throw that away with
             // no warning beyond the confirm dialog, and QuestEngine#abandonQuest itself only accepts
             // IN_PROGRESS anyway, so don't offer a button that would silently no-op.
             if (instance.status() == QuestStatus.IN_PROGRESS) {
-                abandonButton = addRenderableWidget(Button.builder(Component.literal("Abandon Quest"), b -> confirmAbandon())
-                        .bounds(detailsLeft + 160, buttonY, 150, 20).build());
+                specs.add(new Spec("Abandon Quest", 150, this::confirmAbandon));
             }
         }
         // A FAILED instance gets no action button at all -- no in-UI retry, see this class's own doc.
@@ -200,11 +205,33 @@ public final class QuestLogScreen extends Screen {
         // "Report Bug" (explicit user request, 2026-10-12) -- unlike the buttons above, offered
         // regardless of quest status, since a report could just as easily be about a completed or
         // failed quest's own past behavior as an in-progress one.
-        UUID instanceId = selectedId;
-        String questName = QuestRegistry.get(instance.definitionId()).map(QuestDefinition::name).orElse("this quest");
-        reportBugButton = addRenderableWidget(Button.builder(Component.literal("Report Bug"),
-                        b -> Minecraft.getInstance().setScreen(new BugReportScreen(this, instanceId, questName)))
-                .bounds(detailsLeft + 320, buttonY, 100, 20).build());
+        specs.add(new Spec("Report Bug", 100, () -> Minecraft.getInstance().setScreen(new BugReportScreen(this, instanceId, questName))));
+
+        int available = Math.max(60, width - MARGIN - detailsLeft);
+        int gap = 10;
+        int preferredTotal = specs.stream().mapToInt(Spec::preferredWidth).sum() + gap * (specs.size() - 1);
+        double scale = preferredTotal > available ? (double) (available - gap * (specs.size() - 1)) / specs.stream().mapToInt(Spec::preferredWidth).sum() : 1.0;
+        scale = Math.max(0.0, scale);
+        int minWidth = 50;
+        int x = detailsLeft;
+        List<Button> built = new ArrayList<>();
+        for (Spec spec : specs) {
+            int w = Math.max(minWidth, (int) Math.floor(spec.preferredWidth() * scale));
+            Button button = addRenderableWidget(Button.builder(Component.literal(spec.label()), b -> spec.action().run())
+                    .bounds(x, buttonY, w, 20).build());
+            built.add(button);
+            x += w + gap;
+        }
+        // The first entry is "Active Quest"/"Set as Active Quest" only when a status check above
+        // added it -- disable it to reflect the already-active state, same as before.
+        if (!specs.isEmpty() && (instance.status() == QuestStatus.IN_PROGRESS || instance.status() == QuestStatus.AWAITING_REWARD_PICKUP)) {
+            actionButton = built.get(0);
+            actionButton.active = !selectedId.equals(effectiveActiveQuestId(data));
+            if (instance.status() == QuestStatus.IN_PROGRESS && specs.size() > 1 && specs.get(1).label().equals("Abandon Quest")) {
+                abandonButton = built.get(1);
+            }
+        }
+        reportBugButton = built.get(built.size() - 1);
     }
 
     private void setActive() {
