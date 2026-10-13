@@ -232,4 +232,29 @@ public final class Myssions {
     public static boolean acceptRoadQuestOffer(ServerPlayer player, long postingSettlementPlaceId, long targetSettlementPlaceId) {
         return com.github.cerealklla.myssions.quest.RoadQuestLogic.acceptOffer(player, postingSettlementPlaceId, targetSettlementPlaceId);
     }
+
+    /** Min/optimal Highway Stake counts for a straight-line distance -- see {@code RoadQuestLogic#computeThresholds}'s own doc. Exposed read-only so a poster-side UI (e.g. Settlemynts' Establish Highway map picker) can preview the real numbers before actually posting. */
+    public static com.github.cerealklla.myssions.quest.RoadQuestLogic.StakeThresholds computeRoadQuestStakeThresholds(double straightLineDistanceBlocks) {
+        return com.github.cerealklla.myssions.quest.RoadQuestLogic.computeThresholds(straightLineDistanceBlocks);
+    }
+
+    /**
+     * Every destination this settlement currently has a {@code POSTED} (not yet accepted)
+     * road-connection offer out to, with a real resolved display name for each -- added 2026-10-13
+     * so a not-yet-accepted Establish Highway offer can actually show up (and be accepted) from the
+     * Town Hall's own chat menu, not just once someone's already accepted it. Empty if Cartographyr
+     * isn't loaded (needed to resolve a display name) or there are no posted offers.
+     */
+    public static java.util.List<com.github.cerealklla.myssions.quest.RoadQuestRegistry.PostedOffer> getPostedRoadQuestOffers(
+            MinecraftServer server, net.minecraft.server.level.ServerLevel level, long postingPlaceId) {
+        java.util.List<Long> destinations = com.github.cerealklla.myssions.quest.RoadQuestRegistry.get(server).postedOffersFrom(postingPlaceId);
+        java.util.List<com.github.cerealklla.myssions.quest.RoadQuestRegistry.PostedOffer> offers = new java.util.ArrayList<>();
+        for (long destinationPlaceId : destinations) {
+            String name = com.github.cerealklla.cartographyr.api.Cartography.getEntity(level, new com.github.cerealklla.cartographyr.geo.EntityId(destinationPlaceId))
+                    .map(com.github.cerealklla.cartographyr.geo.DisplayText::shortForEntity)
+                    .orElse("an unknown settlement");
+            offers.add(new com.github.cerealklla.myssions.quest.RoadQuestRegistry.PostedOffer(destinationPlaceId, name));
+        }
+        return offers;
+    }
 }

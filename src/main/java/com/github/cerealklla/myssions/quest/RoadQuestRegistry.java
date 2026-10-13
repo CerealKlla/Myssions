@@ -45,6 +45,10 @@ public final class RoadQuestRegistry extends SavedData {
 
     public enum Kind { POSTED, IN_PROGRESS, CONNECTED }
 
+    /** A posted, not-yet-accepted offer with its destination's real display name already resolved -- see {@code api.Myssions#getPostedRoadQuestOffers}'s own doc. */
+    public record PostedOffer(long destinationPlaceId, String destinationName) {
+    }
+
     public record PlaceIdPair(long a, long b) {
         public static PlaceIdPair of(long x, long y) {
             return x <= y ? new PlaceIdPair(x, y) : new PlaceIdPair(y, x);
@@ -145,6 +149,20 @@ public final class RoadQuestRegistry extends SavedData {
 
     public Optional<Entry> get(long placeIdA, long placeIdB) {
         return Optional.ofNullable(entries.get(PlaceIdPair.of(placeIdA, placeIdB)));
+    }
+
+    /** Every destination placeId this settlement currently has a {@code POSTED} (not yet accepted) offer out to -- added 2026-10-13 for the Establish Highway quest's "visible as an option from the Town Hall NPC" requirement, so a not-yet-accepted offer can be shown/accepted from a chat menu without needing the full pair upfront. */
+    public List<Long> postedOffersFrom(long postingPlaceId) {
+        List<Long> destinations = new ArrayList<>();
+        for (Map.Entry<PlaceIdPair, Entry> e : entries.entrySet()) {
+            Entry entry = e.getValue();
+            if (!entry.isPosted() || entry.postingSettlementPlaceId() != postingPlaceId) {
+                continue;
+            }
+            PlaceIdPair pair = e.getKey();
+            destinations.add(pair.a() == postingPlaceId ? pair.b() : pair.a());
+        }
+        return destinations;
     }
 
     /** True if this placeId has a {@code CONNECTED} entry with ANY other settlement -- used to gate escort quests (Phase B). */
