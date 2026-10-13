@@ -48,4 +48,9 @@ public final class SettlemyntsRoadQuestBridge {
     public static int buybackUnusedStakes(ServerPlayer player, UUID instanceId) {
         return Settlemynts.buybackUnusedHighwayStakes(player, instanceId);
     }
+
+    /** Despawns every placed Highway Stake for this instance, reverting its paved terrain first -- see {@code api.Settlemynts#despawnHighwayStakesForInstance}'s own doc. Used on quest failure/abandon, never on a normal completion (the stake network is meant to persist once connected). */
+    public static void despawnStakesForInstance(ServerLevel level, UUID instanceId, BlockPos nearHint) {
+        Settlemynts.despawnHighwayStakesForInstance(level, instanceId, nearHint);
+    }
 }

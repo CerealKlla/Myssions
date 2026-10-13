@@ -202,4 +202,25 @@ public final class RoadQuestRegistry extends SavedData {
             setDirty();
         }
     }
+
+    /**
+     * Reverts an {@code IN_PROGRESS} pair back to the SAME {@code POSTED} offer it was before being
+     * accepted (same posting side, plot, poster, and stake thresholds -- just clearing {@code
+     * instanceId}/{@code acceptedByPlayerId}/{@code stakeCountUsed}), rather than deleting the entry
+     * outright like {@link #reopen} does. Added 2026-10-13, explicit user spec for the Establish
+     * Highway quest: "if the player abandons the quest or it is failed the quest will automatically
+     * be made available again at the Town Hall NPC, and won't re-charge the mayor" -- {@link #reopen}
+     * alone would clear the entry entirely, requiring a fresh (paid) post to get a new offer. A no-op
+     * if the pair has no entry at all.
+     */
+    public void reopenAsPosted(long placeIdA, long placeIdB) {
+        PlaceIdPair pair = PlaceIdPair.of(placeIdA, placeIdB);
+        Entry existing = entries.get(pair);
+        if (existing == null) {
+            return;
+        }
+        entries.put(pair, Entry.posted(existing.postingSettlementPlaceId(), existing.postingPlotId(),
+                existing.posterPlayerId(), existing.minStakes(), existing.optimalStakeCap()));
+        setDirty();
+    }
 }

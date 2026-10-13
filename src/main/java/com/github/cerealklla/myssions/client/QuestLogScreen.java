@@ -117,6 +117,7 @@ public final class QuestLogScreen extends Screen {
         UUID activeId = effectiveActiveQuestId(data);
         List<ListRow> rows = new ArrayList<>();
         List<QuestInstance> active = new ArrayList<>();
+        List<QuestInstance> specialAssignments = new ArrayList<>();
         List<QuestInstance> completed = new ArrayList<>();
         List<QuestInstance> failed = new ArrayList<>();
         for (QuestInstance instance : data.quests().values()) {
@@ -128,7 +129,14 @@ public final class QuestLogScreen extends Screen {
                 // Grouped to the bottom with Failed, 2026-10-11 user request -- previously mixed in
                 // with everything else in insertion order instead of standing out as "done."
                 case COMPLETED -> completed.add(instance);
-                default -> active.add(instance);
+                // Mayor's Special Assignments (2026-10-13) get their own section below the ordinary
+                // active list, explicit user spec -- checked regardless of status (AWAITING_REWARD_
+                // PICKUP included) the same way the ordinary "active" bucket already was.
+                default -> {
+                    boolean isSpecial = QuestRegistry.get(instance.definitionId())
+                            .map(QuestDefinition::isSpecialAssignment).orElse(false);
+                    (isSpecial ? specialAssignments : active).add(instance);
+                }
             }
         }
         for (QuestInstance instance : active) {
@@ -138,6 +146,17 @@ public final class QuestLogScreen extends Screen {
                 int color = isActiveQuest ? ACTIVE_TEXT_COLOR : TEXT_COLOR;
                 rows.add(new ListRow(instance.instanceId(), prefix + def.name(), color, false));
             });
+        }
+        if (!specialAssignments.isEmpty()) {
+            rows.add(new ListRow(null, "-- Mayor's Special Assignments --", HEADER_COLOR, true));
+            for (QuestInstance instance : specialAssignments) {
+                QuestRegistry.get(instance.definitionId()).ifPresent(def -> {
+                    boolean isActiveQuest = instance.instanceId().equals(activeId);
+                    String prefix = instance.status() == QuestStatus.AWAITING_REWARD_PICKUP ? "[Ready] " : (isActiveQuest ? "* " : "");
+                    int color = isActiveQuest ? ACTIVE_TEXT_COLOR : TEXT_COLOR;
+                    rows.add(new ListRow(instance.instanceId(), prefix + def.name(), color, false));
+                });
+            }
         }
         if (!completed.isEmpty()) {
             rows.add(new ListRow(null, "-- Completed Quests --", HEADER_COLOR, true));

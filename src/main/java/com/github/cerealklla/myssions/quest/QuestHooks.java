@@ -134,11 +134,50 @@ final class QuestHooks {
                 QuestEngine.setRewardMultiplier(player, instanceId, Math.max(1, shortfall.nextTier() - 1));
                 // Lets QuestEngine#completePlotUpgradeQuestsForPlot find this instance later if the
                 // player pays for the real upgrade directly through Settlemynts instead of this
-                // quest's own turn-in -- see that method's own doc for the real live report.
-                PlotUpgradeQuestTargets.get(level.getServer()).set(instanceId, plotId);
+                // quest's own turn-in -- see that method's own doc for the real live report. Also
+                // records which specific Tier this instance's own shortfall was sized for (see
+                // PlotUpgradeQuestTargets' own doc, "targetTier added 2026-10-13") -- needed so two
+                // players' instances for the same plot can't both apply a real upgrade.
+                PlotUpgradeQuestTargets.get(level.getServer()).set(instanceId, plotId, shortfall.nextTier());
                 player.sendSystemMessage(Component.literal(
                         "This plot needs more building materials to grow -- bring me what's missing and I'll make it worth your while."));
             });
+        });
+        // Explicit user spec, 2026-10-13: a quest instance whose real-world upgrade has already
+        // happened through some other path (another player's instance for the same plot, the real
+        // "Upgrade Plot" button) should fail outright before this quest's own delivery ever consumes
+        // anything -- see QuestViabilityHooks' own doc. Checked the same read-only way the acceptance
+        // hook above resolves a shortfall in the first place: the plot's real current Tier is still
+        // one below this instance's own recorded targetTier.
+        QuestViabilityHooks.register(questId, (player, instanceId, viabilityId) -> {
+            if (!(player.level() instanceof ServerLevel level)
+                    || !com.github.cerealklla.myssions.bridge.SettlemyntsPlotUpgradeBridge.isLoaded()) {
+                return true;
+            }
+            return PlotUpgradeQuestTargets.get(level.getServer()).get(instanceId)
+                    .map(target -> com.github.cerealklla.myssions.bridge.SettlemyntsPlotUpgradeBridge.resolveShortfall(level, target.plotId())
+                            .map(s -> s.nextTier() == target.targetTier())
+                            .orElse(false))
+                    .orElse(true);
+        });
+        // Real live report, 2026-10-13: the quest completed and paid its reward, but the plot's real
+        // Tier never went up -- the delivery milestone above only ever consumes real wood/stone out
+        // of the player's own inventory, it never touches Settlemynts' Construction Box the real
+        // "Upgrade Plot" button funds from. This is the other half: once the quest's own delivery
+        // satisfies the shortfall, tell Settlemynts to actually apply the Tier raise (see
+        // bridge.SettlemyntsPlotUpgradeBridge#applyUpgrade's own doc for the box-draining accounting
+        // this still needs to do). By the time this fires, QuestViabilityHooks above has already
+        // guaranteed the plot is still at the right Tier for this instance -- applyUpgrade "failing"
+        // here would mean something changed Settlemynts-side within this same single-threaded call,
+        // not a real race; nothing user-facing to say about that.
+        QuestCompletionHooks.register(questId, (player, instanceId, completedId) -> {
+            if (!(player.level() instanceof ServerLevel level)
+                    || !com.github.cerealklla.myssions.bridge.SettlemyntsPlotUpgradeBridge.isLoaded()) {
+                return;
+            }
+            PlotUpgradeQuestTargets.get(level.getServer()).get(instanceId).ifPresent(target ->
+                    com.github.cerealklla.myssions.bridge.SettlemyntsPlotUpgradeBridge.applyUpgrade(
+                            level, target.plotId(), target.targetTier()));
         });
     }
 
@@ -330,6 +369,25 @@ final class QuestHooks {
                 player.sendSystemMessage(Component.literal(
                         "The caravan sets out -- stay close, or bandits may see their chance."));
             });
+        });
+        // Generalized 2026-10-13 out of a special case that used to live inline in
+        // QuestEngine#abandonQuest -- a live CaravanEntity has nothing else watching it once its
+        // instance stops being IN_PROGRESS. QuestEscortTicker#completeEscort already discards the
+        // caravan directly on a real finish, so this only has real work left to do for
+        // FAILED/ABANDONED -- but checking isAlive() first makes it a harmless no-op for COMPLETED
+        // too rather than needing to filter by reason. This also fixes a real pre-existing gap:
+        // failQuest (deadline expiry) never cleaned up an escort's caravan at all before this hook
+        // existed.
+        QuestEndHooks.register(questId, (player, instanceId, endedId, reason) -> {
+            if (player.level() instanceof ServerLevel level) {
+                QuestEngine.getInstance(player, instanceId).ifPresent(instance ->
+                        instance.escort().entityUuid().ifPresent(caravanId -> {
+                            if (level.getEntity(caravanId) instanceof com.github.cerealklla.myssions.quest.entity.CaravanEntity caravan
+                                    && caravan.isAlive()) {
+                                caravan.discard();
+                            }
+                        }));
+            }
         });
     }
 

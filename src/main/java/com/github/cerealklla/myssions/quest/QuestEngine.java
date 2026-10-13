@@ -33,8 +33,28 @@ public final class QuestEngine {
     private QuestEngine() {
     }
 
-    /** Assigns a fresh instance of {@code definitionId} to the player. Returns its new instanceId, or empty if the definition doesn't exist, they're already at the quest cap, or they already have an in-progress instance of this exact definition. */
+    /** Assigns a fresh instance of {@code definitionId} to the player, with no issuing-plot context -- see the 3-arg overload's own doc. */
     public static Optional<UUID> assignQuest(ServerPlayer player, Identifier definitionId) {
+        return assignQuest(player, definitionId, Optional.empty());
+    }
+
+    /**
+     * Assigns a fresh instance of {@code definitionId} to the player. Returns its new instanceId, or
+     * empty if the definition doesn't exist, they're already at the quest cap, or they already have
+     * an in-progress instance of this exact definition.
+     *
+     * <p>{@code plotId} (added 2026-10-13) is the issuing plot, when one exists -- passed straight
+     * through to {@link QuestAssignmentHooks#fire}, now called from inside this method rather than by
+     * each individual caller. Real gap found and fixed the same day: the fire call used to live only
+     * in {@code QuestTurnIn#acceptBoardOffer}, so {@code api.Myssions#assignQuest} (and anything else
+     * calling this method directly, like the debug {@code /myssions givetest} command) silently never
+     * fired assignment hooks at all. Calling this from a context with no real plot (the 2-arg overload
+     * above) is safe even for a definition that *does* have a hook registered -- in practice, only
+     * quest ids accepted through a real plot (the board, or a quest-specific flow like {@code
+     * RoadQuestLogic#acceptOffer}) ever have one, so {@code Optional.empty()} here never actually
+     * reaches a hook that needs a real plot id.
+     */
+    public static Optional<UUID> assignQuest(ServerPlayer player, Identifier definitionId, Optional<UUID> plotId) {
         Optional<QuestDefinition> definition = QuestRegistry.get(definitionId);
         if (definition.isEmpty()) {
             return Optional.empty();
@@ -63,15 +83,44 @@ public final class QuestEngine {
         if (alreadyInProgress) {
             return Optional.empty(); // Already has this exact definition in progress -- assigning again would just duplicate it.
         }
-        long acceptedCount = data.quests().values().stream().filter(i -> i.status() == QuestStatus.IN_PROGRESS).count();
-        if (acceptedCount >= MAX_ACCEPTED_QUESTS) {
-            player.sendSystemMessage(Component.literal("You can't accept any more quests right now (max " + MAX_ACCEPTED_QUESTS + " at once)."));
-            return Optional.empty();
+        // Mayor's Special Assignments (2026-10-13, explicit user spec: "will not be subject to that
+        // NPCs 5 quest limit... house an unlimited number of quests") are exempt from this cap
+        // entirely -- both as the quest being accepted right now (skip the check outright) and as
+        // already-held instances (excluded from the tally below, so holding several doesn't eat into
+        // the 5 ordinary slots either).
+        if (!definition.get().isSpecialAssignment()) {
+            long acceptedCount = data.quests().values().stream()
+                    .filter(i -> i.status() == QuestStatus.IN_PROGRESS)
+                    .filter(i -> !QuestRegistry.get(i.definitionId()).map(QuestDefinition::isSpecialAssignment).orElse(false))
+                    .count();
+            if (acceptedCount >= MAX_ACCEPTED_QUESTS) {
+                player.sendSystemMessage(Component.literal("You can't accept any more quests right now (max " + MAX_ACCEPTED_QUESTS + " at once)."));
+                return Optional.empty();
+            }
         }
         QuestInstance instance = QuestInstance.freshlyAssigned(definitionId, player.level().getGameTime());
         player.setData(ModAttachments.QUEST_DATA, data.withQuest(instance));
         player.sendSystemMessage(Component.literal("New quest: " + definition.get().name()));
+        grantAcceptanceItems(player, definition.get());
+        QuestAssignmentHooks.fire(player, instance.instanceId(), definitionId, plotId.orElse(null));
         return Optional.of(instance.instanceId());
+    }
+
+    /** {@link QuestDefinition#acceptanceGrants()} -- a fixed item handed over the instant an instance is created, regardless of which path created it (see this method's own call site's doc). */
+    private static void grantAcceptanceItems(ServerPlayer player, QuestDefinition definition) {
+        for (QuestReward grant : definition.acceptanceGrants()) {
+            if (grant.kind() != QuestReward.Kind.ITEM) {
+                continue; // Only ITEM makes sense to hand over at acceptance -- gold/XP belong to completion rewards.
+            }
+            Item item = BuiltInRegistries.ITEM.getOptional(grant.itemId()).orElse(null);
+            if (item == null) {
+                continue;
+            }
+            ItemStack stack = new ItemStack(item, grant.amount());
+            if (!player.getInventory().add(stack)) {
+                player.drop(stack, false);
+            }
+        }
     }
 
     /** Sets an in-progress instance's hidden true hint position -- see {@link QuestInstance#hintPos()}'s own doc. */
@@ -202,7 +251,15 @@ public final class QuestEngine {
         if (milestone == null) {
             return;
         }
-        int newProgress = Math.min(milestone.requiredCount(), instance.milestoneProgress().getOrDefault(milestoneId, 0) + amount);
+        // A plot-upgrade milestone's real required amount is resolved per-instance (see
+        // #plotUpgradeRequiredAmount's own doc) -- milestone.requiredCount() is a meaningless 0
+        // placeholder for this kind. Real live report, 2026-10-13: using the static requiredCount()
+        // here clamped every plot-upgrade delivery's progress straight back down to 0, so materials
+        // were genuinely consumed by tryDeliverProof but the quest could never register as complete
+        // (isMilestoneComplete already resolved the real dynamic amount correctly -- only this clamp
+        // didn't match it).
+        int cap = milestone.isPlotUpgradeMilestone() ? plotUpgradeRequiredAmount(instance, milestone) : milestone.requiredCount();
+        int newProgress = Math.min(cap, instance.milestoneProgress().getOrDefault(milestoneId, 0) + amount);
         QuestInstance updated = instance.withProgress(milestoneId, newProgress);
 
         boolean allRequiredComplete = definition.milestones().stream()
@@ -211,6 +268,12 @@ public final class QuestEngine {
 
         if (allRequiredComplete) {
             beginRewardPickup(player, definition, updated);
+            // See QuestCompletionHooks' own doc -- fired only on this, the genuine quest-driven
+            // completion path. NOT fired from completePlotUpgradeQuestsForPlot's own call to
+            // beginRewardPickup below -- that path exists specifically because Settlemynts already
+            // applied the real upgrade itself and is just telling the quest to catch up; firing this
+            // hook there would call straight back into Settlemynts to "apply" an upgrade a second time.
+            QuestCompletionHooks.fire(player, instanceId, definition.id());
         } else {
             player.setData(ModAttachments.QUEST_DATA, data.withQuest(updated));
         }
@@ -259,6 +322,7 @@ public final class QuestEngine {
         }
         player.setData(ModAttachments.QUEST_DATA, updatedData);
         player.sendSystemMessage(Component.literal("Quest complete: " + definition.name()));
+        QuestEndHooks.fire(player, instance.instanceId(), definition.id(), QuestEndHooks.EndReason.COMPLETED);
     }
 
     /** {@code multiplier} scales XP same as Gold/Item -- see {@link QuestInstance#rewardMultiplier()}'s own doc ("scale the reward with the difficulty/distance from starting point"). */
@@ -490,14 +554,15 @@ public final class QuestEngine {
         return missing;
     }
 
-    /** {@code "wood"} -> Oak Log, {@code "stone"} -> Cobblestone -- the same representative concrete items Blueprynts' own {@code GenericResource} enum uses for these two categories, hardcoded here rather than taking a compile dependency on Blueprynts just for two item ids. */
-    private static Identifier plotUpgradeRepresentativeItemId(String resourceKey) {
+    /** {@code "wood"} -> Oak Log, {@code "stone"} -> Cobblestone -- the same representative concrete items Blueprynts' own {@code GenericResource} enum uses for these two categories, hardcoded here rather than taking a compile dependency on Blueprynts just for two item ids. Package-private -- also used by {@code QuestTurnIn#isReadyToComplete}. */
+    static Identifier plotUpgradeRepresentativeItemId(String resourceKey) {
         return "stone".equals(resourceKey)
                 ? Identifier.fromNamespaceAndPath("minecraft", "cobblestone")
                 : Identifier.fromNamespaceAndPath("minecraft", "oak_log");
     }
 
-    private static int plotUpgradeRequiredAmount(QuestInstance instance, QuestMilestone milestone) {
+    /** Package-private -- also used by {@code QuestTurnIn#isReadyToComplete}. */
+    static int plotUpgradeRequiredAmount(QuestInstance instance, QuestMilestone milestone) {
         QuestText.PlotUpgradeAmounts amounts = QuestText.resolvePlotUpgradeAmounts(instance).orElse(new QuestText.PlotUpgradeAmounts(0, 0));
         return "stone".equals(milestone.proofId().orElse("")) ? amounts.stoneNeeded() : amounts.woodNeeded();
     }
@@ -535,6 +600,18 @@ public final class QuestEngine {
             return false;
         }
         QuestDefinition definition = definitionOpt.get();
+
+        // See QuestViabilityHooks' own doc -- must run before anything below consumes a single item.
+        // Explicit user spec, 2026-10-13: if this instance's real-world effect has already happened
+        // through some other path (another player's instance for the same plot, say), fail it outright
+        // -- a full delete, same as a player-chosen Abandon Quest, not a lingering FAILED entry.
+        if (!QuestViabilityHooks.isStillViable(player, instanceId, definition.id())) {
+            PlayerQuestData data = player.getData(ModAttachments.QUEST_DATA);
+            player.setData(ModAttachments.QUEST_DATA, data.withoutQuest(instanceId));
+            player.sendSystemMessage(Component.literal(
+                    "Someone already completed \"" + definition.name() + "\" before you could turn it in."));
+            return false;
+        }
 
         // Real live report, 2026-10-12: "it seems to take the materials, but then leaves the quest
         // active and doesn't upgrade the plot." A quest with more than one REQUIRED deliver
@@ -597,7 +674,7 @@ public final class QuestEngine {
         PlotUpgradeQuestTargets targets = PlotUpgradeQuestTargets.get(player.level().getServer());
         for (QuestInstance instance : List.copyOf(player.getData(ModAttachments.QUEST_DATA).quests().values())) {
             if (instance.status() != QuestStatus.IN_PROGRESS
-                    || targets.get(instance.instanceId()).map(id -> !id.equals(plotId)).orElse(true)) {
+                    || targets.get(instance.instanceId()).map(t -> !t.plotId().equals(plotId)).orElse(true)) {
                 continue;
             }
             Optional<QuestDefinition> definitionOpt = QuestRegistry.get(instance.definitionId());
@@ -730,6 +807,7 @@ public final class QuestEngine {
         player.setData(ModAttachments.QUEST_DATA, updatedData);
         QuestRegistry.get(instance.definitionId()).ifPresent(def ->
                 player.sendSystemMessage(Component.literal("Quest failed: " + def.name())));
+        QuestEndHooks.fire(player, instanceId, instance.definitionId(), QuestEndHooks.EndReason.FAILED);
     }
 
     /**
@@ -749,15 +827,11 @@ public final class QuestEngine {
         if (instance == null || instance.status() != QuestStatus.IN_PROGRESS) {
             return;
         }
-        // An escort instance's caravan is a real live entity with nothing else watching it once the
-        // quest stops being IN_PROGRESS (QuestEscortTicker only ever acts on in-progress instances) --
-        // same cleanup QuestEscortTicker#completeEscort already does on a normal finish.
-        if (instance.escort().entityUuid().isPresent() && player.level() instanceof net.minecraft.server.level.ServerLevel level) {
-            net.minecraft.world.entity.Entity entity = level.getEntity(instance.escort().entityUuid().get());
-            if (entity instanceof com.github.cerealklla.myssions.quest.entity.CaravanEntity caravan) {
-                caravan.discard();
-            }
-        }
+        // Fired BEFORE the delete below -- a hook (e.g. the escort caravan cleanup registered by
+        // QuestHooks#registerEscortHook, generalized 2026-10-13 out of what used to be inline here)
+        // may need to look this instance back up via QuestEngine#getInstance, which would find
+        // nothing once withoutQuest has actually removed it.
+        QuestEndHooks.fire(player, instanceId, instance.definitionId(), QuestEndHooks.EndReason.ABANDONED);
         player.setData(ModAttachments.QUEST_DATA, data.withoutQuest(instanceId));
         QuestRegistry.get(instance.definitionId()).ifPresent(def ->
                 player.sendSystemMessage(Component.literal("Quest abandoned: " + def.name())));

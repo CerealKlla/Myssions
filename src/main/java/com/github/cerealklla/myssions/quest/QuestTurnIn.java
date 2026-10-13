@@ -36,18 +36,21 @@ public final class QuestTurnIn {
         List<QuestGiverMenu.ActiveEntry> activeEntries = new ArrayList<>();
         for (QuestInstance instance : data.quests().values()) {
             boolean isActive = instance.status() == QuestStatus.IN_PROGRESS || instance.status() == QuestStatus.AWAITING_REWARD_PICKUP;
-            if (!isActive || !pool.contains(instance.definitionId())) {
+            QuestDefinition definition = QuestRegistry.get(instance.definitionId()).orElse(null);
+            if (!isActive || definition == null) {
                 continue;
             }
-            QuestDefinition definition = QuestRegistry.get(instance.definitionId()).orElse(null);
-            if (definition == null) {
+            // A Mayor's Special Assignment (2026-10-13) isn't part of any zone-type pool at all (it's
+            // created dynamically, not pre-registered as one of the profession's usual offerings) --
+            // still shown here regardless of pool membership, same as any other active quest.
+            if (!definition.isSpecialAssignment() && !pool.contains(instance.definitionId())) {
                 continue;
             }
             // Already past its milestones and just waiting on reward pickup -- "ready" unconditionally,
             // clicking Complete Quest reopens the reward GUI rather than re-checking anything.
             boolean ready = instance.status() == QuestStatus.AWAITING_REWARD_PICKUP || isReadyToComplete(player, definition, instance);
             boolean needsTalk = !ready && hasIncompleteTalkMilestone(definition, instance);
-            activeEntries.add(new QuestGiverMenu.ActiveEntry(instance.instanceId(), definition.name(), ready, needsTalk));
+            activeEntries.add(new QuestGiverMenu.ActiveEntry(instance.instanceId(), definition.name(), ready, needsTalk, definition.isSpecialAssignment()));
         }
 
         List<QuestGiverMenu.NewOffer> newOffers = new ArrayList<>();
@@ -58,7 +61,19 @@ public final class QuestTurnIn {
             }
             QuestDefinition definition = QuestRegistry.get(offeredId).orElse(null);
             if (definition != null) {
-                newOffers.add(new QuestGiverMenu.NewOffer(offeredId, definition.name(), definition.description()));
+                newOffers.add(new QuestGiverMenu.NewOffer(offeredId, definition.name(), definition.description(), false));
+            }
+        }
+        // Mayor's Special Assignments (2026-10-13) -- a separate, unbounded board, never the
+        // IssuerQuestBoard above (that one's hard-capped at MAX_BOARD_SLOTS).
+        SpecialAssignmentBoard specialBoard = SpecialAssignmentBoard.get(player.level().getServer());
+        for (Identifier offeredId : specialBoard.get(plotId)) {
+            if (data.quests().values().stream().anyMatch(i -> i.definitionId().equals(offeredId))) {
+                continue;
+            }
+            QuestDefinition definition = QuestRegistry.get(offeredId).orElse(null);
+            if (definition != null) {
+                newOffers.add(new QuestGiverMenu.NewOffer(offeredId, definition.name(), definition.description(), true));
             }
         }
         return new QuestGiverMenu(activeEntries, newOffers);
@@ -81,6 +96,18 @@ public final class QuestTurnIn {
             if (milestone.isGatherMilestone()) {
                 Optional<Identifier> itemId = milestone.proofId().flatMap(s -> Optional.ofNullable(Identifier.tryParse(s)));
                 if (itemId.isPresent() && QuestEngine.hasEnoughRealItem(player, itemId.get(), milestone.requiredCount())) {
+                    continue;
+                }
+                return false;
+            }
+            // Real-item check against the dynamic per-instance shortfall, not the static (always 0)
+            // requiredCount() -- see QuestEngine#reportMilestoneProgress's own doc for the sibling bug
+            // this same static/dynamic mismatch caused. Must be checked before the generic
+            // isDeliverMilestone fallback below, since a plot-upgrade milestone is also a deliver
+            // milestone and would otherwise wrongly look for a nonexistent "wood"/"stone" proof item.
+            if (milestone.isPlotUpgradeMilestone()) {
+                Identifier itemId = QuestEngine.plotUpgradeRepresentativeItemId(milestone.proofId().orElse(""));
+                if (QuestEngine.hasEnoughRealItem(player, itemId, QuestEngine.plotUpgradeRequiredAmount(instance, milestone))) {
                     continue;
                 }
                 return false;
@@ -109,12 +136,16 @@ public final class QuestTurnIn {
      * that needs doing" -> pick one -> "Accept" (or the board-offer branch of {@link
      * #quickInteract}). Removes just that one offer (the board's other offers, if any, are
      * untouched -- see {@code IssuerQuestBoard}'s own doc, widened 2026-10-11 from a single-slot
-     * board) and fires the quest's own assignment hook (see {@code QuestAssignmentHooks}' own doc)
-     * on success.
+     * board). Assignment hooks (see {@code QuestAssignmentHooks}' own doc) are fired by {@code
+     * QuestEngine#assignQuest} itself, not here -- this just supplies the real issuing {@code
+     * plotId} that call needs.
      */
     public static Optional<UUID> acceptBoardOffer(ServerPlayer player, UUID plotId, Identifier questId) {
         IssuerQuestBoard board = IssuerQuestBoard.get(player.level().getServer());
-        if (!board.get(plotId).contains(questId)) {
+        SpecialAssignmentBoard specialBoard = SpecialAssignmentBoard.get(player.level().getServer());
+        boolean onOrdinaryBoard = board.get(plotId).contains(questId);
+        boolean onSpecialBoard = !onOrdinaryBoard && specialBoard.get(plotId).contains(questId);
+        if (!onOrdinaryBoard && !onSpecialBoard) {
             player.sendSystemMessage(Component.literal("I don't have anything for you right now."));
             return Optional.empty();
         }
@@ -134,10 +165,13 @@ public final class QuestTurnIn {
             player.sendSystemMessage(Component.literal("You're already working on that one."));
             return Optional.empty();
         }
-        Optional<UUID> instanceId = QuestEngine.assignQuest(player, questId);
+        Optional<UUID> instanceId = QuestEngine.assignQuest(player, questId, Optional.of(plotId));
         instanceId.ifPresent(id -> {
-            board.remove(plotId, questId);
-            QuestAssignmentHooks.fire(player, id, questId, plotId);
+            if (onOrdinaryBoard) {
+                board.remove(plotId, questId);
+            } else {
+                specialBoard.remove(plotId, questId);
+            }
         });
         return instanceId;
     }

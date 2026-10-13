@@ -23,11 +23,12 @@ public record QuestGiverMenu(List<ActiveEntry> activeQuests, List<NewOffer> newO
      * and talking to this NPC is the player's actual next step, not just "this quest happens to be
      * in progress."
      */
-    public record ActiveEntry(UUID instanceId, String questName, boolean readyToComplete, boolean needsTalk) {
+    public record ActiveEntry(UUID instanceId, String questName, boolean readyToComplete, boolean needsTalk,
+                               boolean isSpecialAssignment) {
     }
 
     /** One of the plot's current (unclaimed) board offers, filtered to ones the player doesn't already have a record of. */
-    public record NewOffer(Identifier questId, String questName, String description) {
+    public record NewOffer(Identifier questId, String questName, String description, boolean isSpecialAssignment) {
     }
 
     public static final QuestGiverMenu EMPTY = new QuestGiverMenu(List.of(), List.of());
