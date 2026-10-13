@@ -138,6 +138,11 @@ public final class Myssions {
         return QuestEngine.tryCompleteQuest(player, instanceId);
     }
 
+    /** See {@code QuestEngine#completePlotUpgradeQuestsForPlot}'s own doc -- called by Settlemynts right after its own real "Upgrade Plot" action succeeds, so a matching quest doesn't get left stuck. */
+    public static void completePlotUpgradeQuestsForPlot(ServerPlayer player, UUID plotId) {
+        QuestEngine.completePlotUpgradeQuestsForPlot(player, plotId);
+    }
+
     public static void setActiveQuest(ServerPlayer player, UUID instanceId) {
         QuestEngine.setActiveQuest(player, instanceId);
     }

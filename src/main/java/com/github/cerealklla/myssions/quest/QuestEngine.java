@@ -575,6 +575,53 @@ public final class QuestEngine {
         return updated.status() == QuestStatus.COMPLETED;
     }
 
+    /**
+     * Real live report, 2026-10-12: "Every time I try to turn this in it just takes some portion of
+     * the materials from my inventory and doesn't complete the mission" -- confirmed via direct
+     * inventory inspection that the player's materials really were gone, yet {@code
+     * milestone_progress} stayed at zero. Root cause: the player had used Settlemynts' own real
+     * "Upgrade Plot" action (a genuine, separate Tier-upgrade-funding feature -- see {@code
+     * construction.PlotTierUpgradeFunding} in that mod) to pay for and complete the actual plot
+     * upgrade their quest was themed around. Real materials spent, the plot's real Tier went up, but
+     * this quest was never told, since that action has no connection to Myssions at all.
+     *
+     * <p>Called from Settlemynts' own successful-upgrade path (via {@code bridge
+     * .MyssionsQuestBridge#notifyPlotUpgraded}) right after a real Tier upgrade succeeds -- finds
+     * every one of the player's IN_PROGRESS instances whose {@link PlotUpgradeQuestTargets} entry
+     * matches {@code plotId} and marks their plot-upgrade milestones complete directly (never
+     * touching the player's inventory a second time, since the real payment already happened through
+     * Settlemynts' own flow), then runs the normal "all required complete" check exactly like {@link
+     * #reportMilestoneProgress} does.
+     */
+    public static void completePlotUpgradeQuestsForPlot(ServerPlayer player, UUID plotId) {
+        PlotUpgradeQuestTargets targets = PlotUpgradeQuestTargets.get(player.level().getServer());
+        for (QuestInstance instance : List.copyOf(player.getData(ModAttachments.QUEST_DATA).quests().values())) {
+            if (instance.status() != QuestStatus.IN_PROGRESS
+                    || targets.get(instance.instanceId()).map(id -> !id.equals(plotId)).orElse(true)) {
+                continue;
+            }
+            Optional<QuestDefinition> definitionOpt = QuestRegistry.get(instance.definitionId());
+            if (definitionOpt.isEmpty()) {
+                continue;
+            }
+            QuestDefinition definition = definitionOpt.get();
+            QuestInstance updated = instance;
+            for (QuestMilestone milestone : definition.milestones()) {
+                if (milestone.isPlotUpgradeMilestone()) {
+                    updated = updated.withProgress(milestone.id(), plotUpgradeRequiredAmount(updated, milestone));
+                }
+            }
+            boolean allRequiredComplete = definition.milestones().stream()
+                    .filter(m -> !m.optional())
+                    .allMatch(updated::isMilestoneComplete);
+            if (allRequiredComplete) {
+                beginRewardPickup(player, definition, updated);
+            } else {
+                player.setData(ModAttachments.QUEST_DATA, player.getData(ModAttachments.QUEST_DATA).withQuest(updated));
+            }
+        }
+    }
+
     private static void openRewardMenu(ServerPlayer player, QuestInstance instance) {
         String title = QuestRegistry.get(instance.definitionId()).map(QuestDefinition::name).orElse("Quest Reward");
         QuestRewardMenu.open(player, instance.instanceId(), instance.pendingRewardItems(), title);

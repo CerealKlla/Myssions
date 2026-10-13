@@ -132,6 +132,10 @@ final class QuestHooks {
                 QuestEngine.setHint(player, instanceId, player.blockPosition(), level.dimension().identifier().toString(),
                         Optional.of(QuestText.packPlotUpgradeHint(shortfall.woodNeeded(), shortfall.stoneNeeded())));
                 QuestEngine.setRewardMultiplier(player, instanceId, Math.max(1, shortfall.nextTier() - 1));
+                // Lets QuestEngine#completePlotUpgradeQuestsForPlot find this instance later if the
+                // player pays for the real upgrade directly through Settlemynts instead of this
+                // quest's own turn-in -- see that method's own doc for the real live report.
+                PlotUpgradeQuestTargets.get(level.getServer()).set(instanceId, plotId);
                 player.sendSystemMessage(Component.literal(
                         "This plot needs more building materials to grow -- bring me what's missing and I'll make it worth your while."));
             });
