@@ -33,9 +33,16 @@ public final class RoadQuestDefinitions {
                 "road_quest_board",
                 List.of(
                         QuestMilestone.simple("connect_road", "Connect the two settlements with a road"),
-                        QuestMilestone.simple("efficient_road", "Build it efficiently (bonus reward)", true)
+                        // Explicit user spec, 2026-10-13: "500 base + 300 more max from the optional
+                        // milestones" -- replaces the original 10%-reward-multiplier bonus with a
+                        // flat, understandable amount, same "QuestEngine#addPlainMilestoneBonus" shape
+                        // the deliver/gather quest styles already use for their own bonus gold.
+                        // bonusGoldPerProof (10th field) set directly via the canonical constructor --
+                        // QuestMilestone#simple's own factory always hardcodes this to 0.
+                        new QuestMilestone("efficient_road", "Build it efficiently (bonus reward)", true, 1,
+                                java.util.Optional.empty(), java.util.Optional.empty(), false, false, false, 300, false, false, false, false)
                 ),
-                List.of(QuestReward.gold(20)),
+                List.of(QuestReward.gold(500)),
                 QuestTimeLimit.withinTicksOfAssignment(6L * 60 * 60 * 20),
                 List.of(),
                 true

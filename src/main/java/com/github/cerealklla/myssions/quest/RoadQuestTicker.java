@@ -67,9 +67,11 @@ public final class RoadQuestTicker {
     private void finalizeConnection(ServerLevel level, ServerPlayer player, QuestInstance instance, long originPlaceId, long destinationPlaceId, int stakeCount) {
         RoadQuestRegistry.get(level.getServer()).markConnected(originPlaceId, destinationPlaceId, stakeCount);
 
+        // Flat bonus gold (see RoadQuestDefinitions' own doc, "500 base + 300 more max") now pays
+        // through the normal reward-pickup path (QuestEngine#addPlainMilestoneBonus) once this
+        // milestone's own completion is reported -- no reward-multiplier needed here anymore.
         boolean efficient = stakeCount <= instance.roadQuest().optimalStakeCap();
         if (efficient) {
-            QuestEngine.setRewardMultiplier(player, instance.instanceId(), 1.0 + RoadQuestLogic.EFFICIENCY_REWARD_BONUS_FRACTION);
             QuestEngine.reportMilestoneProgress(player, instance.instanceId(), "efficient_road", 1);
         }
         QuestEngine.reportMilestoneProgress(player, instance.instanceId(), "connect_road", 1);

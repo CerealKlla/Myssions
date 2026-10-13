@@ -299,6 +299,7 @@ public final class QuestEngine {
         addBonusProofGold(rewardItems, definition, updated, multiplier);
         addBuyItemReward(rewardItems, definition, updated, multiplier, player.level().getServer());
         addGatherReward(rewardItems, definition, updated, multiplier);
+        addPlainMilestoneBonus(rewardItems, definition, updated, multiplier);
         PlayerQuestData data = player.getData(ModAttachments.QUEST_DATA);
         if (rewardItems.isEmpty()) {
             finalizeInstance(player, data, definition, updated);
@@ -405,6 +406,25 @@ public final class QuestEngine {
     private static void addGatherReward(List<ItemStack> rewardItems, QuestDefinition definition, QuestInstance updated, double multiplier) {
         for (QuestMilestone milestone : definition.milestones()) {
             if (!milestone.isGatherMilestone() || milestone.bonusGoldPerProof() <= 0 || !updated.isMilestoneComplete(milestone)) {
+                continue;
+            }
+            addStacks(rewardItems, Items.GOLD_NUGGET, scaledAmount(milestone.bonusGoldPerProof() * milestone.requiredCount(), multiplier));
+        }
+    }
+
+    /**
+     * Flat bonus gold for a plain milestone (none of deliver/gather/buy/plot-upgrade, each of which
+     * already has its own dedicated bonus-payment method above) that's both optional and complete --
+     * added 2026-10-13 for the road-connection quest's "efficient_road" bonus (explicit user spec:
+     * "500 base + 300 more max from the optional milestones"). {@code requiredCount()} is always 1
+     * for this kind of milestone (a plain done-or-not completion, no partial-delivery concept), so
+     * this pays a flat {@code bonusGoldPerProof} once, same shape as {@link #addGatherReward}'s own
+     * "flat amount if complete" logic -- just without restricting to one specific milestone kind.
+     */
+    private static void addPlainMilestoneBonus(List<ItemStack> rewardItems, QuestDefinition definition, QuestInstance updated, double multiplier) {
+        for (QuestMilestone milestone : definition.milestones()) {
+            if (milestone.isDeliverMilestone() || milestone.isGatherMilestone() || milestone.isBuyMilestone()
+                    || milestone.isPlotUpgradeMilestone() || milestone.bonusGoldPerProof() <= 0 || !updated.isMilestoneComplete(milestone)) {
                 continue;
             }
             addStacks(rewardItems, Items.GOLD_NUGGET, scaledAmount(milestone.bonusGoldPerProof() * milestone.requiredCount(), multiplier));

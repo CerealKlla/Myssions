@@ -49,7 +49,6 @@ public final class RoadQuestLogic {
     public static final int REQUIRED_SKILL_LEVEL = 1; // Deliberately low for now -- tune once this is live-tested.
 
     public static final double BUYBACK_GOLD_PER_UNUSED_STAKE = 1.0;
-    public static final double EFFICIENCY_REWARD_BONUS_FRACTION = 0.10;
 
     private RoadQuestLogic() {
     }
