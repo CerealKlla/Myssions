@@ -97,6 +97,19 @@ public final class CartographyrRegionBridge {
             if (isOpenWaterAt(level, entity.geometry().centerBlockX(), entity.geometry().centerBlockZ())) {
                 continue;
             }
+            // Real live report, 2026-10-12: a player stood right at the quest's own named location
+            // and no mobs ever spawned there, even after QuestMobSpawnTicker was fixed to keep
+            // re-checking continuously -- the hint position's Y turned out to be -64 (the world's own
+            // floor), 139 blocks below the player's real surface position. Same root cause class as
+            // the open-water rejection above: a region/settlement's centerBlockX/Z is just a
+            // geometric centroid, with no guarantee anything solid sits above it at all -- if that
+            // exact column happens to fall over a deep ravine, cave, or trench, `getHeight` returns
+            // the world's minimum build height instead of a real surface, and nothing caught that
+            // before it became the quest's actual spawn/hint target. Rejected outright, same
+            // precedent as open water: an impossible-to-complete quest is worse than a smaller pool.
+            if (isDegenerateHeightAt(level, entity.geometry().centerBlockX(), entity.geometry().centerBlockZ())) {
+                continue;
+            }
             // Real report, 2026-10-12: a player stood at the quest's own named location and the
             // name shown didn't match, and kills there weren't counting. Root cause -- this method
             // trusts a candidate's own centerBlockX/Z to be real, on-the-ground proof of "this is
@@ -150,6 +163,12 @@ public final class CartographyrRegionBridge {
     private static boolean isOpenWaterAt(ServerLevel level, int x, int z) {
         int y = level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z);
         return !level.getFluidState(new BlockPos(x, y - 1, z)).isEmpty();
+    }
+
+    /** True if (x, z) has no real surface at all -- {@code getHeight} fell all the way to (or near) the world floor, meaning this column is a ravine/cave/trench with nothing solid above it. See {@link #pickWeightedNearby}'s own doc for the real live report this came from. */
+    private static boolean isDegenerateHeightAt(ServerLevel level, int x, int z) {
+        int y = level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z);
+        return y <= level.getMinY() + 8;
     }
 
     /**
