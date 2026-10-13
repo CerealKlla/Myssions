@@ -54,6 +54,16 @@ import net.minecraft.world.item.ItemStack;
  * QuestMobSpawnTicker} has already topped up live mobs near this instance's target to guarantee
  * completability.
  *
+ * <p>{@code assignedAtRealEpochMillis} (added 2026-10-13, fills this record's last remaining codec
+ * slot -- real live-test report: a {@link QuestTimeLimit.Kind#GAME_TICKS_FROM_ASSIGNMENT} deadline
+ * (e.g. the road-connection quest's 6-real-hour limit) is anchored to {@link #assignedAtGameTime()},
+ * the world's own tick counter -- which does NOT advance while the server process itself is down,
+ * so every deploy-triggered restart this session silently paused every in-flight timed quest's
+ * countdown for real minutes at a time, contradicting "reflects the real, clock time deadline."
+ * {@code Optional.empty()} for any instance assigned before this field existed (falls back to the
+ * old tick-only behavior -- see {@code QuestTimeLimit#deadlineGameTime}/{@code QuestDeadlineTicker}/
+ * {@code client.ActiveQuestOverlay}, all three of which now prefer this real timestamp when present).
+ *
  * <p>{@link #escort()} bundles the caravan-raid quest style's own state (added 2026-10-11) --
  * {@code entityUuid} is the live {@code quest.entity.CaravanEntity} this instance owns;
  * {@code remainingRoute} is every waypoint not yet reached, popped by {@code QuestEscortTicker} as
@@ -71,7 +81,8 @@ public record QuestInstance(UUID instanceId, Identifier definitionId, QuestStatu
                              long assignedAtGameTime, Optional<BlockPos> hintPos, Optional<String> hintDimensionId,
                              Optional<String> locationName, List<ItemStack> pendingRewardItems, double rewardMultiplier,
                              Optional<Long> knowledgePlaceId, Optional<String> realLocationName,
-                             boolean mobsSpawned, EscortData escort, RoadQuestData roadQuest) {
+                             boolean mobsSpawned, EscortData escort, RoadQuestData roadQuest,
+                             Optional<Long> assignedAtRealEpochMillis) {
 
     public record EscortData(Optional<UUID> entityUuid, List<BlockPos> remainingRoute) {
         public static final EscortData NONE = new EscortData(Optional.empty(), List.of());
@@ -107,71 +118,73 @@ public record QuestInstance(UUID instanceId, Identifier definitionId, QuestStatu
             Codec.STRING.optionalFieldOf("real_location_name").forGetter(QuestInstance::realLocationName),
             Codec.BOOL.optionalFieldOf("mobs_spawned", false).forGetter(QuestInstance::mobsSpawned),
             EscortData.CODEC.optionalFieldOf("escort", EscortData.NONE).forGetter(QuestInstance::escort),
-            RoadQuestData.CODEC.optionalFieldOf("road_quest", RoadQuestData.NONE).forGetter(QuestInstance::roadQuest)
+            RoadQuestData.CODEC.optionalFieldOf("road_quest", RoadQuestData.NONE).forGetter(QuestInstance::roadQuest),
+            Codec.LONG.optionalFieldOf("assigned_at_real_epoch_millis").forGetter(QuestInstance::assignedAtRealEpochMillis)
     ).apply(instance, QuestInstance::new));
 
     public static QuestInstance freshlyAssigned(Identifier definitionId, long gameTime) {
         return new QuestInstance(UUID.randomUUID(), definitionId, QuestStatus.IN_PROGRESS, Map.of(), gameTime, Optional.empty(), Optional.empty(),
-                Optional.empty(), List.of(), 1.0, Optional.empty(), Optional.empty(), false, EscortData.NONE, RoadQuestData.NONE);
+                Optional.empty(), List.of(), 1.0, Optional.empty(), Optional.empty(), false, EscortData.NONE, RoadQuestData.NONE,
+                Optional.of(System.currentTimeMillis()));
     }
 
     public QuestInstance withStatus(QuestStatus newStatus) {
         return new QuestInstance(instanceId, definitionId, newStatus, milestoneProgress, assignedAtGameTime, hintPos, hintDimensionId,
-                locationName, pendingRewardItems, rewardMultiplier, knowledgePlaceId, realLocationName, mobsSpawned, escort, roadQuest);
+                locationName, pendingRewardItems, rewardMultiplier, knowledgePlaceId, realLocationName, mobsSpawned, escort, roadQuest, assignedAtRealEpochMillis);
     }
 
     public QuestInstance withProgress(String milestoneId, int amount) {
         Map<String, Integer> updated = new java.util.HashMap<>(milestoneProgress);
         updated.put(milestoneId, amount);
         return new QuestInstance(instanceId, definitionId, status, Map.copyOf(updated), assignedAtGameTime, hintPos, hintDimensionId,
-                locationName, pendingRewardItems, rewardMultiplier, knowledgePlaceId, realLocationName, mobsSpawned, escort, roadQuest);
+                locationName, pendingRewardItems, rewardMultiplier, knowledgePlaceId, realLocationName, mobsSpawned, escort, roadQuest, assignedAtRealEpochMillis);
     }
 
     public QuestInstance withHint(BlockPos pos, String dimensionId, Optional<String> newLocationName) {
         return new QuestInstance(instanceId, definitionId, status, milestoneProgress, assignedAtGameTime, Optional.of(pos), Optional.of(dimensionId),
-                newLocationName, pendingRewardItems, rewardMultiplier, knowledgePlaceId, realLocationName, mobsSpawned, escort, roadQuest);
+                newLocationName, pendingRewardItems, rewardMultiplier, knowledgePlaceId, realLocationName, mobsSpawned, escort, roadQuest, assignedAtRealEpochMillis);
     }
 
     public QuestInstance withRewardMultiplier(double newRewardMultiplier) {
         return new QuestInstance(instanceId, definitionId, status, milestoneProgress, assignedAtGameTime, hintPos, hintDimensionId,
-                locationName, pendingRewardItems, newRewardMultiplier, knowledgePlaceId, realLocationName, mobsSpawned, escort, roadQuest);
+                locationName, pendingRewardItems, newRewardMultiplier, knowledgePlaceId, realLocationName, mobsSpawned, escort, roadQuest, assignedAtRealEpochMillis);
     }
 
     /** Transitions to {@link QuestStatus#AWAITING_REWARD_PICKUP} carrying the still-uncollected reward stacks. */
     public QuestInstance withPendingRewardItems(List<ItemStack> items) {
         return new QuestInstance(instanceId, definitionId, QuestStatus.AWAITING_REWARD_PICKUP, milestoneProgress, assignedAtGameTime, hintPos, hintDimensionId,
-                locationName, List.copyOf(items), rewardMultiplier, knowledgePlaceId, realLocationName, mobsSpawned, escort, roadQuest);
+                locationName, List.copyOf(items), rewardMultiplier, knowledgePlaceId, realLocationName, mobsSpawned, escort, roadQuest, assignedAtRealEpochMillis);
     }
 
     /** Sets the real-knowledge wiring for a region quest -- see this class's own doc. {@code locationName} is left unset; {@code QuestWaypointTicker} fills it in on its very next tick via {@code bridge.LyfeWaypointBridge#resolveLocationText}. */
     public QuestInstance withRegionKnowledge(long newKnowledgePlaceId, String newRealLocationName) {
         return new QuestInstance(instanceId, definitionId, status, milestoneProgress, assignedAtGameTime, hintPos, hintDimensionId,
                 locationName, pendingRewardItems, rewardMultiplier,
-                Optional.of(newKnowledgePlaceId), Optional.of(newRealLocationName), mobsSpawned, escort, roadQuest);
+                Optional.of(newKnowledgePlaceId), Optional.of(newRealLocationName), mobsSpawned, escort, roadQuest, assignedAtRealEpochMillis);
     }
 
     /** Upgrades {@link #locationName()} once the player's real knowledge of {@link #knowledgePlaceId()} is good enough -- see {@code QuestWaypointTicker}. */
     public QuestInstance withUpgradedLocationName(String upgradedLocationName) {
         return new QuestInstance(instanceId, definitionId, status, milestoneProgress, assignedAtGameTime, hintPos, hintDimensionId,
-                Optional.of(upgradedLocationName), pendingRewardItems, rewardMultiplier, knowledgePlaceId, realLocationName, mobsSpawned, escort, roadQuest);
+                Optional.of(upgradedLocationName), pendingRewardItems, rewardMultiplier, knowledgePlaceId, realLocationName, mobsSpawned, escort, roadQuest, assignedAtRealEpochMillis);
     }
 
     public QuestInstance withMobsSpawned() {
         return new QuestInstance(instanceId, definitionId, status, milestoneProgress, assignedAtGameTime, hintPos, hintDimensionId,
-                locationName, pendingRewardItems, rewardMultiplier, knowledgePlaceId, realLocationName, true, escort, roadQuest);
+                locationName, pendingRewardItems, rewardMultiplier, knowledgePlaceId, realLocationName, true, escort, roadQuest, assignedAtRealEpochMillis);
     }
 
     /** Resets {@link #mobsSpawned()} to {@code false} for one cycle -- used by {@code QuestEscortTicker} to re-trigger {@code QuestMobSpawnTicker}'s existing spawn-guarantee logic at each new unguarded stake. */
     public QuestInstance withMobsSpawnedReset() {
         return new QuestInstance(instanceId, definitionId, status, milestoneProgress, assignedAtGameTime, hintPos, hintDimensionId,
-                locationName, pendingRewardItems, rewardMultiplier, knowledgePlaceId, realLocationName, false, escort, roadQuest);
+                locationName, pendingRewardItems, rewardMultiplier, knowledgePlaceId, realLocationName, false, escort, roadQuest, assignedAtRealEpochMillis);
     }
 
     /** Binds the live caravan entity and its full route -- set once, right after the caravan is spawned at assignment (see {@code NpcQuests#registerEscortHook}). */
     public QuestInstance withEscort(UUID caravanUuid, List<BlockPos> route) {
         return new QuestInstance(instanceId, definitionId, status, milestoneProgress, assignedAtGameTime, hintPos, hintDimensionId,
                 locationName, pendingRewardItems, rewardMultiplier, knowledgePlaceId, realLocationName, mobsSpawned,
-                new EscortData(Optional.of(caravanUuid), List.copyOf(route)), roadQuest);
+                new EscortData(Optional.of(caravanUuid), List.copyOf(route)), roadQuest, assignedAtRealEpochMillis);
     }
 
     /** Pops the just-reached waypoint off the front of the escort route -- see {@code QuestEscortTicker}. */
@@ -179,14 +192,14 @@ public record QuestInstance(UUID instanceId, Identifier definitionId, QuestStatu
         List<BlockPos> remaining = escort.remainingRoute().isEmpty() ? escort.remainingRoute() : escort.remainingRoute().subList(1, escort.remainingRoute().size());
         return new QuestInstance(instanceId, definitionId, status, milestoneProgress, assignedAtGameTime, hintPos, hintDimensionId,
                 locationName, pendingRewardItems, rewardMultiplier, knowledgePlaceId, realLocationName, mobsSpawned,
-                new EscortData(escort.entityUuid(), List.copyOf(remaining)), roadQuest);
+                new EscortData(escort.entityUuid(), List.copyOf(remaining)), roadQuest, assignedAtRealEpochMillis);
     }
 
     /** Sets this road-connection instance's origin settlement and stake-count thresholds -- the destination settlement itself reuses {@link #withRegionKnowledge} (its placeId goes into {@link #knowledgePlaceId()}). See {@code RoadQuestLogic#acceptOffer}. */
     public QuestInstance withRoadQuestData(long newRoadOriginPlaceId, int newRoadMinStakes, int newRoadOptimalStakeCap) {
         return new QuestInstance(instanceId, definitionId, status, milestoneProgress, assignedAtGameTime, hintPos, hintDimensionId,
                 locationName, pendingRewardItems, rewardMultiplier, knowledgePlaceId, realLocationName, mobsSpawned, escort,
-                new RoadQuestData(Optional.of(newRoadOriginPlaceId), newRoadMinStakes, newRoadOptimalStakeCap));
+                new RoadQuestData(Optional.of(newRoadOriginPlaceId), newRoadMinStakes, newRoadOptimalStakeCap), assignedAtRealEpochMillis);
     }
 
     /**

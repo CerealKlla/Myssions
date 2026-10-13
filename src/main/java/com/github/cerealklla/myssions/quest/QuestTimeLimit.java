@@ -43,6 +43,7 @@ public record QuestTimeLimit(Kind kind, long ticksFromAssignment, long realWorld
     }
 
     private static final long TICKS_PER_DAY = 24000L;
+    private static final long MILLIS_PER_TICK = 50L; // 20 TPS.
 
     /**
      * The game-time instant this instance actually expires at, for {@link Kind#GAME_TICKS_FROM_ASSIGNMENT}/
@@ -51,6 +52,15 @@ public record QuestTimeLimit(Kind kind, long ticksFromAssignment, long realWorld
      * 2026-10-13 specifically so the two can never silently drift apart. Meaningless ({@code
      * Long.MAX_VALUE}, "never") for {@link Kind#NONE}/{@link Kind#REAL_WORLD_DATE} -- the latter has
      * its own absolute {@link #realWorldEpochMillis()} instead, not anchored to game time at all.
+     *
+     * <p><b>{@link Kind#GAME_TICKS_FROM_ASSIGNMENT} only, prefer {@link #hasExpiredReal}/{@link
+     * #remainingRealMillis} instead whenever a real {@code assignedAtRealEpochMillis} is available</b>
+     * (added 2026-10-13) -- this tick-based formula silently pauses for the real minutes a dedicated
+     * server process itself is down (a deploy restart, a crash), which a real live report caught
+     * directly: "this quest remaining time seems to have not decreased while I was away... it's
+     * supposed to be clock time, not in-game." {@link Kind#NEXT_GAME_DAY_BOUNDARY} is deliberately
+     * NOT given a real-time equivalent -- "before the next in-game day" is an in-game-calendar
+     * concept by its own definition, correctly tied to the tick clock.
      */
     public long deadlineGameTime(long assignedAtGameTime) {
         return switch (kind) {
@@ -67,5 +77,20 @@ public record QuestTimeLimit(Kind kind, long ticksFromAssignment, long realWorld
             case NEXT_GAME_DAY_BOUNDARY -> deadlineGameTime(assignedAtGameTime) - assignedAtGameTime;
             default -> -1L;
         };
+    }
+
+    /** True only for {@link Kind#GAME_TICKS_FROM_ASSIGNMENT} -- the one kind meant as a genuine real-world duration (see this class's own "e.g. 72000 ticks (1 hour of real time at 20 TPS)" doc), as opposed to {@link Kind#NEXT_GAME_DAY_BOUNDARY}'s deliberately in-game-calendar meaning. */
+    public boolean isRealTimeDuration() {
+        return kind == Kind.GAME_TICKS_FROM_ASSIGNMENT;
+    }
+
+    /** The real wall-clock instant this instance expires at -- {@link #isRealTimeDuration()} only. */
+    public long deadlineRealEpochMillis(long assignedAtRealEpochMillis) {
+        return assignedAtRealEpochMillis + ticksFromAssignment * MILLIS_PER_TICK;
+    }
+
+    /** The real total wall-clock span this instance's deadline was given -- {@link #isRealTimeDuration()} only, the real-time countdown bar's own denominator. */
+    public long totalRealMillis() {
+        return ticksFromAssignment * MILLIS_PER_TICK;
     }
 }

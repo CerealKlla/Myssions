@@ -57,9 +57,17 @@ public final class QuestDeadlineTicker {
     }
 
     private boolean isExpired(QuestTimeLimit limit, QuestInstance instance, long nowGameTime, long nowEpochMillis) {
-        // GAME_TICKS_FROM_ASSIGNMENT/NEXT_GAME_DAY_BOUNDARY now share QuestTimeLimit#deadlineGameTime
-        // with client.ActiveQuestOverlay's own countdown bar (added 2026-10-13) -- one formula, so
-        // the two can never silently drift apart.
+        // GAME_TICKS_FROM_ASSIGNMENT/NEXT_GAME_DAY_BOUNDARY share QuestTimeLimit#deadlineGameTime with
+        // client.ActiveQuestOverlay's own countdown bar (added 2026-10-13) -- one formula, so the two
+        // can never silently drift apart.
+        //
+        // GAME_TICKS_FROM_ASSIGNMENT specifically now prefers a real assignedAtRealEpochMillis when
+        // the instance has one (added 2026-10-13, real live report: the tick clock silently pauses
+        // for every real minute the server process itself is down, e.g. a deploy restart) -- falls
+        // back to the tick-based check for any instance assigned before this field existed.
+        if (limit.kind() == QuestTimeLimit.Kind.GAME_TICKS_FROM_ASSIGNMENT && instance.assignedAtRealEpochMillis().isPresent()) {
+            return nowEpochMillis >= limit.deadlineRealEpochMillis(instance.assignedAtRealEpochMillis().get());
+        }
         return switch (limit.kind()) {
             case NONE -> false;
             case GAME_TICKS_FROM_ASSIGNMENT, NEXT_GAME_DAY_BOUNDARY -> nowGameTime >= limit.deadlineGameTime(instance.assignedAtGameTime());

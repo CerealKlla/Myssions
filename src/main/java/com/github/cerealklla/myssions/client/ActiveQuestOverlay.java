@@ -39,6 +39,10 @@ public final class ActiveQuestOverlay implements GuiLayer {
     // to game time (GAME_TICKS_FROM_ASSIGNMENT/NEXT_GAME_DAY_BOUNDARY, see QuestTimeLimit#deadlineGameTime's
     // own doc) -- REAL_WORLD_DATE has no stored "started at" real timestamp to normalize a fraction
     // against, and no quest in this mod actually uses that kind today.
+    //
+    // GAME_TICKS_FROM_ASSIGNMENT specifically now prefers QuestInstance#assignedAtRealEpochMillis
+    // when present (added later the same day, real live report: the tick-based version silently
+    // pauses for every real minute the server process itself is down) -- see render()'s own comment.
     private static final int BAR_HEIGHT = 4;
     private static final int BAR_GAP_ABOVE = 3;
     private static final int BAR_TRACK_COLOR = 0xFF303030;
@@ -68,10 +72,25 @@ public final class ActiveQuestOverlay implements GuiLayer {
         float remainingFraction = 0f;
         String remainingText = "";
         if (showCountdown) {
-            long now = minecraft.level.getGameTime();
-            long deadline = limit.deadlineGameTime(instance.assignedAtGameTime());
-            long total = limit.totalGameTicks(instance.assignedAtGameTime());
-            long remaining = deadline - now;
+            // GAME_TICKS_FROM_ASSIGNMENT prefers a real assignedAtRealEpochMillis when the instance has
+            // one (added 2026-10-13, real live report: "this quest remaining time seems to have not
+            // decreased while I was away... it's supposed to be clock time, not in-game" -- the tick
+            // clock silently pauses for every real minute the server process itself is down, e.g. a
+            // deploy restart). Expressed back in "effective ticks" (remaining real millis / 50ms-per-
+            // tick) purely so #formatTicks stays the one shared formatter either way.
+            long remaining;
+            long total;
+            if (limit.isRealTimeDuration() && instance.assignedAtRealEpochMillis().isPresent()) {
+                long nowMillis = System.currentTimeMillis();
+                long deadlineMillis = limit.deadlineRealEpochMillis(instance.assignedAtRealEpochMillis().get());
+                total = limit.totalRealMillis() / 50L;
+                remaining = (deadlineMillis - nowMillis) / 50L;
+            } else {
+                long now = minecraft.level.getGameTime();
+                long deadline = limit.deadlineGameTime(instance.assignedAtGameTime());
+                total = limit.totalGameTicks(instance.assignedAtGameTime());
+                remaining = deadline - now;
+            }
             remainingFraction = total > 0 ? Mth.clamp((float) remaining / total, 0f, 1f) : 0f;
             remainingText = "Time Remaining: " + formatTicks(Math.max(0, remaining));
         }
