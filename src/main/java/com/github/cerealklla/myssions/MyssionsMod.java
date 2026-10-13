@@ -53,6 +53,7 @@ public class MyssionsMod {
         NeoForge.EVENT_BUS.register(new com.github.cerealklla.myssions.quest.QuestReportBackTicker());
         NeoForge.EVENT_BUS.register(new com.github.cerealklla.myssions.quest.QuestEscortTicker());
         NeoForge.EVENT_BUS.register(new com.github.cerealklla.myssions.quest.RoadQuestTicker());
+        NeoForge.EVENT_BUS.register(new com.github.cerealklla.myssions.quest.NaturalVillageHighwayTicker());
         NeoForge.EVENT_BUS.register(new QuestNpcTalkListener());
         NeoForge.EVENT_BUS.addListener((RegisterCommandsEvent event) -> DebugCommands.register(event.getDispatcher()));
 
