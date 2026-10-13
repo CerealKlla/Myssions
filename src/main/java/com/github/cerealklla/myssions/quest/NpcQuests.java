@@ -428,6 +428,11 @@ public final class NpcQuests {
                 List.of(QuestMilestone.talk("report_back", "Return and report what you found")),
                 List.of(QuestReward.gold(goldReward)),
                 QuestTimeLimit.NONE));
+        // Real live report, 2026-10-12: the reporter NPC used to spawn immediately at acceptance,
+        // right on top of the player -- completable instantly with no exploration at all. It's now
+        // spawned by QuestReportBackTicker, only once the player actually reaches the real target;
+        // this registration just names who shows up when that happens. See that ticker's own doc.
+        UnbornTownReporters.register(questId, reporterName);
         QuestAssignmentHooks.register(questId, (player, instanceId, assignedId, plotId) -> {
             if (!(player.level() instanceof net.minecraft.server.level.ServerLevel level)
                     || !com.github.cerealklla.myssions.bridge.CartographyrRegionBridge.isLoaded()) {
@@ -439,7 +444,6 @@ public final class NpcQuests {
                 String direction = QuestHooks.directionWord(player.blockPosition(), target.pos());
                 QuestEngine.setHint(player, instanceId, target.pos(), target.dimension().identifier().toString(),
                         Optional.of(target.displayName()));
-                QuestNpcSpawner.spawn(level, player.blockPosition(), player.getUUID(), instanceId, false, reporterName);
                 player.sendSystemMessage(net.minecraft.network.chat.Component.literal(
                         wordOfMessagePrefix + target.displayName() + ", " + direction + " of here" + wordOfMessageSuffix));
             }, () -> player.sendSystemMessage(net.minecraft.network.chat.Component.literal(nothingFoundMessage)));
