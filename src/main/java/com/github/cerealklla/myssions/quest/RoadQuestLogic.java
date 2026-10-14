@@ -66,6 +66,18 @@ public final class RoadQuestLogic {
     }
 
     /**
+     * Recomputes the granted stack size from a persisted instance's own {@code optimalStakeCap} --
+     * added 2026-10-13 for {@code client.ActiveQuestOverlay}'s "Have N Extra when done" milestone
+     * text. {@link QuestInstance.RoadQuestData} never stored the granted count directly (only
+     * {@code minStakes}/{@code optimalStakeCap} -- see that record's own doc on the 16-field codec
+     * arity limit), but it's a pure deterministic function of {@code optimalStakeCap}, so there's
+     * nothing to persist separately.
+     */
+    public static int grantedCountFor(int optimalStakeCap) {
+        return Math.max(1, (int) Math.ceil(optimalStakeCap * GRANTED_STACK_BUFFER_FACTOR));
+    }
+
+    /**
      * Posts a new offer for this settlement pair -- false if the pair already has ANY entry
      * (posted/in-progress/connected), or either settlement can't currently be resolved. Called from
      * Settlemynts' Message Board UI (a real Mayor) or an NPC-settlement auto-post (not yet built).

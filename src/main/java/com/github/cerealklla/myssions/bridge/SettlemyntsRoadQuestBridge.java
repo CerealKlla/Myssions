@@ -53,4 +53,9 @@ public final class SettlemyntsRoadQuestBridge {
     public static void despawnStakesForInstance(ServerLevel level, UUID instanceId, BlockPos nearHint) {
         Settlemynts.despawnHighwayStakesForInstance(level, instanceId, nearHint);
     }
+
+    /** Discards the now-redundant ghost stake/torch markers for a just-COMPLETED road, with no terrain revert -- see {@code api.Settlemynts#hideCompletedHighwayMarkers}'s own doc. */
+    public static void hideCompletedMarkers(ServerLevel level, UUID instanceId, BlockPos nearHint) {
+        Settlemynts.hideCompletedHighwayMarkers(level, instanceId, nearHint);
+    }
 }

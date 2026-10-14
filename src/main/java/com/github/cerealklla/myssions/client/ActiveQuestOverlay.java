@@ -1,5 +1,7 @@
 package com.github.cerealklla.myssions.client;
 
+import java.util.Optional;
+
 import com.github.cerealklla.myssions.quest.QuestDefinition;
 import com.github.cerealklla.myssions.quest.QuestInstance;
 import com.github.cerealklla.myssions.quest.QuestMilestone;
@@ -32,6 +34,12 @@ public final class ActiveQuestOverlay implements GuiLayer {
     private static final int TITLE_COLOR = 0xFFFFD700;
     private static final int TEXT_COLOR = 0xFFE0E0E0;
     private static final int DONE_COLOR = 0xFFA0A0A0;
+    // Added 2026-10-13, explicit user spec: "it should show the milestones as crossed out successful
+    // or failed too." An optional milestone that's still incomplete once the quest itself is done
+    // (AWAITING_REWARD_PICKUP/COMPLETED -- no more progress is possible) is struck through in this
+    // color instead of DONE_COLOR, so "missed this bonus" reads visually distinct from "completed
+    // this bonus" rather than both looking identical to a still-pending milestone.
+    private static final int FAILED_COLOR = 0xFFE05050;
     private static final int BACKGROUND_COLOR = 0x80101010;
 
     // Time-remaining countdown bar (2026-10-13, explicit user spec: "starts Green becomes red...
@@ -116,13 +124,20 @@ public final class ActiveQuestOverlay implements GuiLayer {
         int y = top + PADDING;
         graphics.text(font, definition.name(), left + PADDING, y, TITLE_COLOR);
         y += font.lineHeight;
+        boolean questDone = instance.status() != QuestStatus.IN_PROGRESS;
         for (QuestMilestone milestone : definition.milestones()) {
             boolean complete = instance.isMilestoneComplete(milestone);
+            boolean failed = !complete && questDone && milestone.optional();
             String line = milestoneLine(milestone, instance);
+            int color = TEXT_COLOR;
             if (complete) {
                 line = ChatFormatting.STRIKETHROUGH + line;
+                color = DONE_COLOR;
+            } else if (failed) {
+                line = ChatFormatting.STRIKETHROUGH + line;
+                color = FAILED_COLOR;
             }
-            graphics.text(font, line, left + PADDING, y, complete ? DONE_COLOR : TEXT_COLOR);
+            graphics.text(font, line, left + PADDING, y, color);
             y += font.lineHeight;
         }
         if (showCountdown) {
@@ -175,9 +190,12 @@ public final class ActiveQuestOverlay implements GuiLayer {
      */
     private static String milestoneLine(QuestMilestone milestone, QuestInstance instance) {
         String line;
+        Optional<Integer> roadExtra = roadEfficiencyExtraStakes(milestone, instance);
         if (isBonusProofMilestone(milestone)) {
             String proofName = milestone.proofId().flatMap(com.github.cerealklla.myssions.quest.ProofItemCatalog::getDisplayName).orElse("Proof");
             line = "- (Optional) Retrieve " + proofName;
+        } else if (roadExtra.isPresent()) {
+            line = "- Have " + roadExtra.get() + " Extra when done";
         } else {
             line = "- " + QuestText.resolveShort(milestone.description(), instance);
         }
@@ -188,6 +206,30 @@ public final class ActiveQuestOverlay implements GuiLayer {
             line += " (optional)";
         }
         return line;
+    }
+
+    /**
+     * The road-connection quest's own three cascading efficiency milestones -- explicit user spec,
+     * 2026-10-13: "the milestones need to say 'Have # Extra when done'... and they can pick up
+     * unnecessary stakes to be more efficient." Returns how many of the granted Highway Stake stack
+     * would still be unused (returned to inventory) if this tier's own stake-count threshold is met,
+     * i.e. {@code grantedCount - threshold} -- empty for every other quest's milestones, or a road
+     * quest instance with no real thresholds recorded yet (shouldn't normally happen post-acceptance).
+     */
+    private static Optional<Integer> roadEfficiencyExtraStakes(QuestMilestone milestone, QuestInstance instance) {
+        int minStakes = instance.roadQuest().minStakes();
+        int optimalCap = instance.roadQuest().optimalStakeCap();
+        if (minStakes <= 0 || optimalCap <= 0) {
+            return Optional.empty();
+        }
+        int granted = com.github.cerealklla.myssions.quest.RoadQuestLogic.grantedCountFor(optimalCap);
+        int midpoint = Math.round((minStakes + optimalCap) / 2.0f);
+        return switch (milestone.id()) {
+            case "efficient_road_tier1" -> Optional.of(granted - optimalCap);
+            case "efficient_road_tier2" -> Optional.of(granted - midpoint);
+            case "efficient_road_tier3" -> Optional.of(granted - minStakes);
+            default -> Optional.empty();
+        };
     }
 
     /** The region-kill quest taxonomy's own "bring back proof for bonus gold" milestone -- see {@code QuestHooks#registerRegionKillQuest}. */

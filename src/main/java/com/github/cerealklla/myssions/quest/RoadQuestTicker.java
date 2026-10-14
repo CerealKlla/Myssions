@@ -100,5 +100,12 @@ public final class RoadQuestTicker {
             player.sendSystemMessage(Component.literal(
                     "The road sinks in! Bought back " + unused + " unused Highway Stake" + (unused == 1 ? "" : "s") + "."));
         }
+
+        // Explicit user request, 2026-10-13: the ghost stake/torch markers should disappear once the
+        // road is actually finished -- both cosmetic clutter at that point, and a real interaction
+        // hazard left alone (right-clicking a still-live connected stake un-paves part of the road,
+        // via HighwayStakeEntity#snapAllConnections). No terrain revert happens here -- see
+        // SettlemyntsRoadQuestBridge#hideCompletedMarkers's own doc.
+        instance.hintPos().ifPresent(hint -> SettlemyntsRoadQuestBridge.hideCompletedMarkers(level, instance.instanceId(), hint));
     }
 }
