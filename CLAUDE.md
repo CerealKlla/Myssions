@@ -276,4 +276,16 @@ milestone's resolved price, both already rendered as their own dynamic Gold Nugg
 fix only ever removed the fake line. `./gradlew build` green, whole-suite (8 mods) rebuild clean.
 **Not yet live-tested.**
 
+**New optional soft dependency on TinyWyrlds; entrance-type quests added, 2026-10-15** (see
+[context/decisions.md](context/decisions.md)) -- design doc item 4's own worked example, built while
+working through TinyWyrlds' own pending-work list in order. `bridge.TinyWyrldsEntranceBridge` spawns
+a real Wyrld Entrance on quest accept and tracks a "defeat the dungeon's guardian" + "escape"
+milestone pair via `PlayerInteractEvent.EntityInteract`/`LivingDeathEvent`/
+`PlayerEvent.PlayerChangedDimensionEvent`. New sample quest **"Find a Troll"** (Mayor), using a real
+`troll_cave` WyrldRecipe + permanent `Troll Den` WyrldPrint (both authored/verified in TinyWyrlds'
+own session). New generic `/myssions assign <questId>` debug command. `./gradlew build` green in
+both repos, whole-suite (10 mods) rebuild clean. **Verified over RCON**: the TinyWyrlds-side
+recipe/population pipeline and a real zombie guardian generating from the permanent content. **Not
+yet verified**: the full quest-accept→interact→kill→escape chain through a real connected player.
+
 See [context/classes/](context/classes/) for per-class reference.
