@@ -197,12 +197,64 @@ final class QuestHooks {
                 List.of(
                         new QuestMilestone("fend_off_bandits", "Fend off any Bandits that attack the caravan",
                                 true, maxBanditEncounters, Optional.of(Identifier.fromNamespaceAndPath("minecraft", "pillager")),
-                                Optional.empty(), false, false, false, 0, false, false, false, false),
+                                Optional.empty(), false, false, false, 0, false, false, false, false, Optional.empty()),
                         QuestMilestone.escort("escort_caravan", "Escort the caravan safely to the end of the road")
                 ),
                 rewards, QuestTimeLimit.NONE));
         registerEscortHook(questId, waypointCount);
         return questId;
+    }
+
+    /**
+     * Design doc item 4's own worked example, verbatim: "a player takes a quest to go find a troll
+     * within a cave... completing some objective within the cave completes a milestone, then the
+     * player has to escape." Two milestones -- {@link QuestMilestone#defeatGuardian}/{@link
+     * QuestMilestone#escape} -- backed entirely by {@code bridge.TinyWyrldsEntranceBridge}'s own
+     * event listeners, not any poll/ticker here. {@code recipeName} must already exist as a saved
+     * {@code tinywyrlds.wyrldprint.recipe.WyrldRecipe} (created via {@code /tinywyrlds recipe
+     * create/addloot/addenemy/...}) -- this mod never authors one itself.
+     */
+    static Identifier registerEntranceQuest(Identifier questId, String name, String description, String zoneType,
+                                              String guardianMilestoneText, String escapeMilestoneText,
+                                              String recipeName, String introMessage, List<QuestReward> rewards) {
+        QuestRegistry.register(new QuestDefinition(questId, name, description, zoneType,
+                List.of(
+                        QuestMilestone.defeatGuardian("defeat_guardian", guardianMilestoneText),
+                        QuestMilestone.escape("escape_dungeon", escapeMilestoneText)
+                ),
+                rewards, QuestTimeLimit.NONE));
+        registerEntranceHook(questId, recipeName, introMessage);
+        return questId;
+    }
+
+    /**
+     * Spawns a real {@code WyrldEntranceEntity} "out past the player" (same honest simplification
+     * {@link #registerTalkNpcHook} already uses -- the Entrance itself IS the destination marker,
+     * unlike a talk-NPC quest's own named place) -- a no-op if TinyWyrlds isn't loaded.
+     */
+    static void registerEntranceHook(Identifier questId, String recipeName, String introMessage) {
+        QuestAssignmentHooks.register(questId, (player, instanceId, assignedId, plotId) -> {
+            if (!(player.level() instanceof ServerLevel level)
+                    || !com.github.cerealklla.myssions.bridge.TinyWyrldsEntranceBridge.isLoaded()) {
+                return;
+            }
+            double angle = player.getRandom().nextDouble() * Math.PI * 2;
+            double distance = 80 + player.getRandom().nextDouble() * 120;
+            BlockPos roughSpot = player.blockPosition().offset(
+                    (int) Math.round(Math.cos(angle) * distance), 0, (int) Math.round(Math.sin(angle) * distance));
+            int groundY = level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, roughSpot.getX(), roughSpot.getZ());
+            BlockPos truePos = new BlockPos(roughSpot.getX(), groundY + 1, roughSpot.getZ());
+
+            QuestEngine.setHint(player, instanceId, truePos, level.dimension().identifier().toString());
+            com.github.cerealklla.myssions.bridge.TinyWyrldsEntranceBridge.spawnEntranceForQuest(
+                    level, truePos, instanceId, recipeName, player.getUUID());
+
+            if (com.github.cerealklla.myssions.bridge.LyfeWaypointBridge.isLoaded()) {
+                long placeId = QuestWaypointTicker.placeIdFor(instanceId);
+                com.github.cerealklla.myssions.bridge.LyfeWaypointBridge.grantKnowledge(player, placeId, true, true, false);
+            }
+            player.sendSystemMessage(Component.literal(introMessage));
+        });
     }
 
     /** A "go talk to a named NPC" quest, reusing {@link #registerTalkNpcHook}. */

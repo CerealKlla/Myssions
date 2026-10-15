@@ -64,7 +64,7 @@ public final class NpcQuests {
         List<Identifier> mayorQuests = List.of(
                 warbandAtTheGates(), clearTheCaves(), findOldHarlen(), scoutTheFrontier(),
                 raidersOnTheOldRoad(), theWitchInTheSwamp(), beyondTheKnownMap(), theHermitsApprentice(),
-                phantomsOverTheWalls(), drownedAtTheFord(), growingTheTownHall());
+                phantomsOverTheWalls(), drownedAtTheFord(), growingTheTownHall(), findATroll());
         List<Identifier> travelingMerchantQuests = List.of(
                 merchantCaravanEscort(), aShortSupplyRun(), theLongHaul(), theBackRoads(), stockBeforeTheRun(),
                 aTradeGoodRequest(), escortToTheCrossroads(), sparePartsForTheCart(), aRiskyShortcut(), restockingSilver(),
@@ -342,6 +342,23 @@ public final class NpcQuests {
                 "bone_fragments", "Arrow-Notched Bone Fragments", "Splintered and grooved -- these didn't come from just walking around.",
                 false, 2,
                 List.of(QuestReward.gold(28)));
+    }
+
+    /**
+     * Design doc item 4's own worked example, verbatim: "a player takes a quest to go find a troll
+     * within a cave." Real a vanilla Zombie standing in for "a troll" (no troll entity exists in
+     * vanilla Minecraft) -- the "troll_cave" {@code WyrldRecipe} this needs must be created once,
+     * server-side, via the real debug commands (see context/decisions.md for the exact commands
+     * run and verified).
+     */
+    private static Identifier findATroll() {
+        Identifier questId = id("find_a_troll");
+        return QuestHooks.registerEntranceQuest(questId, "Find a Troll",
+                "There's a troll denned up in a cave not far from here -- scared off two work crews "
+                        + "already. Find its den, deal with it, and get yourself back out in one piece.",
+                TOWN_HALL_ZONE_TYPE, "Defeat the troll", "Escape the cave",
+                "troll_cave", "A troll's denned up nearby -- I've marked roughly where. Deal with it, then get out.",
+                List.of(QuestReward.gold(25), QuestReward.xp("explorer", 40)));
     }
 
     private static Identifier raidersOnTheOldRoad() {

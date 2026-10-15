@@ -62,3 +62,13 @@ Quest system: a player-facing quest log UI, Active Quest HUD, waypoint hints, an
     reason="Lets a quest reward grant gold if present."
     ordering="NONE"
     side="BOTH"
+
+# Optional soft dependency -- an "entrance quest" (design doc item 4, "go find a troll within a
+# cave") spawns a real TinyWyrlds Wyrld Entrance if present; the mod works standalone without it,
+# just without that one quest shape available.
+[[dependencies.${mod_id}]]
+    modId="tinywyrlds"
+    type="optional"
+    reason="Lets an entrance-type quest spawn a real Wyrld Entrance dungeon if present."
+    ordering="NONE"
+    side="BOTH"

@@ -81,6 +81,7 @@ dependencies {
     compileOnly files("../Settlemynts/build/libs/settlemynts-${settlemynts_version}.jar")
     compileOnly files("../Lyfe/build/libs/lyfe-${lyfe_version}.jar")
     compileOnly files("../Yconomics/build/libs/yconomics-${yconomics_version}.jar")
+    compileOnly files("../TinyWyrlds/build/libs/tinywyrlds-${tinywyrlds_version}.jar")
 
     testImplementation 'org.junit.jupiter:junit-jupiter:5.7.1'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'

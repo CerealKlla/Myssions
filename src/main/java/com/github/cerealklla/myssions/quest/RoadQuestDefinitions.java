@@ -46,11 +46,11 @@ public final class RoadQuestDefinitions {
                         // set directly via the canonical constructor -- QuestMilestone#simple's own
                         // factory always hardcodes this to 0.
                         new QuestMilestone("efficient_road_tier1", "Build it efficiently (bonus reward)", true, 1,
-                                java.util.Optional.empty(), java.util.Optional.empty(), false, false, false, 100, false, false, false, false),
+                                java.util.Optional.empty(), java.util.Optional.empty(), false, false, false, 100, false, false, false, false, java.util.Optional.empty()),
                         new QuestMilestone("efficient_road_tier2", "Build it more efficiently (bigger bonus)", true, 1,
-                                java.util.Optional.empty(), java.util.Optional.empty(), false, false, false, 100, false, false, false, false),
+                                java.util.Optional.empty(), java.util.Optional.empty(), false, false, false, 100, false, false, false, false, java.util.Optional.empty()),
                         new QuestMilestone("efficient_road_tier3", "Build it very efficiently (max bonus)", true, 1,
-                                java.util.Optional.empty(), java.util.Optional.empty(), false, false, false, 100, false, false, false, false)
+                                java.util.Optional.empty(), java.util.Optional.empty(), false, false, false, 100, false, false, false, false, java.util.Optional.empty())
                 ),
                 List.of(QuestReward.gold(500)),
                 QuestTimeLimit.withinTicksOfAssignment(6L * 60 * 60 * 20),

@@ -70,6 +70,11 @@ public class MyssionsMod {
         if (net.neoforged.fml.ModList.get().isLoaded("lyfe")) {
             NeoForge.EVENT_BUS.register(new com.github.cerealklla.myssions.quest.QuestWaypointTicker());
         }
+        // Design doc item 4's quest-triggered Entrance variant -- only registered when TinyWyrlds is
+        // loaded, since this listener directly references its WyrldEntranceEntity class.
+        if (net.neoforged.fml.ModList.get().isLoaded("tinywyrlds")) {
+            NeoForge.EVENT_BUS.register(new com.github.cerealklla.myssions.bridge.TinyWyrldsEntranceBridge());
+        }
     }
 
     private void registerAttributes(net.neoforged.neoforge.event.entity.EntityAttributeCreationEvent event) {

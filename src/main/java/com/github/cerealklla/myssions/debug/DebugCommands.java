@@ -1,6 +1,7 @@
 package com.github.cerealklla.myssions.debug;
 
 import com.mojang.brigadier.CommandDispatcher;
+import com.mojang.brigadier.arguments.StringArgumentType;
 
 import com.github.cerealklla.myssions.api.Myssions;
 import com.github.cerealklla.myssions.quest.SampleQuests;
@@ -8,6 +9,7 @@ import com.github.cerealklla.myssions.quest.SampleQuests;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerPlayer;
 
 /** DEBUG ONLY -- deliberately no permission gate, same precedent as every other sibling mod's own {@code debug.DebugCommands}. */
@@ -22,7 +24,33 @@ public final class DebugCommands {
                 .then(Commands.literal("givetest")
                         .executes(ctx -> giveTestQuest(ctx.getSource())))
                 .then(Commands.literal("fixplotupgrade")
-                        .executes(ctx -> fixPlotUpgrade(ctx.getSource()))));
+                        .executes(ctx -> fixPlotUpgrade(ctx.getSource())))
+                .then(Commands.literal("assign")
+                        .then(Commands.argument("questId", StringArgumentType.greedyString())
+                                .executes(ctx -> assignQuestById(ctx.getSource(),
+                                        StringArgumentType.getString(ctx, "questId"))))));
+    }
+
+    /** Assigns any registered quest definition by its raw id -- added so a specific quest (e.g. a
+     *  newly-authored entrance quest) can be tested directly without needing to actually trigger
+     *  whatever real in-game offer/board mechanism would normally surface it. */
+    private static int assignQuestById(CommandSourceStack source, String questIdArg) {
+        if (!(source.getEntity() instanceof ServerPlayer player)) {
+            source.sendFailure(Component.literal("Only a player can run this."));
+            return 0;
+        }
+        Identifier questId = Identifier.tryParse(questIdArg.contains(":") ? questIdArg : "myssions:" + questIdArg);
+        if (questId == null) {
+            source.sendFailure(Component.literal("'" + questIdArg + "' isn't a valid quest id."));
+            return 0;
+        }
+        boolean assigned = Myssions.assignQuest(player, questId).isPresent();
+        if (assigned) {
+            source.sendSuccess(() -> Component.literal("Assigned '" + questId + "'."), false);
+            return 1;
+        }
+        source.sendFailure(Component.literal("Could not assign '" + questId + "' (unknown id, already in progress, or at the active-quest cap)."));
+        return 0;
     }
 
     /**

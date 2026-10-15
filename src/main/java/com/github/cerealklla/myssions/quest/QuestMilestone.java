@@ -80,12 +80,23 @@ import net.minecraft.resources.Identifier;
  * onto {@code QuestInstance#locationName()} the same way a buy milestone packs its gold reward there
  * -- see {@code QuestText}'s own doc. {@link #requiredCount()} on the static milestone itself is a
  * meaningless placeholder (0) for this kind, exactly like a buy milestone's own static count.
+ *
+ * <p>{@link #entranceMilestoneKind()} (added 2026-10-15, design doc item 4 -- "go find a troll
+ * within a cave... completing some objective within the cave completes a milestone, then the
+ * player has to escape") backs the two steps of an entrance-type quest (see {@code
+ * QuestHooks#registerEntranceQuest}): {@link #isDefeatGuardianMilestone()} ({@code "guardian"})
+ * completes when {@code bridge.TinyWyrldsEntranceBridge} sees the dungeon's own tracked guardian
+ * entity die, and {@link #isEscapeMilestone()} ({@code "escape"}) completes when that same bridge
+ * sees the player leave the {@code tinywyrlds:wyrld_space} dimension afterward. A single new {@code
+ * Optional<String>} field rather than two more booleans -- this record already sits at Mojang's
+ * 16-field {@code RecordCodecBuilder} group-arity limit, and "reuse a field/token instead of adding
+ * one" is this class's own established precedent (see {@link #isGatherMilestone()}'s own doc).
  */
 public record QuestMilestone(String id, String description, boolean optional, int requiredCount,
                               Optional<Identifier> killTargetEntityType, Optional<String> proofId,
                               boolean isDeliverMilestone, boolean isTalkMilestone, boolean isEscortMilestone,
                               int bonusGoldPerProof, boolean nightOnly, boolean isBuyMilestone, boolean isGatherMilestone,
-                              boolean isPlotUpgradeMilestone) {
+                              boolean isPlotUpgradeMilestone, Optional<String> entranceMilestoneKind) {
 
     public static final Codec<QuestMilestone> CODEC = RecordCodecBuilder.create(instance -> instance.group(
             Codec.STRING.fieldOf("id").forGetter(QuestMilestone::id),
@@ -101,55 +112,74 @@ public record QuestMilestone(String id, String description, boolean optional, in
             Codec.BOOL.optionalFieldOf("night_only", false).forGetter(QuestMilestone::nightOnly),
             Codec.BOOL.optionalFieldOf("is_buy_milestone", false).forGetter(QuestMilestone::isBuyMilestone),
             Codec.BOOL.optionalFieldOf("is_gather_milestone", false).forGetter(QuestMilestone::isGatherMilestone),
-            Codec.BOOL.optionalFieldOf("is_plot_upgrade_milestone", false).forGetter(QuestMilestone::isPlotUpgradeMilestone)
+            Codec.BOOL.optionalFieldOf("is_plot_upgrade_milestone", false).forGetter(QuestMilestone::isPlotUpgradeMilestone),
+            Codec.STRING.optionalFieldOf("entrance_milestone_kind").forGetter(QuestMilestone::entranceMilestoneKind)
     ).apply(instance, QuestMilestone::new));
 
+    public boolean isDefeatGuardianMilestone() {
+        return entranceMilestoneKind.map("guardian"::equals).orElse(false);
+    }
+
+    public boolean isEscapeMilestone() {
+        return entranceMilestoneKind.map("escape"::equals).orElse(false);
+    }
+
+    public static QuestMilestone defeatGuardian(String id, String description) {
+        return new QuestMilestone(id, description, false, 1, Optional.empty(), Optional.empty(), false, false, false,
+                0, false, false, false, false, Optional.of("guardian"));
+    }
+
+    public static QuestMilestone escape(String id, String description) {
+        return new QuestMilestone(id, description, false, 1, Optional.empty(), Optional.empty(), false, false, false,
+                0, false, false, false, false, Optional.of("escape"));
+    }
+
     public static QuestMilestone simple(String id, String description) {
-        return new QuestMilestone(id, description, false, 1, Optional.empty(), Optional.empty(), false, false, false, 0, false, false, false, false);
+        return new QuestMilestone(id, description, false, 1, Optional.empty(), Optional.empty(), false, false, false, 0, false, false, false, false, Optional.empty());
     }
 
     public static QuestMilestone simple(String id, String description, boolean optional) {
-        return new QuestMilestone(id, description, optional, 1, Optional.empty(), Optional.empty(), false, false, false, 0, false, false, false, false);
+        return new QuestMilestone(id, description, optional, 1, Optional.empty(), Optional.empty(), false, false, false, 0, false, false, false, false, Optional.empty());
     }
 
     public static QuestMilestone kill(String id, String description, Identifier entityType, int count, String proofId) {
-        return new QuestMilestone(id, description, false, count, Optional.of(entityType), Optional.of(proofId), false, false, false, 0, false, false, false, false);
+        return new QuestMilestone(id, description, false, count, Optional.of(entityType), Optional.of(proofId), false, false, false, 0, false, false, false, false, Optional.empty());
     }
 
     /** Like {@link #kill(String, String, Identifier, int, String)}, but only counts a kill at night -- see this class's own doc. */
     public static QuestMilestone kill(String id, String description, Identifier entityType, int count, String proofId, boolean nightOnly) {
-        return new QuestMilestone(id, description, false, count, Optional.of(entityType), Optional.of(proofId), false, false, false, 0, nightOnly, false, false, false);
+        return new QuestMilestone(id, description, false, count, Optional.of(entityType), Optional.of(proofId), false, false, false, 0, nightOnly, false, false, false, Optional.empty());
     }
 
     public static QuestMilestone deliver(String id, String description, String proofId, int count) {
-        return new QuestMilestone(id, description, false, count, Optional.empty(), Optional.of(proofId), true, false, false, 0, false, false, false, false);
+        return new QuestMilestone(id, description, false, count, Optional.empty(), Optional.of(proofId), true, false, false, 0, false, false, false, false, Optional.empty());
     }
 
     /** An optional deliver milestone that pays {@code bonusGoldPerProof} Gold per item actually turned in (up to {@code maxCount}) -- see this class's own doc for how this differs from the required {@link #deliver} above. */
     public static QuestMilestone optionalDeliverWithBonus(String id, String description, String proofId, int maxCount, int bonusGoldPerProof) {
-        return new QuestMilestone(id, description, true, maxCount, Optional.empty(), Optional.of(proofId), true, false, false, bonusGoldPerProof, false, false, false, false);
+        return new QuestMilestone(id, description, true, maxCount, Optional.empty(), Optional.of(proofId), true, false, false, bonusGoldPerProof, false, false, false, false, Optional.empty());
     }
 
     public static QuestMilestone talk(String id, String description) {
-        return new QuestMilestone(id, description, false, 1, Optional.empty(), Optional.empty(), false, true, false, 0, false, false, false, false);
+        return new QuestMilestone(id, description, false, 1, Optional.empty(), Optional.empty(), false, true, false, 0, false, false, false, false, Optional.empty());
     }
 
     public static QuestMilestone escort(String id, String description) {
-        return new QuestMilestone(id, description, false, 1, Optional.empty(), Optional.empty(), false, false, true, 0, false, false, false, false);
+        return new QuestMilestone(id, description, false, 1, Optional.empty(), Optional.empty(), false, false, true, 0, false, false, false, false, Optional.empty());
     }
 
     /** See this class's own doc for {@link #isBuyMilestone()} -- the real target item is resolved per-instance, not stored here. */
     public static QuestMilestone buyItem(String id, String description, int count) {
-        return new QuestMilestone(id, description, false, count, Optional.empty(), Optional.empty(), true, false, false, 0, false, true, false, false);
+        return new QuestMilestone(id, description, false, count, Optional.empty(), Optional.empty(), true, false, false, 0, false, true, false, false, Optional.empty());
     }
 
     /** See this class's own doc for {@link #isGatherMilestone()} -- {@code itemId} is fixed for every instance of this quest definition; {@code goldPerUnit} sizes the turn-in reward (see {@code QuestEngine#addGatherReward}). */
     public static QuestMilestone gather(String id, String description, Identifier itemId, int count, int goldPerUnit) {
-        return new QuestMilestone(id, description, false, count, Optional.empty(), Optional.of(itemId.toString()), true, false, false, goldPerUnit, false, false, true, false);
+        return new QuestMilestone(id, description, false, count, Optional.empty(), Optional.of(itemId.toString()), true, false, false, goldPerUnit, false, false, true, false, Optional.empty());
     }
 
     /** See this class's own doc for {@link #isPlotUpgradeMilestone()} -- {@code resourceKey} is {@code "wood"} or {@code "stone"}; the real required amount is resolved per-instance, not stored here. */
     public static QuestMilestone plotUpgradeResource(String id, String description, String resourceKey) {
-        return new QuestMilestone(id, description, false, 0, Optional.empty(), Optional.of(resourceKey), true, false, false, 0, false, false, false, true);
+        return new QuestMilestone(id, description, false, 0, Optional.empty(), Optional.of(resourceKey), true, false, false, 0, false, false, false, true, Optional.empty());
     }
 }
