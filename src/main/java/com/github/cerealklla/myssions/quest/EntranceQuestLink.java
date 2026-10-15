@@ -88,6 +88,19 @@ public final class EntranceQuestLink extends SavedData {
         return Optional.ofNullable(links.get(instanceId));
     }
 
+    /** Every tracked entrance that hasn't yet picked up a real guardian entity -- what {@code
+     *  bridge.TinyWyrldsEntranceGuardianTicker} polls each pass. A plain snapshot copy (not a live
+     *  view) since the caller iterates it while this map may keep changing underneath. */
+    public List<UUID> idsWithoutGuardian() {
+        List<UUID> result = new ArrayList<>();
+        for (Map.Entry<UUID, Link> entry : links.entrySet()) {
+            if (entry.getValue().guardianEntityId() == null) {
+                result.add(entry.getKey());
+            }
+        }
+        return result;
+    }
+
     public void create(UUID instanceId, String recipeName) {
         links.put(instanceId, new Link(recipeName, null));
         setDirty();
