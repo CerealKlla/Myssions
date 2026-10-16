@@ -296,4 +296,16 @@ active quests directly rather than a single "last entrance used" map, so holding
 at once no longer loses track of one. `./gradlew build` green in both repos, whole-suite (10 mods)
 rebuild clean.
 
+**Establish Highway quest gets 3 clear step-by-step milestones, 2026-10-15** (see
+[context/decisions.md](context/decisions.md)) — explicit user spec: the old single "Connect the two
+settlements with a road" line (unclear about what to actually do) is replaced by three required
+steps listed above the existing efficiency-bonus optionals — "Place Highway Stake directly outside
+\<origin\>", "...outside \<destination\>", and "Connect stakes in a chain between the two towns"
+(`connect_road`, reworded, not renamed). The two new milestones report off Settlemynts' newly
+exposed per-settlement anchor state (`HighwayProgress#anchoredAtA`/`anchoredAtB` — see its own
+CLAUDE.md) with no new detection built on this side. `QuestInstance.RoadQuestData` gained a plain
+`originName` (the origin is always fully known at acceptance, unlike the destination's own
+knowledge-gated `{location}` reveal) and `QuestText` a matching `{origin}` token. `./gradlew build`
+green in both repos, whole-suite (10 mods) boot-smoke-tested clean. **Not yet live-tested.**
+
 See [context/classes/](context/classes/) for per-class reference.
