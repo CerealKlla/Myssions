@@ -440,9 +440,17 @@ public final class NpcQuests {
                                                          int goldReward, String reporterName,
                                                          String wordOfMessagePrefix, String wordOfMessageSuffix,
                                                          String nothingFoundMessage) {
+        // Real live report, 2026-10-15: the Quest Log only ever showed the static "Return and
+        // report what you found" -- never naming the actual discovered town (even though QuestEngine
+        // #setHint below already records it as this instance's locationName, resolvable via the
+        // {location} token every other location-aware quest already uses -- this one just never
+        // used it), and "Return" read as "go back to where you accepted this," not "travel out to
+        // the place you haven't been yet," which is what completing it actually requires (the
+        // reporter NPC only spawns once the player gets within QuestReportBackTicker's own radius of
+        // the real target -- standing back at the issuing Town Hall can never trigger it).
         QuestRegistry.register(new QuestDefinition(questId, name, description,
                 TOWN_HALL_ZONE_TYPE,
-                List.of(QuestMilestone.talk("report_back", "Return and report what you found")),
+                List.of(QuestMilestone.talk("report_back", "Travel to {location} and talk to " + reporterName)),
                 List.of(QuestReward.gold(goldReward)),
                 QuestTimeLimit.NONE));
         // Real live report, 2026-10-12: the reporter NPC used to spawn immediately at acceptance,
