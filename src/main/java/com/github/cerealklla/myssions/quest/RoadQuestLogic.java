@@ -140,7 +140,12 @@ public final class RoadQuestLogic {
 
         Optional<GeographicEntity> destination = Cartography.getEntity(level, new EntityId(destinationPlaceId));
         String destinationName = destination.map(com.github.cerealklla.cartographyr.geo.DisplayText::shortForEntity).orElse("the other settlement");
-        QuestEngine.setRoadQuestData(player, instanceId, originPlaceId, entry.minStakes(), entry.optimalStakeCap());
+        // The origin is wherever the player is standing/accepting from -- always fully known, no
+        // knowledge-gating needed the way the destination's own reveal has (see RoadQuestData's own
+        // doc for why this is a plain stored name rather than reusing withRegionKnowledge).
+        Optional<GeographicEntity> origin = Cartography.getEntity(level, new EntityId(originPlaceId));
+        String originName = origin.map(com.github.cerealklla.cartographyr.geo.DisplayText::shortForEntity).orElse("the home settlement");
+        QuestEngine.setRoadQuestData(player, instanceId, originPlaceId, entry.minStakes(), entry.optimalStakeCap(), originName);
         QuestEngine.setRegionKnowledge(player, instanceId, destinationPlaceId, destinationName);
 
         grantDestinationKnowledge(level, player, entry, destinationPlaceId);

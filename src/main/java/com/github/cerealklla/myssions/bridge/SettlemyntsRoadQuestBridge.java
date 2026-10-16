@@ -25,7 +25,11 @@ public final class SettlemyntsRoadQuestBridge {
         return ModList.get().isLoaded("settlemynts");
     }
 
-    public record Progress(int stakeCount, boolean connected) {
+    /** {@code anchoredAtA}/{@code anchoredAtB} (added 2026-10-15) -- whether a Highway Stake is
+     *  planted just outside settlement A/B respectively, matching whichever order {@code placeIdA}/
+     *  {@code placeIdB} were passed to {@link #checkProgress} in. {@code RoadQuestTicker} always
+     *  calls this with A = origin, B = destination. */
+    public record Progress(int stakeCount, boolean connected, boolean anchoredAtA, boolean anchoredAtB) {
     }
 
     public static Optional<UUID> findCoreIdForPlaceId(ServerLevel level, long placeId) {
@@ -38,7 +42,7 @@ public final class SettlemyntsRoadQuestBridge {
 
     public static Progress checkProgress(ServerLevel level, UUID instanceId, BlockPos nearHint, long placeIdA, long placeIdB) {
         var result = Settlemynts.checkHighwayProgress(level, instanceId, nearHint, placeIdA, placeIdB);
-        return new Progress(result.stakeCount(), result.connected());
+        return new Progress(result.stakeCount(), result.connected(), result.anchoredAtA(), result.anchoredAtB());
     }
 
     public static int getSettlementTier(ServerLevel level, long placeId) {

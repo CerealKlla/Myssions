@@ -93,13 +93,20 @@ public record QuestInstance(UUID instanceId, Identifier definitionId, QuestStatu
         ).apply(i, EscortData::new));
     }
 
-    public record RoadQuestData(Optional<Long> originPlaceId, int minStakes, int optimalStakeCap) {
-        public static final RoadQuestData NONE = new RoadQuestData(Optional.empty(), 0, 0);
+    public record RoadQuestData(Optional<Long> originPlaceId, int minStakes, int optimalStakeCap, Optional<String> originName) {
+        public static final RoadQuestData NONE = new RoadQuestData(Optional.empty(), 0, 0, Optional.empty());
 
         public static final Codec<RoadQuestData> CODEC = RecordCodecBuilder.create(i -> i.group(
                 Codec.LONG.optionalFieldOf("origin_place_id").forGetter(RoadQuestData::originPlaceId),
                 Codec.INT.optionalFieldOf("min_stakes", 0).forGetter(RoadQuestData::minStakes),
-                Codec.INT.optionalFieldOf("optimal_stake_cap", 0).forGetter(RoadQuestData::optimalStakeCap)
+                Codec.INT.optionalFieldOf("optimal_stake_cap", 0).forGetter(RoadQuestData::optimalStakeCap),
+                // Added 2026-10-15, explicit user request (the Establish Highway quest's new
+                // "Place Highway Stake directly outside {origin}" milestone) -- the origin
+                // settlement's real display name, resolved once at acceptance exactly like
+                // QuestInstance#locationName already is for the destination, but stored here
+                // instead since this is a plain always-known name (the player is standing right
+                // there when they accept), not a knowledge-gated reveal like the destination's own.
+                Codec.STRING.optionalFieldOf("origin_name").forGetter(RoadQuestData::originName)
         ).apply(i, RoadQuestData::new));
     }
 
@@ -195,11 +202,11 @@ public record QuestInstance(UUID instanceId, Identifier definitionId, QuestStatu
                 new EscortData(escort.entityUuid(), List.copyOf(remaining)), roadQuest, assignedAtRealEpochMillis);
     }
 
-    /** Sets this road-connection instance's origin settlement and stake-count thresholds -- the destination settlement itself reuses {@link #withRegionKnowledge} (its placeId goes into {@link #knowledgePlaceId()}). See {@code RoadQuestLogic#acceptOffer}. */
-    public QuestInstance withRoadQuestData(long newRoadOriginPlaceId, int newRoadMinStakes, int newRoadOptimalStakeCap) {
+    /** Sets this road-connection instance's origin settlement, stake-count thresholds, and real origin name -- the destination settlement itself reuses {@link #withRegionKnowledge} (its placeId goes into {@link #knowledgePlaceId()}). See {@code RoadQuestLogic#acceptOffer}. */
+    public QuestInstance withRoadQuestData(long newRoadOriginPlaceId, int newRoadMinStakes, int newRoadOptimalStakeCap, String newRoadOriginName) {
         return new QuestInstance(instanceId, definitionId, status, milestoneProgress, assignedAtGameTime, hintPos, hintDimensionId,
                 locationName, pendingRewardItems, rewardMultiplier, knowledgePlaceId, realLocationName, mobsSpawned, escort,
-                new RoadQuestData(Optional.of(newRoadOriginPlaceId), newRoadMinStakes, newRoadOptimalStakeCap), assignedAtRealEpochMillis);
+                new RoadQuestData(Optional.of(newRoadOriginPlaceId), newRoadMinStakes, newRoadOptimalStakeCap, Optional.of(newRoadOriginName)), assignedAtRealEpochMillis);
     }
 
     /**

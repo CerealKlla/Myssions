@@ -32,7 +32,14 @@ public final class RoadQuestDefinitions {
                         + "in, the Board pays out -- and anything you didn't end up needing gets bought back.",
                 "road_quest_board",
                 List.of(
-                        QuestMilestone.simple("connect_road", "Connect the two settlements with a road"),
+                        // Three required steps (added 2026-10-15, explicit user request) replacing
+                        // the old single "Connect the two settlements with a road" line, which didn't
+                        // say what to actually do. {origin}/{location} resolve via QuestText -- see
+                        // RoadQuestData's own doc for why {origin} is a plain always-known name while
+                        // {location} (the destination) stays knowledge-gated.
+                        QuestMilestone.simple("place_stake_origin", "Place Highway Stake directly outside {origin}"),
+                        QuestMilestone.simple("place_stake_destination", "Place Highway Stake directly outside {location}"),
+                        QuestMilestone.simple("connect_road", "Connect stakes in a chain between the two towns"),
                         // Explicit user spec, 2026-10-13 (correcting an earlier, wrong flat-bonus
                         // read of the same spec): three cascading efficiency tiers, not one -- "a
                         // road can be slightly efficient, slightly more efficient, and very

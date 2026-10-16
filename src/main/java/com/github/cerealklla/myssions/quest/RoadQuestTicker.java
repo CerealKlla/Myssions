@@ -57,6 +57,18 @@ public final class RoadQuestTicker {
             BlockPos nearHint = instance.hintPos().get();
 
             var progress = SettlemyntsRoadQuestBridge.checkProgress(level, instance.instanceId(), nearHint, originPlaceId, destinationPlaceId);
+            // The two "Place Highway Stake directly outside X" milestones report as soon as their
+            // own anchor is planted, independent of full connection -- added 2026-10-15, explicit
+            // user request for clearer step-by-step guidance. reportMilestoneProgress is itself
+            // idempotent against a milestone that's already complete (same convention every other
+            // milestone-progress call site in this mod relies on), so reporting again every 2
+            // seconds while still in progress is harmless.
+            if (progress.anchoredAtA()) {
+                QuestEngine.reportMilestoneProgress(player, instance.instanceId(), "place_stake_origin", 1);
+            }
+            if (progress.anchoredAtB()) {
+                QuestEngine.reportMilestoneProgress(player, instance.instanceId(), "place_stake_destination", 1);
+            }
             if (!progress.connected()) {
                 continue;
             }

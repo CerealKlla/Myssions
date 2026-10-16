@@ -32,6 +32,7 @@ import java.util.Optional;
 public final class QuestText {
 
     private static final String TOKEN = "{location}";
+    private static final String ORIGIN_TOKEN = "{origin}";
     private static final String WOOD_TOKEN = "{wood}";
     private static final String STONE_TOKEN = "{stone}";
     private static final String FALLBACK = "the area";
@@ -68,6 +69,12 @@ public final class QuestText {
         String result = template;
         if (result.contains(TOKEN)) {
             result = result.replace(TOKEN, displayOnly(shortLocationName(instance, shortLocation)));
+        }
+        // The road-connection quest's origin settlement -- always fully known (the player accepted
+        // standing right there), so this is a plain stored name, never knowledge-gated the way
+        // {location}'s own destination reveal is. See RoadQuestData's own doc.
+        if (result.contains(ORIGIN_TOKEN)) {
+            result = result.replace(ORIGIN_TOKEN, instance.roadQuest().originName().orElse("the home settlement"));
         }
         if (result.contains(WOOD_TOKEN) || result.contains(STONE_TOKEN)) {
             PlotUpgradeAmounts amounts = resolvePlotUpgradeAmounts(instance).orElse(new PlotUpgradeAmounts(0, 0));
