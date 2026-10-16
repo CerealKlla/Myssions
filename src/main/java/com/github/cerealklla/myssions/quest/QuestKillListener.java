@@ -1,11 +1,17 @@
 package com.github.cerealklla.myssions.quest;
 
+import java.util.Set;
+import java.util.UUID;
+
+import com.github.cerealklla.myssions.bridge.LyfeAssistBridge;
 import com.github.cerealklla.myssions.registration.ModAttachments;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.Identifier;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.event.entity.living.LivingDeathEvent;
@@ -46,6 +52,14 @@ import net.neoforged.neoforge.event.entity.living.LivingDeathEvent;
  * day/night gating already uses), so a quest that claims "this only happens at night" actually
  * enforces it instead of being flavor text a player can ignore. Silent no-op during the day, same
  * shape as the geofence check above -- no current quest sets this flag yet.
+ *
+ * <p><b>Multi-player assist credit, 2026-10-16</b> (explicit user spec, General section: "every
+ * player who has an assist marker on that mob will be given equal credit toward killing it...
+ * primarily meant to affect quest requirement progress") -- a kill now credits every player Lyfe's
+ * {@code combat.AssistTracker} says dealt real damage to the mob in the last 15 seconds (see {@code
+ * bridge.LyfeAssistBridge}), not just whoever landed the killing blow. Falls back to the single
+ * killer (the old behavior) if Lyfe isn't loaded, since the assist-marker system lives entirely
+ * there.
  */
 public final class QuestKillListener {
 
@@ -56,13 +70,38 @@ public final class QuestKillListener {
 
     @SubscribeEvent
     public void onDeath(LivingDeathEvent event) {
-        if (!(event.getSource().getEntity() instanceof ServerPlayer player)) {
+        LivingEntity deadMob = event.getEntity();
+        if (!(deadMob.level() instanceof ServerLevel level)) {
             return;
         }
-        Identifier deadType = BuiltInRegistries.ENTITY_TYPE.getKey(event.getEntity().getType());
-        BlockPos deadPos = event.getEntity().blockPosition();
-        String deadDimensionId = player.level().dimension().identifier().toString();
-        Long deadTaggedPlaceId = event.getEntity().getPersistentData().getLong(MobRegionTagListener.TAG_KEY).orElse(null);
+        Set<UUID> creditedIds;
+        if (LyfeAssistBridge.isLoaded()) {
+            // General "assist marker" system (explicit user spec, 2026-10-16) -- every player who
+            // dealt real damage to this mob in the last 15 seconds gets equal credit, not just
+            // whoever landed the killing blow. Falls back to the single killer below when Lyfe isn't
+            // loaded at all, since the assist-marker system lives entirely there.
+            creditedIds = LyfeAssistBridge.getAssistCredit(deadMob);
+        } else if (event.getSource().getEntity() instanceof ServerPlayer killer) {
+            creditedIds = Set.of(killer.getUUID());
+        } else {
+            return;
+        }
+        if (creditedIds.isEmpty()) {
+            return;
+        }
+        Identifier deadType = BuiltInRegistries.ENTITY_TYPE.getKey(deadMob.getType());
+        BlockPos deadPos = deadMob.blockPosition();
+        String deadDimensionId = level.dimension().identifier().toString();
+        Long deadTaggedPlaceId = deadMob.getPersistentData().getLong(MobRegionTagListener.TAG_KEY).orElse(null);
+        for (UUID playerId : creditedIds) {
+            ServerPlayer player = level.getServer().getPlayerList().getPlayer(playerId);
+            if (player != null) {
+                creditKillToPlayer(player, deadType, deadPos, deadDimensionId, deadTaggedPlaceId);
+            }
+        }
+    }
+
+    private void creditKillToPlayer(ServerPlayer player, Identifier deadType, BlockPos deadPos, String deadDimensionId, Long deadTaggedPlaceId) {
         var data = player.getData(ModAttachments.QUEST_DATA);
         for (QuestInstance instance : data.quests().values()) {
             if (instance.status() != QuestStatus.IN_PROGRESS) {
