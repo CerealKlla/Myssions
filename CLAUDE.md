@@ -308,4 +308,15 @@ CLAUDE.md) with no new detection built on this side. `QuestInstance.RoadQuestDat
 knowledge-gated `{location}` reveal) and `QuestText` a matching `{origin}` token. `./gradlew build`
 green in both repos, whole-suite (10 mods) boot-smoke-tested clean. **Not yet live-tested.**
 
+**Kill-type quest milestones now credit every assisting player, 2026-10-16** (see
+[context/decisions.md](context/decisions.md)) -- explicit user spec, General section: "every player
+who has an assist marker on that mob will be given equal credit toward killing it... primarily
+meant to affect quest requirement progress." New `bridge.LyfeAssistBridge` reaches Lyfe's new
+General assist-marker system (`api.Lyfe#getAssistCredit`, see Lyfe's own CLAUDE.md) --
+`quest.QuestKillListener#onDeath` now resolves every player who dealt real damage to the mob in the
+last 15 seconds (not just whoever landed the killing blow) and runs the existing per-player
+milestone-crediting logic for each, falling back to the old single-killer behavior when Lyfe isn't
+loaded at all. `./gradlew build` green in both repos, whole-suite (11 mods) boot-smoke-tested clean.
+**Not yet live-tested or deployed.**
+
 See [context/classes/](context/classes/) for per-class reference.
