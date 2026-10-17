@@ -29,6 +29,15 @@ public class MyssionsModClient {
     public MyssionsModClient(ModContainer container) {
     }
 
+    // Menu consolidation (2026-10-17) -- contributes the "Quests" tab to Nuclyus's shared "K"
+    // menu. See com.github.cerealklla.nuclyus.menu.client.MenuContributor's own doc. "J" below is
+    // untouched and keeps working standalone, same reasoning as every other contributing mod.
+    @SubscribeEvent
+    static void onClientSetup(net.neoforged.fml.event.lifecycle.FMLClientSetupEvent event) {
+        com.github.cerealklla.nuclyus.menu.client.NuclyusMenuRegistry.registerContributor(
+                () -> java.util.List.of(new com.github.cerealklla.myssions.menu.client.QuestLogTab()));
+    }
+
     // "Press J to open the Quest Log" -- "J" (for Journal) is free across the suite (Settlemynts
     // uses G/H, Lyfe uses [ ] O K), flagged as an easy-to-rebind placeholder like every other
     // keybind in this suite.
