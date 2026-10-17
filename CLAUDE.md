@@ -330,4 +330,9 @@ standalone "J" keybind is completely unaffected. `./gradlew build` green in both
 (12 mods) rebuild green, `runServer` boot-smoke-tested clean. **Not yet live-tested in a real
 client** -- neither the standalone nor the Nuclyus-hosted path has been opened yet.
 
+**Shared word-wrap extracted into Nuclyus, 2026-10-17** (see Nuclyus's own CLAUDE.md/decisions.md)
+-- `menu.client.QuestLogTab`'s hand-rolled `wrapToWidth` now calls `nuclyus.client.TextWrap#wrap`;
+pure behavior-preserving refactor, no public API change. `./gradlew build` green, whole-suite
+(12 mods) rebuild green, `runServer` boot-smoke-tested clean.
+
 See [context/classes/](context/classes/) for per-class reference.
