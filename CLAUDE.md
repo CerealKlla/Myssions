@@ -319,4 +319,15 @@ milestone-crediting logic for each, falling back to the old single-killer behavi
 loaded at all. `./gradlew build` green in both repos, whole-suite (11 mods) boot-smoke-tested clean.
 **Not yet live-tested or deployed.**
 
+**Quest Log ported into a new foundation mod's shared menu, 2026-10-17** (see
+[context/decisions.md](context/decisions.md)) -- a new suite-wide mod, **Nuclyus** (hard-required by
+every mod, see its own CLAUDE.md), now owns a shared tabbed "K" menu that any mod can contribute to.
+The old standalone `client.QuestLogScreen` is now a thin host wrapping a new
+`menu.client.QuestLogTab`, which is also what Nuclyus's shared menu displays as its "Quests" tab
+when Myssions is loaded -- identical behavior either way, same list/details/action-button logic,
+just ported to render against an injected rect instead of the screen's own `width`/`height`. The
+standalone "J" keybind is completely unaffected. `./gradlew build` green in both repos, whole-suite
+(12 mods) rebuild green, `runServer` boot-smoke-tested clean. **Not yet live-tested in a real
+client** -- neither the standalone nor the Nuclyus-hosted path has been opened yet.
+
 See [context/classes/](context/classes/) for per-class reference.
