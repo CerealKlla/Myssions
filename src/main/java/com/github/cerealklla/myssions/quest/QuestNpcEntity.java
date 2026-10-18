@@ -51,6 +51,11 @@ public class QuestNpcEntity extends Villager {
     public QuestNpcEntity(EntityType<? extends Villager> type, Level level) {
         super(type, level);
         skipDropExperience();
+        // Real report, 2026-10-17 (Settlemynts): "NPCs keep getting stuck up in trees" -- neither
+        // vanilla's Mob nor AbstractVillager sets a PathType.LEAVES malus, so a tree's leaf canopy
+        // reads as ordinary walkable ground to the pathfinder. Same fix applied here since a quest
+        // NPC spawned out in the wilderness (an unborn-town reporter, etc.) is just as exposed.
+        this.setPathfindingMalus(net.minecraft.world.level.pathfinder.PathType.LEAVES, -1.0F);
     }
 
     public void configure(UUID ownerPlayerId, UUID linkedInstanceId, boolean hidesAtNight, String npcName) {
