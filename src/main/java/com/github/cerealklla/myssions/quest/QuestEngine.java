@@ -267,6 +267,18 @@ public final class QuestEngine {
                 .allMatch(updated::isMilestoneComplete);
 
         if (allRequiredComplete) {
+            // Real report, 2026-10-17: an optional bonus-paying deliver milestone (e.g. "return Tufts
+            // of Fox Fur for bonus gold") could never actually be fulfilled once the required
+            // milestones finished on their own -- a kill-count milestone, which already hands the
+            // matching proof item straight to the player as a side effect (see QuestKillListener),
+            // commonly completes before the player ever manually turns that proof in. tryDeliverProof
+            // (the only other place that records this kind of progress) refuses to run against
+            // anything but an IN_PROGRESS instance, and this method is about to move the instance away
+            // from IN_PROGRESS for good right here -- so the bonus was permanently unreachable, and the
+            // Quest Log/HUD wrongly rendered the still-incomplete optional milestone as "failed" even
+            // though the player was holding everything needed to finish it. Sweeps whatever proof the
+            // player already holds into any such milestone BEFORE finalizing the reward.
+            updated = applyBonusDeliveries(player, definition, updated);
             beginRewardPickup(player, definition, updated);
             // See QuestCompletionHooks' own doc -- fired only on this, the genuine quest-driven
             // completion path. NOT fired from completePlotUpgradeQuestsForPlot's own call to
@@ -277,6 +289,37 @@ public final class QuestEngine {
         } else {
             player.setData(ModAttachments.QUEST_DATA, data.withQuest(updated));
         }
+    }
+
+    /**
+     * Best-effort sweep, called only from the completion branch of {@link #reportMilestoneProgress}
+     * right before the instance leaves {@code IN_PROGRESS} for good -- for every optional bonus-paying
+     * deliver milestone not yet complete, consumes whatever proof the player is currently holding (up
+     * to the milestone's own cap) and records that progress directly on the returned instance.
+     * Deliberately a flat, local progress update rather than calling {@link #tryDeliverProof} (which
+     * would recurse back into {@link #reportMilestoneProgress} and re-run this same completion branch
+     * a second time, firing {@link #beginRewardPickup} twice for one real completion).
+     */
+    private static QuestInstance applyBonusDeliveries(ServerPlayer player, QuestDefinition definition, QuestInstance instance) {
+        QuestInstance current = instance;
+        for (QuestMilestone milestone : definition.milestones()) {
+            if (!milestone.isDeliverMilestone() || !milestone.optional() || milestone.bonusGoldPerProof() <= 0
+                    || current.isMilestoneComplete(milestone) || milestone.proofId().isEmpty()) {
+                continue;
+            }
+            int remaining = milestone.requiredCount() - current.milestoneProgress().getOrDefault(milestone.id(), 0);
+            if (remaining <= 0) {
+                continue;
+            }
+            int held = countProof(player, milestone.proofId().get());
+            int toDeliver = Math.min(held, remaining);
+            if (toDeliver <= 0) {
+                continue;
+            }
+            consumeProof(player, milestone.proofId().get(), toDeliver);
+            current = current.withProgress(milestone.id(), current.milestoneProgress().getOrDefault(milestone.id(), 0) + toDeliver);
+        }
+        return current;
     }
 
     /**

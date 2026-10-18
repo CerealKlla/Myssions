@@ -335,4 +335,15 @@ client** -- neither the standalone nor the Nuclyus-hosted path has been opened y
 pure behavior-preserving refactor, no public API change. `./gradlew build` green, whole-suite
 (12 mods) rebuild green, `runServer` boot-smoke-tested clean.
 
+**Bug report review, 2026-10-17** -- went through every outstanding report in `bugreports/`. Three
+("Scout the Frontier"/unborn-town NPC spawning on top of the player, "Expanding the Farm"/partial
+material consumption, "Beyond the Known Map"/vague milestone text) turned out to already be fixed by
+earlier work (Builds 72/78/141 respectively, confirmed via git history + ReleaseNotes.md) -- moved to
+`bugreports/fixed/` and the reporter paid 500 Gold each via Coryspondance mail. The fourth ("Foxes in
+the Cornfield"/an optional bonus-proof milestone rendering as failed) was a real, still-open bug --
+see [context/decisions.md](context/decisions.md)'s own entry for the fix (`QuestEngine
+#applyBonusDeliveries`). `./gradlew build` green, whole-suite (12 mods) rebuild + `runServer`
+boot-smoke-test clean. **Not yet deployed** -- this report's own triage (file move + reward) is held
+until it ships.
+
 See [context/classes/](context/classes/) for per-class reference.
