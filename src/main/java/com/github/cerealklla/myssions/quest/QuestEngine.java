@@ -271,14 +271,21 @@ public final class QuestEngine {
             // of Fox Fur for bonus gold") could never actually be fulfilled once the required
             // milestones finished on their own -- a kill-count milestone, which already hands the
             // matching proof item straight to the player as a side effect (see QuestKillListener),
-            // commonly completes before the player ever manually turns that proof in. tryDeliverProof
-            // (the only other place that records this kind of progress) refuses to run against
-            // anything but an IN_PROGRESS instance, and this method is about to move the instance away
-            // from IN_PROGRESS for good right here -- so the bonus was permanently unreachable, and the
-            // Quest Log/HUD wrongly rendered the still-incomplete optional milestone as "failed" even
-            // though the player was holding everything needed to finish it. Sweeps whatever proof the
-            // player already holds into any such milestone BEFORE finalizing the reward.
-            updated = applyBonusDeliveries(player, definition, updated);
+            // commonly completes before the player ever manually turns that proof in, and this method
+            // is about to move the instance away from IN_PROGRESS for good right here.
+            //
+            // **Reverted 2026-10-19**: the first fix for this (an automatic "sweep whatever you're
+            // holding" pass right here, before finalizing) consumed proof items the instant the kill
+            // landed -- a real follow-up report: "it should literally only take the proof items when
+            // you talk to the quest giver to turn in the quest." That's correct and matches how every
+            // other deliver milestone in this mod already behaves (consumed only via tryDeliverProof,
+            // itself only ever called from a real player action) -- a kill-completion event is not a
+            // player action in that sense. The bonus milestone now simply stays incomplete when this
+            // fires; delivering it is deferred entirely to {@link #tryCompleteQuest}'s own
+            // AWAITING_REWARD_PICKUP branch, which runs only when the player actually talks to the
+            // quest giver, via a new {@link #tryDeliverProofWhilePending} that -- unlike
+            // tryDeliverProof -- can still run on an instance that's already left IN_PROGRESS, and
+            // appends the earned bonus gold onto the reward that was already computed below.
             beginRewardPickup(player, definition, updated);
             // See QuestCompletionHooks' own doc -- fired only on this, the genuine quest-driven
             // completion path. NOT fired from completePlotUpgradeQuestsForPlot's own call to
@@ -292,34 +299,39 @@ public final class QuestEngine {
     }
 
     /**
-     * Best-effort sweep, called only from the completion branch of {@link #reportMilestoneProgress}
-     * right before the instance leaves {@code IN_PROGRESS} for good -- for every optional bonus-paying
-     * deliver milestone not yet complete, consumes whatever proof the player is currently holding (up
-     * to the milestone's own cap) and records that progress directly on the returned instance.
-     * Deliberately a flat, local progress update rather than calling {@link #tryDeliverProof} (which
-     * would recurse back into {@link #reportMilestoneProgress} and re-run this same completion branch
-     * a second time, firing {@link #beginRewardPickup} twice for one real completion).
+     * Delivers one still-incomplete OPTIONAL bonus-paying deliver milestone's proof on an instance
+     * that's already {@link QuestStatus#AWAITING_REWARD_PICKUP} -- the real, player-driven fulfillment
+     * path for the common case where a kill-count quest's required milestone finished before the
+     * player ever talked to the quest giver (see {@link #reportMilestoneProgress}'s own doc, 2026-10-19
+     * correction). Called only from {@link #tryCompleteQuest}, i.e. only from a genuine "talk to the
+     * quest giver" action -- never automatically. Mirrors {@link #tryDeliverProof}'s own held/remaining
+     * logic for the optional-bonus case, but can't reuse it directly: that method (and the
+     * {@link #reportMilestoneProgress} call it ends with) assumes the instance is still IN_PROGRESS.
+     * Appends the newly-earned bonus gold directly onto the reward {@link #beginRewardPickup} already
+     * computed and parked on {@link QuestInstance#pendingRewardItems()}, rather than recomputing the
+     * whole reward from scratch.
      */
-    private static QuestInstance applyBonusDeliveries(ServerPlayer player, QuestDefinition definition, QuestInstance instance) {
-        QuestInstance current = instance;
-        for (QuestMilestone milestone : definition.milestones()) {
-            if (!milestone.isDeliverMilestone() || !milestone.optional() || milestone.bonusGoldPerProof() <= 0
-                    || current.isMilestoneComplete(milestone) || milestone.proofId().isEmpty()) {
-                continue;
-            }
-            int remaining = milestone.requiredCount() - current.milestoneProgress().getOrDefault(milestone.id(), 0);
-            if (remaining <= 0) {
-                continue;
-            }
-            int held = countProof(player, milestone.proofId().get());
-            int toDeliver = Math.min(held, remaining);
-            if (toDeliver <= 0) {
-                continue;
-            }
-            consumeProof(player, milestone.proofId().get(), toDeliver);
-            current = current.withProgress(milestone.id(), current.milestoneProgress().getOrDefault(milestone.id(), 0) + toDeliver);
+    private static boolean tryDeliverProofWhilePending(ServerPlayer player, QuestInstance instance, QuestMilestone milestone) {
+        if (!milestone.isDeliverMilestone() || !milestone.optional() || milestone.bonusGoldPerProof() <= 0
+                || instance.isMilestoneComplete(milestone) || milestone.proofId().isEmpty()) {
+            return false;
         }
-        return current;
+        int remaining = milestone.requiredCount() - instance.milestoneProgress().getOrDefault(milestone.id(), 0);
+        if (remaining <= 0) {
+            return false;
+        }
+        int held = countProof(player, milestone.proofId().get());
+        int toDeliver = Math.min(held, remaining);
+        if (toDeliver <= 0) {
+            return false;
+        }
+        consumeProof(player, milestone.proofId().get(), toDeliver);
+        QuestInstance updated = instance.withProgress(milestone.id(), instance.milestoneProgress().getOrDefault(milestone.id(), 0) + toDeliver);
+        List<ItemStack> rewardItems = new ArrayList<>(updated.pendingRewardItems());
+        addStacks(rewardItems, Items.GOLD_NUGGET, scaledAmount(milestone.bonusGoldPerProof() * toDeliver, updated.rewardMultiplier()));
+        updated = updated.withPendingRewardItems(rewardItems);
+        player.setData(ModAttachments.QUEST_DATA, player.getData(ModAttachments.QUEST_DATA).withQuest(updated));
+        return true;
     }
 
     /**
@@ -653,7 +665,23 @@ public final class QuestEngine {
             return false;
         }
         if (instance.status() == QuestStatus.AWAITING_REWARD_PICKUP) {
-            openRewardMenu(player, instance);
+            // Real, player-driven fulfillment of any still-incomplete optional bonus-proof milestone
+            // -- see tryDeliverProofWhilePending's own doc (2026-10-19 correction). Runs only here,
+            // from the player's own "talk to the quest giver" action, never automatically. Re-fetches
+            // between milestones (rather than looping over one stale snapshot) so a second qualifying
+            // milestone sees the first one's already-updated progress/pending-reward state.
+            QuestInstance current = instance;
+            for (QuestMilestone milestone : QuestRegistry.get(instance.definitionId())
+                    .map(QuestDefinition::milestones).orElse(List.of())) {
+                if (tryDeliverProofWhilePending(player, current, milestone)) {
+                    QuestInstance refetched = player.getData(ModAttachments.QUEST_DATA).quests().get(instanceId);
+                    if (refetched == null) {
+                        return false;
+                    }
+                    current = refetched;
+                }
+            }
+            openRewardMenu(player, current);
             return true;
         }
         if (instance.status() != QuestStatus.IN_PROGRESS) {
