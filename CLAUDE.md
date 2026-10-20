@@ -343,7 +343,18 @@ earlier work (Builds 72/78/141 respectively, confirmed via git history + Release
 the Cornfield"/an optional bonus-proof milestone rendering as failed) was a real, still-open bug --
 see [context/decisions.md](context/decisions.md)'s own entry for the fix (`QuestEngine
 #applyBonusDeliveries`). `./gradlew build` green, whole-suite (12 mods) rebuild + `runServer`
-boot-smoke-test clean. **Not yet deployed** -- this report's own triage (file move + reward) is held
-until it ships.
+boot-smoke-test clean.
+
+**Shipped in Build 153, 2026-10-19** -- the fix above only ever addressed the kill-count-side sweep;
+two more reports against the identical symptom came in afterward ("Wolves at the Fence Line" x2,
+"Cave Spiders Underfoot"), still live since the first fix had never actually been deployed. Real root
+cause found this round: `ActiveQuestOverlay`'s own "failed" rendering keyed off `status != IN_PROGRESS`
+-- true the instant the quest reaches `AWAITING_REWARD_PICKUP`, well before an actual turn-in, which
+is the literal thing every one of these reports objected to. Fixed to key off a genuinely terminal
+status (`COMPLETED`/`FAILED`) instead. The second "Wolves" report ("the NPC despawned and now there's
+no abandon button") surfaced a real, separate gap: `QuestEngine#abandonQuest` and the Quest Log's own
+"Abandon Quest" button were both `IN_PROGRESS`-only, so a quest stuck awaiting reward pickup with an
+unreachable issuer had no way out at all -- widened both to also cover `AWAITING_REWARD_PICKUP`. All
+four reports moved to `bugreports/fixed/`, reporter paid 500 Gold each via Coryspondance mail.
 
 See [context/classes/](context/classes/) for per-class reference.
