@@ -224,9 +224,11 @@ public final class QuestLogTab implements NuclyusMenu {
         if (instance.status() == QuestStatus.IN_PROGRESS || instance.status() == QuestStatus.AWAITING_REWARD_PICKUP) {
             boolean isActiveQuest = selectedId.equals(effectiveActiveQuestId(data));
             specs.add(new Spec(isActiveQuest ? "Active Quest" : "Set as Active Quest", 150, this::setActive));
-            if (instance.status() == QuestStatus.IN_PROGRESS) {
-                specs.add(new Spec("Abandon Quest", 150, this::confirmAbandon));
-            }
+            // Widened 2026-10-19 (real report: a despawned issuing NPC left an AWAITING_REWARD_PICKUP
+            // quest with no way to ever collect its reward AND no way to abandon it either, since this
+            // was IN_PROGRESS-only) -- see QuestEngine#abandonQuest's own doc for the matching
+            // server-side widening this button now relies on.
+            specs.add(new Spec("Abandon Quest", 150, this::confirmAbandon));
         }
         specs.add(new Spec("Report Bug", 100, () -> Minecraft.getInstance().setScreen(new BugReportScreen(host, instanceId, questName))));
 
@@ -248,7 +250,7 @@ public final class QuestLogTab implements NuclyusMenu {
         if (!specs.isEmpty() && (instance.status() == QuestStatus.IN_PROGRESS || instance.status() == QuestStatus.AWAITING_REWARD_PICKUP)) {
             actionButton = built.get(0);
             actionButton.active = !selectedId.equals(effectiveActiveQuestId(data));
-            if (instance.status() == QuestStatus.IN_PROGRESS && specs.size() > 1 && specs.get(1).label().equals("Abandon Quest")) {
+            if (specs.size() > 1 && specs.get(1).label().equals("Abandon Quest")) {
                 abandonButton = built.get(1);
             }
         }
@@ -274,6 +276,11 @@ public final class QuestLogTab implements NuclyusMenu {
         QuestInstance instance = data.quests().get(instanceId);
         String questName = instance == null ? "this quest"
                 : QuestRegistry.get(instance.definitionId()).map(QuestDefinition::name).orElse("this quest");
+        // Reward-forfeit wording added 2026-10-19 alongside widening this button to
+        // AWAITING_REWARD_PICKUP (see QuestEngine#abandonQuest's own doc) -- a player in that state
+        // has an already-earned reward sitting uncollected, which this action forfeits outright.
+        String rewardWarning = instance != null && instance.status() == QuestStatus.AWAITING_REWARD_PICKUP
+                ? " You'll also forfeit the reward you already earned." : "";
         Minecraft.getInstance().setScreen(new ConfirmScreen(
                 confirmed -> {
                     Minecraft.getInstance().setScreen(host);
@@ -282,7 +289,7 @@ public final class QuestLogTab implements NuclyusMenu {
                     }
                 },
                 Component.literal("Abandon Quest"),
-                Component.literal("Permanently give up on \"" + questName + "\"? This can't be undone, but you'll be free to accept it (or anything else) again.")));
+                Component.literal("Permanently give up on \"" + questName + "\"? This can't be undone, but you'll be free to accept it (or anything else) again." + rewardWarning)));
     }
 
     private void abandon(UUID instanceId) {

@@ -884,11 +884,20 @@ public final class QuestEngine {
      * deliberate exception to that record's own "never removed" instance-retention rule -- not a
      * third status alongside FAILED/COMPLETED. {@code failQuest} (deadline expiry) is untouched and
      * still uses FAILED/Retry; this is a different, player-chosen "pretend this never happened" path.
+     *
+     * <p><b>Widened to also cover {@link QuestStatus#AWAITING_REWARD_PICKUP}, 2026-10-19</b> -- real
+     * report: a quest's issuing NPC despawned while the instance was already awaiting reward pickup,
+     * leaving the player with no way to ever collect it (needs the NPC) AND no "Abandon Quest" button
+     * (was IN_PROGRESS-only) -- permanently stuck either way. This is exactly the "bugged quest" case
+     * the 2026-10-11 correction above was meant to give players an escape hatch from. Forfeits
+     * whatever's sitting in {@code pendingRewardItems}, same as abandoning mid-progress forfeits
+     * whatever work was already done -- an accepted tradeoff for a deliberate give-up.
      */
     public static void abandonQuest(ServerPlayer player, UUID instanceId) {
         PlayerQuestData data = player.getData(ModAttachments.QUEST_DATA);
         QuestInstance instance = data.quests().get(instanceId);
-        if (instance == null || instance.status() != QuestStatus.IN_PROGRESS) {
+        if (instance == null
+                || (instance.status() != QuestStatus.IN_PROGRESS && instance.status() != QuestStatus.AWAITING_REWARD_PICKUP)) {
             return;
         }
         // Fired BEFORE the delete below -- a hook (e.g. the escort caravan cleanup registered by

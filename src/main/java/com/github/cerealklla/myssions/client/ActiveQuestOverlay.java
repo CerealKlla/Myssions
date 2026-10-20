@@ -124,10 +124,17 @@ public final class ActiveQuestOverlay implements GuiLayer {
         int y = top + PADDING;
         graphics.text(font, definition.name(), left + PADDING, y, TITLE_COLOR);
         y += font.lineHeight;
-        boolean questDone = instance.status() != QuestStatus.IN_PROGRESS;
+        // Real report, 2026-10-19 (three separate quests, same root cause): an optional milestone
+        // rendered red/failed the instant the required kill-count milestone finished and the instance
+        // moved to AWAITING_REWARD_PICKUP -- even though the player hasn't actually turned the quest
+        // in yet ("should only be invalidated when the quest is actually turned in"). AWAITING_REWARD_
+        // PICKUP is still a pending state (see QuestStatus's own doc -- reward not yet collected); only
+        // a genuinely terminal status (COMPLETED, or FAILED from a timeout/abandon) means no further
+        // chance was ever possible, so only those should render an incomplete optional as failed.
+        boolean questClosed = instance.status() == QuestStatus.COMPLETED || instance.status() == QuestStatus.FAILED;
         for (QuestMilestone milestone : definition.milestones()) {
             boolean complete = instance.isMilestoneComplete(milestone);
-            boolean failed = !complete && questDone && milestone.optional();
+            boolean failed = !complete && questClosed && milestone.optional();
             String line = milestoneLine(milestone, instance);
             int color = TEXT_COLOR;
             if (complete) {
