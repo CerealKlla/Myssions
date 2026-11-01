@@ -90,18 +90,19 @@ public final class QuestKillListener {
             return;
         }
         Identifier deadType = BuiltInRegistries.ENTITY_TYPE.getKey(deadMob.getType());
+        boolean deadIsHostile = deadMob instanceof net.minecraft.world.entity.monster.Enemy;
         BlockPos deadPos = deadMob.blockPosition();
         String deadDimensionId = level.dimension().identifier().toString();
         Long deadTaggedPlaceId = deadMob.getPersistentData().getLong(MobRegionTagListener.TAG_KEY).orElse(null);
         for (UUID playerId : creditedIds) {
             ServerPlayer player = level.getServer().getPlayerList().getPlayer(playerId);
             if (player != null) {
-                creditKillToPlayer(player, deadType, deadPos, deadDimensionId, deadTaggedPlaceId);
+                creditKillToPlayer(player, deadType, deadIsHostile, deadPos, deadDimensionId, deadTaggedPlaceId);
             }
         }
     }
 
-    private void creditKillToPlayer(ServerPlayer player, Identifier deadType, BlockPos deadPos, String deadDimensionId, Long deadTaggedPlaceId) {
+    private void creditKillToPlayer(ServerPlayer player, Identifier deadType, boolean deadIsHostile, BlockPos deadPos, String deadDimensionId, Long deadTaggedPlaceId) {
         var data = player.getData(ModAttachments.QUEST_DATA);
         for (QuestInstance instance : data.quests().values()) {
             if (instance.status() != QuestStatus.IN_PROGRESS) {
@@ -121,7 +122,13 @@ public final class QuestKillListener {
             }
             QuestRegistry.get(instance.definitionId()).ifPresent(definition -> {
                 for (QuestMilestone milestone : definition.milestones()) {
-                    if (milestone.killTargetEntityType().isEmpty() || !milestone.killTargetEntityType().get().equals(deadType)) {
+                    if (milestone.killTargetEntityType().isEmpty()) {
+                        continue;
+                    }
+                    Identifier wanted = milestone.killTargetEntityType().get();
+                    boolean matches = wanted.equals(deadType)
+                            || (wanted.equals(QuestMilestone.ANY_HOSTILE_ENTITY_TYPE) && deadIsHostile);
+                    if (!matches) {
                         continue;
                     }
                     if (milestone.nightOnly() && !player.level().isDarkOutside()) {

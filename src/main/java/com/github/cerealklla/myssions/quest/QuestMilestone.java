@@ -146,6 +146,24 @@ public record QuestMilestone(String id, String description, boolean optional, in
         return new QuestMilestone(id, description, false, count, Optional.of(entityType), Optional.of(proofId), false, false, false, 0, false, false, false, false, Optional.empty());
     }
 
+    /**
+     * A sentinel {@code killTargetEntityType} meaning "any {@code net.minecraft.world.entity.monster.Enemy}",
+     * not one specific registered entity type -- never a real registry key, so {@code
+     * QuestKillListener} special-cases it rather than doing an {@code Identifier} equality check.
+     */
+    public static final Identifier ANY_HOSTILE_ENTITY_TYPE = Identifier.fromNamespaceAndPath("myssions", "any_hostile");
+
+    /**
+     * A kill milestone that counts any hostile mob (any {@code Enemy}), not one specific entity type
+     * -- added 2026-10-31 for Settlemynts' Tavern hiring Trial ("defeat N hostile mobs"), the first
+     * quest content that genuinely doesn't care which kind of hostile dies. Grants no proof item at
+     * all (no deliver/turn-in step is needed -- completing this milestone alone finishes the quest,
+     * same as any other quest whose milestone list has nothing left incomplete once this one is).
+     */
+    public static QuestMilestone killAnyHostile(String id, String description, int count) {
+        return new QuestMilestone(id, description, false, count, Optional.of(ANY_HOSTILE_ENTITY_TYPE), Optional.empty(), false, false, false, 0, false, false, false, false, Optional.empty());
+    }
+
     /** Like {@link #kill(String, String, Identifier, int, String)}, but only counts a kill at night -- see this class's own doc. */
     public static QuestMilestone kill(String id, String description, Identifier entityType, int count, String proofId, boolean nightOnly) {
         return new QuestMilestone(id, description, false, count, Optional.of(entityType), Optional.of(proofId), false, false, false, 0, nightOnly, false, false, false, Optional.empty());
