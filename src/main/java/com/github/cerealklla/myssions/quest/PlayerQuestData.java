@@ -1,13 +1,16 @@
 package com.github.cerealklla.myssions.quest;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 
 import net.minecraft.core.UUIDUtil;
+import net.minecraft.resources.Identifier;
 
 /**
  * One player's full quest state -- a single NeoForge attachment (see {@code
@@ -25,20 +28,21 @@ import net.minecraft.core.UUIDUtil;
  * per-issuer total the user's own spec asks for, for a future karma/reputation system to build on.
  */
 public record PlayerQuestData(Map<UUID, QuestInstance> quests, Optional<UUID> activeQuestId,
-                               Map<String, Integer> completedCountByIssuer) {
+                               Map<String, Integer> completedCountByIssuer, Set<Identifier> availableQuestIds) {
 
-    public static final PlayerQuestData EMPTY = new PlayerQuestData(Map.of(), Optional.empty(), Map.of());
+    public static final PlayerQuestData EMPTY = new PlayerQuestData(Map.of(), Optional.empty(), Map.of(), Set.of());
 
     public static final Codec<PlayerQuestData> CODEC = RecordCodecBuilder.create(instance -> instance.group(
             Codec.unboundedMap(UUIDUtil.STRING_CODEC, QuestInstance.CODEC).optionalFieldOf("quests", Map.of()).forGetter(PlayerQuestData::quests),
             UUIDUtil.CODEC.optionalFieldOf("active_quest_id").forGetter(PlayerQuestData::activeQuestId),
-            Codec.unboundedMap(Codec.STRING, Codec.INT).optionalFieldOf("completed_count_by_issuer", Map.of()).forGetter(PlayerQuestData::completedCountByIssuer)
+            Codec.unboundedMap(Codec.STRING, Codec.INT).optionalFieldOf("completed_count_by_issuer", Map.of()).forGetter(PlayerQuestData::completedCountByIssuer),
+            Identifier.CODEC.listOf().xmap(Set::copyOf, List::copyOf).optionalFieldOf("available_quest_ids", Set.of()).forGetter(PlayerQuestData::availableQuestIds)
     ).apply(instance, PlayerQuestData::new));
 
     public PlayerQuestData withQuest(QuestInstance instance) {
         Map<UUID, QuestInstance> updated = new java.util.HashMap<>(quests);
         updated.put(instance.instanceId(), instance);
-        return new PlayerQuestData(Map.copyOf(updated), activeQuestId, completedCountByIssuer);
+        return new PlayerQuestData(Map.copyOf(updated), activeQuestId, completedCountByIssuer, availableQuestIds);
     }
 
     /** Fully deletes an instance -- see class doc's note on why this is the one exception to "never removed." Also clears {@code activeQuestId} if it pointed at this instance. */
@@ -46,16 +50,33 @@ public record PlayerQuestData(Map<UUID, QuestInstance> quests, Optional<UUID> ac
         Map<UUID, QuestInstance> updated = new java.util.HashMap<>(quests);
         updated.remove(instanceId);
         Optional<UUID> newActive = activeQuestId.map(id -> id.equals(instanceId) ? null : id);
-        return new PlayerQuestData(Map.copyOf(updated), newActive, completedCountByIssuer);
+        return new PlayerQuestData(Map.copyOf(updated), newActive, completedCountByIssuer, availableQuestIds);
     }
 
     public PlayerQuestData withActiveQuest(UUID instanceId) {
-        return new PlayerQuestData(quests, Optional.ofNullable(instanceId), completedCountByIssuer);
+        return new PlayerQuestData(quests, Optional.ofNullable(instanceId), completedCountByIssuer, availableQuestIds);
     }
 
     public PlayerQuestData withIssuerCompletionIncremented(String issuerId) {
         Map<String, Integer> updated = new java.util.HashMap<>(completedCountByIssuer);
         updated.merge(issuerId, 1, Integer::sum);
-        return new PlayerQuestData(quests, activeQuestId, Map.copyOf(updated));
+        return new PlayerQuestData(quests, activeQuestId, Map.copyOf(updated), availableQuestIds);
+    }
+
+    /** A quest definition just became acceptable (see {@code QuestDefinition#unlocksQuestId}) -- shown under "Available" in the Quest Log until the player accepts (or it's otherwise removed). */
+    public PlayerQuestData withAvailableQuestAdded(Identifier questId) {
+        Set<Identifier> updated = new java.util.HashSet<>(availableQuestIds);
+        updated.add(questId);
+        return new PlayerQuestData(quests, activeQuestId, completedCountByIssuer, Set.copyOf(updated));
+    }
+
+    /** Called the instant a definition is actually accepted (see {@code QuestEngine#assignQuest}) -- it's no longer merely "available," it's a real in-progress instance. */
+    public PlayerQuestData withAvailableQuestRemoved(Identifier questId) {
+        if (!availableQuestIds.contains(questId)) {
+            return this;
+        }
+        Set<Identifier> updated = new java.util.HashSet<>(availableQuestIds);
+        updated.remove(questId);
+        return new PlayerQuestData(quests, activeQuestId, completedCountByIssuer, Set.copyOf(updated));
     }
 }

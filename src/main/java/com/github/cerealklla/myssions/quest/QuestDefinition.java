@@ -1,6 +1,7 @@
 package com.github.cerealklla.myssions.quest;
 
 import java.util.List;
+import java.util.Optional;
 
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
@@ -43,7 +44,8 @@ import net.minecraft.resources.Identifier;
  */
 public record QuestDefinition(Identifier id, String name, String description, String issuerId,
                                List<QuestMilestone> milestones, List<QuestReward> rewards, QuestTimeLimit timeLimit,
-                               List<QuestReward> acceptanceGrants, boolean isSpecialAssignment) {
+                               List<QuestReward> acceptanceGrants, boolean isSpecialAssignment,
+                               Optional<Identifier> unlocksQuestId) {
 
     public static final Codec<QuestDefinition> CODEC = RecordCodecBuilder.create(instance -> instance.group(
             Identifier.CODEC.fieldOf("id").forGetter(QuestDefinition::id),
@@ -54,7 +56,8 @@ public record QuestDefinition(Identifier id, String name, String description, St
             QuestReward.CODEC.listOf().fieldOf("rewards").forGetter(QuestDefinition::rewards),
             QuestTimeLimit.CODEC.optionalFieldOf("time_limit", QuestTimeLimit.NONE).forGetter(QuestDefinition::timeLimit),
             QuestReward.CODEC.listOf().optionalFieldOf("acceptance_grants", List.of()).forGetter(QuestDefinition::acceptanceGrants),
-            Codec.BOOL.optionalFieldOf("is_special_assignment", false).forGetter(QuestDefinition::isSpecialAssignment)
+            Codec.BOOL.optionalFieldOf("is_special_assignment", false).forGetter(QuestDefinition::isSpecialAssignment),
+            Identifier.CODEC.optionalFieldOf("unlocks_quest_id").forGetter(QuestDefinition::unlocksQuestId)
     ).apply(instance, QuestDefinition::new));
 
     /**
@@ -65,6 +68,32 @@ public record QuestDefinition(Identifier id, String name, String description, St
      */
     public QuestDefinition(Identifier id, String name, String description, String issuerId,
                            List<QuestMilestone> milestones, List<QuestReward> rewards, QuestTimeLimit timeLimit) {
-        this(id, name, description, issuerId, milestones, rewards, timeLimit, List.of(), false);
+        this(id, name, description, issuerId, milestones, rewards, timeLimit, List.of(), false, Optional.empty());
+    }
+
+    /**
+     * 9-arg shape (pre-{@link #unlocksQuestId}, added 2026-11-06 for Myssions' new QuestChain
+     * mechanic -- see that field's own doc on {@code PlayerQuestData#availableQuestIds}) -- kept so
+     * every existing call site passing {@code acceptanceGrants}/{@code isSpecialAssignment}
+     * explicitly doesn't need touching. {@code unlocksQuestId} defaults to none (an ordinary quest
+     * with no follow-up).
+     */
+    public QuestDefinition(Identifier id, String name, String description, String issuerId,
+                           List<QuestMilestone> milestones, List<QuestReward> rewards, QuestTimeLimit timeLimit,
+                           List<QuestReward> acceptanceGrants, boolean isSpecialAssignment) {
+        this(id, name, description, issuerId, milestones, rewards, timeLimit, acceptanceGrants, isSpecialAssignment, Optional.empty());
+    }
+
+    /**
+     * Completing this quest makes {@code nextQuestId} show up under "Available" in the player's
+     * Quest Log (see {@code PlayerQuestData#availableQuestIds}) -- a player explicitly accepts it
+     * from there, same as any other quest, rather than it being auto-assigned. The simplest possible
+     * "QuestChain" -- a quest naming the one quest after it -- rather than a separate chain-grouping
+     * concept, since a linked list of definitions is already everything "completing A unlocks B"
+     * needs.
+     */
+    public QuestDefinition withUnlocksQuestId(Identifier nextQuestId) {
+        return new QuestDefinition(id, name, description, issuerId, milestones, rewards, timeLimit,
+                acceptanceGrants, isSpecialAssignment, Optional.of(nextQuestId));
     }
 }

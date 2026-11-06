@@ -120,6 +120,14 @@ public class MyssionsMod {
                     }
                 });
 
+        registrar.playToServer(com.github.cerealklla.myssions.net.AcceptAvailableQuestPayload.TYPE,
+                com.github.cerealklla.myssions.net.AcceptAvailableQuestPayload.STREAM_CODEC,
+                (payload, context) -> {
+                    if (context.player() instanceof ServerPlayer player) {
+                        Myssions.assignQuest(player, payload.questId());
+                    }
+                });
+
         registrar.playToServer(com.github.cerealklla.myssions.net.SubmitBugReportPayload.TYPE,
                 com.github.cerealklla.myssions.net.SubmitBugReportPayload.STREAM_CODEC,
                 (payload, context) -> {

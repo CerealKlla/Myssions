@@ -99,7 +99,8 @@ public final class QuestEngine {
             }
         }
         QuestInstance instance = QuestInstance.freshlyAssigned(definitionId, player.level().getGameTime());
-        player.setData(ModAttachments.QUEST_DATA, data.withQuest(instance));
+        data = data.withQuest(instance).withAvailableQuestRemoved(definitionId);
+        player.setData(ModAttachments.QUEST_DATA, data);
         player.sendSystemMessage(Component.literal("New quest: " + definition.get().name()));
         grantAcceptanceItems(player, definition.get());
         QuestAssignmentHooks.fire(player, instance.instanceId(), definitionId, plotId.orElse(null));
@@ -214,12 +215,22 @@ public final class QuestEngine {
         }
     }
 
+    /**
+     * A milestone whose id is literally {@code "set_active"} (a plain convention, not a new {@link
+     * QuestMilestone} kind field -- that record is already close to Mojang's 16-field codec-arity
+     * limit) auto-completes the instant this method runs -- added 2026-11-06 for Arryval's tutorial
+     * quest ("teach the player how to set a quest as active"), but generic: any quest can opt into
+     * this the same way just by naming one of its milestones that. {@link #reportMilestoneProgress}
+     * already no-ops safely for a milestone id that doesn't exist on the definition, so this is safe
+     * to call unconditionally on every activation.
+     */
     public static void setActiveQuest(ServerPlayer player, UUID instanceId) {
         PlayerQuestData data = player.getData(ModAttachments.QUEST_DATA);
         if (!data.quests().containsKey(instanceId)) {
             return;
         }
         player.setData(ModAttachments.QUEST_DATA, data.withActiveQuest(instanceId));
+        reportMilestoneProgress(player, instanceId, "set_active", Integer.MAX_VALUE / 2);
     }
 
     public static Optional<QuestInstance> getInstance(ServerPlayer player, UUID instanceId) {
@@ -368,6 +379,13 @@ public final class QuestEngine {
     private static void finalizeInstance(ServerPlayer player, PlayerQuestData data, QuestDefinition definition, QuestInstance instance) {
         QuestInstance completed = instance.withStatus(QuestStatus.COMPLETED);
         PlayerQuestData updatedData = data.withQuest(completed).withIssuerCompletionIncremented(definition.issuerId());
+        // QuestChain (2026-11-06, explicit user spec: "completing a quest allows a player to accept
+        // the next quest in the chain, listed as Available") -- the simplest possible chain: a
+        // definition just names the one quest after it, added to availableQuestIds here rather than
+        // auto-assigned, so the player explicitly accepts it from the Quest Log like any other quest.
+        if (definition.unlocksQuestId().isPresent()) {
+            updatedData = updatedData.withAvailableQuestAdded(definition.unlocksQuestId().get());
+        }
         // Real report, 2026-10-11: a completed quest stayed the Active Quest HUD/waypoint target
         // forever, since nothing ever cleared activeQuestId on completion -- only PlayerQuestData's
         // own doc ("which instance (if any) shows on the Active Quest HUD") implies it should only

@@ -7,6 +7,7 @@ import java.util.UUID;
 
 import com.github.cerealklla.myssions.client.BugReportScreen;
 import com.github.cerealklla.myssions.net.AbandonQuestPayload;
+import com.github.cerealklla.myssions.net.AcceptAvailableQuestPayload;
 import com.github.cerealklla.myssions.net.SetActiveQuestPayload;
 import com.github.cerealklla.myssions.quest.QuestDefinition;
 import com.github.cerealklla.myssions.quest.QuestInstance;
@@ -30,6 +31,7 @@ import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.client.renderer.Rect2i;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.protocol.common.ServerboundCustomPayloadPacket;
+import net.minecraft.resources.Identifier;
 
 /**
  * "Quests" tab -- direct port of the former standalone {@code client.QuestLogScreen} into the
@@ -63,12 +65,27 @@ public final class QuestLogTab implements NuclyusMenu {
     private static final int ACTIVE_TEXT_COLOR = 0xFFFFD700;
     private static final int HEADER_COLOR = 0xFFFFFFFF;
 
-    private record ListRow(UUID instanceId, String label, int color, boolean isHeader) {
+    private static final int AVAILABLE_TEXT_COLOR = 0xFF55DD55;
+
+    /** {@code availableQuestId} is set (and {@code instanceId} null) only for a not-yet-accepted "-- Available --" row -- see {@code PlayerQuestData#availableQuestIds}. */
+    private record ListRow(UUID instanceId, Identifier availableQuestId, String label, int color, boolean isHeader) {
+        static ListRow header(String label) {
+            return new ListRow(null, null, label, HEADER_COLOR, true);
+        }
+
+        static ListRow instance(UUID instanceId, String label, int color) {
+            return new ListRow(instanceId, null, label, color, false);
+        }
+
+        static ListRow available(Identifier questId, String label) {
+            return new ListRow(null, questId, label, AVAILABLE_TEXT_COLOR, false);
+        }
     }
 
     private Screen host;
     private List<ListRow> listRows = List.of();
     private UUID selectedId;
+    private Identifier selectedAvailableQuestId;
     private int listScroll;
     private int detailsScroll;
     private Button actionButton;
@@ -79,6 +96,7 @@ public final class QuestLogTab implements NuclyusMenu {
     // the still-stale synced attachment.
     private UUID optimisticActiveQuestId;
     private final java.util.Set<UUID> optimisticallyAbandoned = new java.util.HashSet<>();
+    private final java.util.Set<Identifier> optimisticallyAccepted = new java.util.HashSet<>();
 
     @Override
     public Component title() {
@@ -104,8 +122,11 @@ public final class QuestLogTab implements NuclyusMenu {
     @Override
     public void onShown() {
         rebuildListRows();
-        if (selectedId == null && !listRows.isEmpty()) {
-            listRows.stream().filter(r -> !r.isHeader()).findFirst().ifPresent(r -> selectedId = r.instanceId());
+        if (selectedId == null && selectedAvailableQuestId == null && !listRows.isEmpty()) {
+            listRows.stream().filter(r -> !r.isHeader()).findFirst().ifPresent(r -> {
+                selectedId = r.instanceId();
+                selectedAvailableQuestId = r.availableQuestId();
+            });
         }
         rebuildActionButton();
     }
@@ -148,37 +169,50 @@ public final class QuestLogTab implements NuclyusMenu {
                 }
             }
         }
+        // QuestChain (2026-11-06) -- shown first, above everything else, so a freshly-unlocked
+        // follow-up quest is impossible to miss. optimisticallyAccepted mirrors the existing
+        // optimisticActiveQuestId/optimisticallyAbandoned pattern just below -- hides a row the
+        // instant its own Accept click is sent, without waiting for the still-stale synced
+        // attachment to catch up.
+        List<Identifier> availableNow = data.availableQuestIds().stream()
+                .filter(id -> !optimisticallyAccepted.contains(id)).toList();
+        if (!availableNow.isEmpty()) {
+            rows.add(ListRow.header("-- Available --"));
+            for (Identifier questId : availableNow) {
+                QuestRegistry.get(questId).ifPresent(def -> rows.add(ListRow.available(questId, def.name())));
+            }
+        }
         for (QuestInstance instance : active) {
             QuestRegistry.get(instance.definitionId()).ifPresent(def -> {
                 boolean isActiveQuest = instance.instanceId().equals(activeId);
                 String prefix = instance.status() == QuestStatus.AWAITING_REWARD_PICKUP ? "[Ready] " : (isActiveQuest ? "* " : "");
                 int color = isActiveQuest ? ACTIVE_TEXT_COLOR : TEXT_COLOR;
-                rows.add(new ListRow(instance.instanceId(), prefix + def.name(), color, false));
+                rows.add(ListRow.instance(instance.instanceId(), prefix + def.name(), color));
             });
         }
         if (!specialAssignments.isEmpty()) {
-            rows.add(new ListRow(null, "-- Mayor's Special Assignments --", HEADER_COLOR, true));
+            rows.add(ListRow.header("-- Mayor's Special Assignments --"));
             for (QuestInstance instance : specialAssignments) {
                 QuestRegistry.get(instance.definitionId()).ifPresent(def -> {
                     boolean isActiveQuest = instance.instanceId().equals(activeId);
                     String prefix = instance.status() == QuestStatus.AWAITING_REWARD_PICKUP ? "[Ready] " : (isActiveQuest ? "* " : "");
                     int color = isActiveQuest ? ACTIVE_TEXT_COLOR : TEXT_COLOR;
-                    rows.add(new ListRow(instance.instanceId(), prefix + def.name(), color, false));
+                    rows.add(ListRow.instance(instance.instanceId(), prefix + def.name(), color));
                 });
             }
         }
         if (!completed.isEmpty()) {
-            rows.add(new ListRow(null, "-- Completed Quests --", HEADER_COLOR, true));
+            rows.add(ListRow.header("-- Completed Quests --"));
             for (QuestInstance instance : completed) {
                 QuestRegistry.get(instance.definitionId())
-                        .ifPresent(def -> rows.add(new ListRow(instance.instanceId(), "[Done] " + def.name(), DIM_TEXT_COLOR, false)));
+                        .ifPresent(def -> rows.add(ListRow.instance(instance.instanceId(), "[Done] " + def.name(), DIM_TEXT_COLOR)));
             }
         }
         if (!failed.isEmpty()) {
-            rows.add(new ListRow(null, "-- Failed Quests --", HEADER_COLOR, true));
+            rows.add(ListRow.header("-- Failed Quests --"));
             for (QuestInstance instance : failed) {
                 QuestRegistry.get(instance.definitionId())
-                        .ifPresent(def -> rows.add(new ListRow(instance.instanceId(), def.name(), FAILED_TEXT_COLOR, false)));
+                        .ifPresent(def -> rows.add(ListRow.instance(instance.instanceId(), def.name(), FAILED_TEXT_COLOR)));
             }
         }
         listRows = rows;
@@ -204,7 +238,18 @@ public final class QuestLogTab implements NuclyusMenu {
 
     private void rebuildActionButton() {
         removeButtons();
-        if (selectedId == null || !(host instanceof WidgetHost widgetHost)) {
+        if (!(host instanceof WidgetHost widgetHost)) {
+            return;
+        }
+        if (selectedAvailableQuestId != null) {
+            Rect2i area = area();
+            int detailsLeft = area.getX() + area.getWidth() * LIST_WIDTH_FRACTION_NUM / FRACTION_DEN + MARGIN * 2;
+            int buttonY = area.getY() + MARGIN;
+            actionButton = widgetHost.addMenuWidget(Button.builder(Component.literal("Accept Quest"), b -> acceptAvailable())
+                    .bounds(detailsLeft, buttonY, 150, 20).build());
+            return;
+        }
+        if (selectedId == null) {
             return;
         }
         var data = Minecraft.getInstance().player.getData(ModAttachments.QUEST_DATA);
@@ -257,6 +302,25 @@ public final class QuestLogTab implements NuclyusMenu {
         reportBugButton = built.get(built.size() - 1);
     }
 
+    private void acceptAvailable() {
+        if (selectedAvailableQuestId == null) {
+            return;
+        }
+        Identifier questId = selectedAvailableQuestId;
+        Minecraft.getInstance().getConnection().send(new ServerboundCustomPayloadPacket(new AcceptAvailableQuestPayload(questId)));
+        optimisticallyAccepted.add(questId);
+        selectedAvailableQuestId = null;
+        selectedId = null;
+        rebuildListRows();
+        if (!listRows.isEmpty()) {
+            listRows.stream().filter(r -> !r.isHeader()).findFirst().ifPresent(r -> {
+                selectedId = r.instanceId();
+                selectedAvailableQuestId = r.availableQuestId();
+            });
+        }
+        rebuildActionButton();
+    }
+
     private void setActive() {
         if (selectedId == null) {
             return;
@@ -299,8 +363,11 @@ public final class QuestLogTab implements NuclyusMenu {
             selectedId = null;
         }
         rebuildListRows();
-        if (selectedId == null && !listRows.isEmpty()) {
-            listRows.stream().filter(r -> !r.isHeader()).findFirst().ifPresent(r -> selectedId = r.instanceId());
+        if (selectedId == null && selectedAvailableQuestId == null && !listRows.isEmpty()) {
+            listRows.stream().filter(r -> !r.isHeader()).findFirst().ifPresent(r -> {
+                selectedId = r.instanceId();
+                selectedAvailableQuestId = r.availableQuestId();
+            });
         }
         rebuildActionButton();
     }
@@ -319,6 +386,7 @@ public final class QuestLogTab implements NuclyusMenu {
                 ListRow row = listRows.get(clickedIndex);
                 if (!row.isHeader()) {
                     selectedId = row.instanceId();
+                    selectedAvailableQuestId = row.availableQuestId();
                     detailsScroll = 0;
                     rebuildActionButton();
                 }
@@ -358,7 +426,8 @@ public final class QuestLogTab implements NuclyusMenu {
         int y = top - listScroll;
         for (ListRow row : listRows) {
             if (y + ROW_HEIGHT >= top && y <= bottom) {
-                boolean selected = !row.isHeader() && row.instanceId().equals(selectedId);
+                boolean selected = !row.isHeader() && (row.instanceId() != null ? row.instanceId().equals(selectedId)
+                        : row.availableQuestId() != null && row.availableQuestId().equals(selectedAvailableQuestId));
                 if (selected) {
                     graphics.fill(listLeft, y, listRight, y + ROW_HEIGHT, 0x60FFFFFF);
                 }
@@ -368,9 +437,46 @@ public final class QuestLogTab implements NuclyusMenu {
         }
         graphics.disableScissor();
 
-        if (selectedId != null) {
+        if (selectedAvailableQuestId != null) {
+            renderAvailableDetails(graphics, font, detailsLeft, detailsRight, top, bottom);
+        } else if (selectedId != null) {
             renderDetails(graphics, font, detailsLeft, detailsRight, top, bottom);
         }
+    }
+
+    /** Same layout as {@link #renderDetails}, but for a not-yet-accepted "-- Available --" row -- no {@link QuestInstance} exists yet, so milestones/rewards render from the bare {@link QuestDefinition} with no progress/strikethrough. */
+    private void renderAvailableDetails(GuiGraphicsExtractor graphics, Font font, int left, int right, int topBound, int bottom) {
+        Optional<QuestDefinition> definitionOpt = QuestRegistry.get(selectedAvailableQuestId);
+        if (definitionOpt.isEmpty()) {
+            return;
+        }
+        QuestDefinition definition = definitionOpt.get();
+        int top = topBound + 26;
+
+        graphics.enableScissor(left, top, right, bottom);
+        int y = top - detailsScroll;
+        int lineHeight = font.lineHeight + 2;
+        int wrapWidth = right - left - 6;
+
+        y = drawWrapped(graphics, font, definition.name(), left, y, wrapWidth, HEADER_COLOR, lineHeight);
+        y += 2;
+        y = drawWrapped(graphics, font, definition.description(), left, y, wrapWidth, TEXT_COLOR, lineHeight);
+        y += 4;
+
+        y = drawWrapped(graphics, font, "Milestones:", left, y, wrapWidth, HEADER_COLOR, lineHeight);
+        for (QuestMilestone milestone : definition.milestones()) {
+            String text = "- " + milestone.description() + (milestone.optional() ? " (optional)" : "");
+            y = drawWrapped(graphics, font, text, left, y, wrapWidth, TEXT_COLOR, lineHeight);
+        }
+        y += 4;
+
+        y = drawWrapped(graphics, font, "Rewards:", left, y, wrapWidth, HEADER_COLOR, lineHeight);
+        for (QuestReward reward : definition.rewards()) {
+            y = drawWrapped(graphics, font, "- " + reward.displayLine(), left, y, wrapWidth, TEXT_COLOR, lineHeight);
+        }
+        y += 4;
+        drawWrapped(graphics, font, "Not yet accepted -- click Accept Quest above.", left, y, wrapWidth, AVAILABLE_TEXT_COLOR, lineHeight);
+        graphics.disableScissor();
     }
 
     private void renderDetails(GuiGraphicsExtractor graphics, Font font, int left, int right, int topBound, int bottom) {
