@@ -237,6 +237,21 @@ public final class QuestEngine {
         return Optional.ofNullable(player.getData(ModAttachments.QUEST_DATA).quests().get(instanceId));
     }
 
+    /**
+     * Finds the player's own IN_PROGRESS instance of {@code definitionId}, if they have one -- for a
+     * caller that doesn't itself control/track the instance id (e.g. a QuestChain follow-up quest,
+     * which the player accepts themselves from the Quest Log's "Available" section, not something
+     * the original quest's own assigner ever sees). {@link #assignQuest} already prevents a player
+     * from holding two IN_PROGRESS instances of the same definition at once, so "the" instance is
+     * unambiguous.
+     */
+    public static Optional<UUID> findInProgressInstanceId(ServerPlayer player, Identifier definitionId) {
+        return player.getData(ModAttachments.QUEST_DATA).quests().values().stream()
+                .filter(i -> i.definitionId().equals(definitionId) && i.status() == QuestStatus.IN_PROGRESS)
+                .map(QuestInstance::instanceId)
+                .findFirst();
+    }
+
     public static int getCompletedCountForIssuer(ServerPlayer player, String issuerId) {
         return player.getData(ModAttachments.QUEST_DATA).completedCountByIssuer().getOrDefault(issuerId, 0);
     }

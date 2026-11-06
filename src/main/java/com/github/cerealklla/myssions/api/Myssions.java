@@ -113,6 +113,11 @@ public final class Myssions {
         return QuestEngine.getInstance(player, instanceId);
     }
 
+    /** See {@code QuestEngine#findInProgressInstanceId}'s own doc -- for a caller that doesn't itself control/track the instance id (e.g. a QuestChain follow-up quest the player accepted themselves). */
+    public static Optional<UUID> findInProgressInstanceId(ServerPlayer player, Identifier definitionId) {
+        return QuestEngine.findInProgressInstanceId(player, definitionId);
+    }
+
     /**
      * Adds {@code amount} progress toward one milestone of an instance the player already has
      * in-progress -- automatically completes (and applies the rewards of) the quest once every
