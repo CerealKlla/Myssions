@@ -142,6 +142,11 @@ public record QuestMilestone(String id, String description, boolean optional, in
         return new QuestMilestone(id, description, optional, 1, Optional.empty(), Optional.empty(), false, false, false, 0, false, false, false, false, Optional.empty());
     }
 
+    /** Like {@link #simple(String, String)}, but with a real {@code requiredCount} -- for a plain, manually-reported tally (e.g. "talk to N villagers") that isn't any of this class's other real trigger types. */
+    public static QuestMilestone simple(String id, String description, int requiredCount) {
+        return new QuestMilestone(id, description, false, requiredCount, Optional.empty(), Optional.empty(), false, false, false, 0, false, false, false, false, Optional.empty());
+    }
+
     public static QuestMilestone kill(String id, String description, Identifier entityType, int count, String proofId) {
         return new QuestMilestone(id, description, false, count, Optional.of(entityType), Optional.of(proofId), false, false, false, 0, false, false, false, false, Optional.empty());
     }

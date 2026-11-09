@@ -54,6 +54,7 @@ public class MyssionsMod {
         NeoForge.EVENT_BUS.register(new com.github.cerealklla.myssions.quest.QuestEscortTicker());
         NeoForge.EVENT_BUS.register(new com.github.cerealklla.myssions.quest.RoadQuestTicker());
         NeoForge.EVENT_BUS.register(new com.github.cerealklla.myssions.quest.NaturalVillageHighwayTicker());
+        NeoForge.EVENT_BUS.register(new com.github.cerealklla.myssions.quest.QuestOfferPromptTicker());
         NeoForge.EVENT_BUS.register(new QuestNpcTalkListener());
         NeoForge.EVENT_BUS.addListener((RegisterCommandsEvent event) -> DebugCommands.register(event.getDispatcher()));
 
@@ -127,6 +128,20 @@ public class MyssionsMod {
                         Myssions.assignQuest(player, payload.questId());
                     }
                 });
+
+        registrar.playToServer(com.github.cerealklla.myssions.net.DeclineAvailableQuestPayload.TYPE,
+                com.github.cerealklla.myssions.net.DeclineAvailableQuestPayload.STREAM_CODEC,
+                (payload, context) -> {
+                    if (context.player() instanceof ServerPlayer player) {
+                        Myssions.declineQuest(player, payload.questId());
+                    }
+                });
+
+        // "Press <key> to review quest offer" HUD prompt (2026-11-06) -- see
+        // quest.QuestOfferPromptTicker's own doc.
+        registrar.playToClient(com.github.cerealklla.myssions.net.QuestOfferPromptPayload.TYPE,
+                com.github.cerealklla.myssions.net.QuestOfferPromptPayload.STREAM_CODEC,
+                (payload, context) -> com.github.cerealklla.myssions.client.ClientQuestOfferPromptState.set(payload.show()));
 
         registrar.playToServer(com.github.cerealklla.myssions.net.SubmitBugReportPayload.TYPE,
                 com.github.cerealklla.myssions.net.SubmitBugReportPayload.STREAM_CODEC,

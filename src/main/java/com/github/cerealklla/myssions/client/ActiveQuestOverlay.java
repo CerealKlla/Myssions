@@ -239,8 +239,18 @@ public final class ActiveQuestOverlay implements GuiLayer {
         };
     }
 
-    /** The region-kill quest taxonomy's own "bring back proof for bonus gold" milestone -- see {@code QuestHooks#registerRegionKillQuest}. */
+    /**
+     * The region-kill quest taxonomy's own "bring back proof for bonus gold" milestone -- see {@code
+     * QuestHooks#registerRegionKillQuest}. Explicitly excludes a gather milestone ({@link
+     * QuestMilestone#isGatherMilestone()}) -- a hand-built optional gather (real item, real
+     * bonus-gold-per-unit) shares this exact same field signature (deliver + optional + bonus gold +
+     * a proofId), but its {@code proofId} names a real item, not a synthetic {@code ProofItemCatalog}
+     * entry, so resolving it through that catalog always misses and silently renders the generic
+     * fallback word "Proof" instead of the milestone's own real description. Found live 2026-11-06 via
+     * Arryval's tutorial quest showing "(Optional) Retrieve Proof" instead of its real pickaxe text.
+     */
     private static boolean isBonusProofMilestone(QuestMilestone milestone) {
-        return milestone.isDeliverMilestone() && milestone.optional() && milestone.bonusGoldPerProof() > 0 && milestone.proofId().isPresent();
+        return milestone.isDeliverMilestone() && milestone.optional() && milestone.bonusGoldPerProof() > 0
+                && milestone.proofId().isPresent() && !milestone.isGatherMilestone();
     }
 }

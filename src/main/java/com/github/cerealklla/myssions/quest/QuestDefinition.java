@@ -41,11 +41,18 @@ import net.minecraft.resources.Identifier;
  * cap (special-assignment offers live on a separate, unbounded {@code SpecialAssignmentBoard}
  * instead), and is shown under its own "Mayor's Special Assignments" heading in the Quest Log rather
  * than mixed into the ordinary active-quest list.
+ *
+ * <p>{@link #disableDecline}/{@link #disableAbandon} (added 2026-11-06, explicit user spec) -- a
+ * quest with {@code disableDecline} true hides the "Decline" button on its own Available-quest row
+ * (see {@code menu.client.QuestLogTab}); {@code disableAbandon} hides/refuses "Abandon Quest" once
+ * it's in progress (enforced in {@code QuestEngine#abandonQuest} itself, not just hidden client-side
+ * -- a modified client can't bypass this by sending the payload directly). Both default {@code false}
+ * for every quest registered before this field existed.
  */
 public record QuestDefinition(Identifier id, String name, String description, String issuerId,
                                List<QuestMilestone> milestones, List<QuestReward> rewards, QuestTimeLimit timeLimit,
                                List<QuestReward> acceptanceGrants, boolean isSpecialAssignment,
-                               Optional<Identifier> unlocksQuestId) {
+                               Optional<Identifier> unlocksQuestId, boolean disableDecline, boolean disableAbandon) {
 
     public static final Codec<QuestDefinition> CODEC = RecordCodecBuilder.create(instance -> instance.group(
             Identifier.CODEC.fieldOf("id").forGetter(QuestDefinition::id),
@@ -57,31 +64,43 @@ public record QuestDefinition(Identifier id, String name, String description, St
             QuestTimeLimit.CODEC.optionalFieldOf("time_limit", QuestTimeLimit.NONE).forGetter(QuestDefinition::timeLimit),
             QuestReward.CODEC.listOf().optionalFieldOf("acceptance_grants", List.of()).forGetter(QuestDefinition::acceptanceGrants),
             Codec.BOOL.optionalFieldOf("is_special_assignment", false).forGetter(QuestDefinition::isSpecialAssignment),
-            Identifier.CODEC.optionalFieldOf("unlocks_quest_id").forGetter(QuestDefinition::unlocksQuestId)
+            Identifier.CODEC.optionalFieldOf("unlocks_quest_id").forGetter(QuestDefinition::unlocksQuestId),
+            Codec.BOOL.optionalFieldOf("disable_decline", false).forGetter(QuestDefinition::disableDecline),
+            Codec.BOOL.optionalFieldOf("disable_abandon", false).forGetter(QuestDefinition::disableAbandon)
     ).apply(instance, QuestDefinition::new));
 
     /**
      * Legacy 7-arg shape, kept so every existing quest-definition registration across this mod's 110+
-     * quest content files doesn't need touching -- {@code acceptanceGrants} defaults to none, {@code
-     * isSpecialAssignment} to false (an ordinary board-offered/5-active-cap-counted quest, same as
-     * every quest registered before 2026-10-13). See this class's own doc for what both new fields do.
+     * quest content files doesn't need touching -- every field added since defaults to its own
+     * original "ordinary quest" behavior. See this class's own doc for what each added field does.
      */
     public QuestDefinition(Identifier id, String name, String description, String issuerId,
                            List<QuestMilestone> milestones, List<QuestReward> rewards, QuestTimeLimit timeLimit) {
-        this(id, name, description, issuerId, milestones, rewards, timeLimit, List.of(), false, Optional.empty());
+        this(id, name, description, issuerId, milestones, rewards, timeLimit, List.of(), false, Optional.empty(), false, false);
     }
 
     /**
      * 9-arg shape (pre-{@link #unlocksQuestId}, added 2026-11-06 for Myssions' new QuestChain
      * mechanic -- see that field's own doc on {@code PlayerQuestData#availableQuestIds}) -- kept so
      * every existing call site passing {@code acceptanceGrants}/{@code isSpecialAssignment}
-     * explicitly doesn't need touching. {@code unlocksQuestId} defaults to none (an ordinary quest
-     * with no follow-up).
+     * explicitly doesn't need touching. {@code unlocksQuestId}/{@code disableDecline}/{@code
+     * disableAbandon} all default to their own "ordinary quest" behavior.
      */
     public QuestDefinition(Identifier id, String name, String description, String issuerId,
                            List<QuestMilestone> milestones, List<QuestReward> rewards, QuestTimeLimit timeLimit,
                            List<QuestReward> acceptanceGrants, boolean isSpecialAssignment) {
-        this(id, name, description, issuerId, milestones, rewards, timeLimit, acceptanceGrants, isSpecialAssignment, Optional.empty());
+        this(id, name, description, issuerId, milestones, rewards, timeLimit, acceptanceGrants, isSpecialAssignment, Optional.empty(), false, false);
+    }
+
+    /**
+     * 10-arg shape (pre-{@code disableDecline}/{@code disableAbandon}, same day) -- kept so any
+     * direct caller already passing {@code unlocksQuestId} explicitly (rather than via {@link
+     * #withUnlocksQuestId}) doesn't need touching either.
+     */
+    public QuestDefinition(Identifier id, String name, String description, String issuerId,
+                           List<QuestMilestone> milestones, List<QuestReward> rewards, QuestTimeLimit timeLimit,
+                           List<QuestReward> acceptanceGrants, boolean isSpecialAssignment, Optional<Identifier> unlocksQuestId) {
+        this(id, name, description, issuerId, milestones, rewards, timeLimit, acceptanceGrants, isSpecialAssignment, unlocksQuestId, false, false);
     }
 
     /**
@@ -94,6 +113,12 @@ public record QuestDefinition(Identifier id, String name, String description, St
      */
     public QuestDefinition withUnlocksQuestId(Identifier nextQuestId) {
         return new QuestDefinition(id, name, description, issuerId, milestones, rewards, timeLimit,
-                acceptanceGrants, isSpecialAssignment, Optional.of(nextQuestId));
+                acceptanceGrants, isSpecialAssignment, Optional.of(nextQuestId), disableDecline, disableAbandon);
+    }
+
+    /** See this class's own doc for what both flags do. */
+    public QuestDefinition withOfferFlags(boolean disableDecline, boolean disableAbandon) {
+        return new QuestDefinition(id, name, description, issuerId, milestones, rewards, timeLimit,
+                acceptanceGrants, isSpecialAssignment, unlocksQuestId, disableDecline, disableAbandon);
     }
 }

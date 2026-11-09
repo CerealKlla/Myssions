@@ -57,6 +57,13 @@ public class QuestRewardMenu extends ChestMenu {
         this.instanceId = instanceId;
     }
 
+    /** The quest instance this reward GUI belongs to -- lets an external listener (e.g. a
+     *  {@code PlayerContainerEvent.Close} subscriber) tell which quest's reward pickup just finished
+     *  without this class needing to know anything about that consumer. */
+    public UUID instanceId() {
+        return instanceId;
+    }
+
     /** Opens this menu for {@code player}, pre-filled with {@code items} -- the one real entry point, called from {@code QuestEngine#tryCompleteQuest}/{@code #openRewardMenu}, never constructed directly elsewhere. */
     public static void open(ServerPlayer player, UUID instanceId, List<ItemStack> items, String title) {
         SimpleContainer container = new SimpleContainer(SLOT_COUNT);

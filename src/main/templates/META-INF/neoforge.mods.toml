@@ -73,6 +73,17 @@ Quest system: a player-facing quest log UI, Active Quest HUD, waypoint hints, an
     ordering="NONE"
     side="BOTH"
 
+# Optional soft dependency, added 2026-11-06 -- the new quest-offer-review prompt reads whether a
+# player is actively conversing with an NPC to decide when to show itself; the mod works standalone
+# without it, the prompt just never shows (an available quest still shows up in the Quest Log
+# normally either way, there's just no proactive nudge to go look).
+[[dependencies.${mod_id}]]
+    modId="audyble"
+    type="optional"
+    reason="Lets the quest-offer-review prompt trigger off an active NPC conversation if present."
+    ordering="NONE"
+    side="BOTH"
+
 # Nuclyus is the suite's foundation mod -- required (not optional) for every mod, starting with the
 # cross-mod menu-contribution system (see Nuclyus' own CLAUDE.md).
 [[dependencies.${mod_id}]]

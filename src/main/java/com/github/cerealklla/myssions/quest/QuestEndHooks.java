@@ -1,8 +1,10 @@
 package com.github.cerealklla.myssions.quest;
 
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerPlayer;
@@ -36,6 +38,14 @@ public final class QuestEndHooks {
 
     private static final Map<Identifier, Hook> HOOKS = new ConcurrentHashMap<>();
 
+    /**
+     * "Any quest at all, for any player" hooks -- added 2026-11-08 for Terrytories' per-settlement
+     * reputation (quests for a settlement grant rep) and Arryval's "do 10 quests for your village"
+     * milestone, neither of which can know every quest id that will ever exist (new mods keep adding
+     * more). Fired alongside the per-id {@link #HOOKS} dispatch above, for every quest, every reason.
+     */
+    private static final List<Hook> GLOBAL_HOOKS = new CopyOnWriteArrayList<>();
+
     private QuestEndHooks() {
     }
 
@@ -43,10 +53,17 @@ public final class QuestEndHooks {
         HOOKS.put(questId, hook);
     }
 
+    public static void registerGlobal(Hook hook) {
+        GLOBAL_HOOKS.add(hook);
+    }
+
     public static void fire(ServerPlayer player, UUID instanceId, Identifier questId, EndReason reason) {
         Hook hook = HOOKS.get(questId);
         if (hook != null) {
             hook.onEnded(player, instanceId, questId, reason);
+        }
+        for (Hook globalHook : GLOBAL_HOOKS) {
+            globalHook.onEnded(player, instanceId, questId, reason);
         }
     }
 }

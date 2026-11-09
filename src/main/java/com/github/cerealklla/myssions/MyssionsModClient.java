@@ -44,9 +44,16 @@ public class MyssionsModClient {
     public static final KeyMapping OPEN_QUEST_LOG = new KeyMapping(
             "key.myssions.open_quest_log", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_J, KeyMapping.Category.MISC);
 
+    // "Press U to review quest offer" (request #3, 2026-11-06) -- "U" is free across the suite,
+    // flagged as an easy-to-rebind placeholder like every other keybind here. Opens the unified
+    // Nuclyus "K" menu directly to the Quests tab, not the standalone J-bound QuestLogScreen.
+    public static final KeyMapping OPEN_QUEST_OFFER_REVIEW = new KeyMapping(
+            "key.myssions.open_quest_offer_review", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_U, KeyMapping.Category.MISC);
+
     @SubscribeEvent
     static void onRegisterKeyMappings(RegisterKeyMappingsEvent event) {
         event.register(OPEN_QUEST_LOG);
+        event.register(OPEN_QUEST_OFFER_REVIEW);
     }
 
     @SubscribeEvent
@@ -68,6 +75,8 @@ public class MyssionsModClient {
     @SubscribeEvent
     static void onRegisterGuiLayers(RegisterGuiLayersEvent event) {
         event.registerAboveAll(Identifier.fromNamespaceAndPath(MyssionsMod.MODID, "active_quest_overlay"), new ActiveQuestOverlay());
+        event.registerAboveAll(Identifier.fromNamespaceAndPath(MyssionsMod.MODID, "quest_offer_prompt_overlay"),
+                new com.github.cerealklla.myssions.client.QuestOfferPromptOverlay());
     }
 
     @SubscribeEvent
@@ -82,6 +91,13 @@ public class MyssionsModClient {
             } else if (minecraft.screen == null) {
                 minecraft.setScreen(new QuestLogScreen());
             }
+        }
+        while (OPEN_QUEST_OFFER_REVIEW.consumeClick()) {
+            if (minecraft.player == null || minecraft.screen != null) {
+                continue;
+            }
+            com.github.cerealklla.nuclyus.menu.client.NuclyusMenuScreen.requestInitialTab("Quests");
+            minecraft.setScreen(new com.github.cerealklla.nuclyus.menu.client.NuclyusMenuScreen());
         }
     }
 }

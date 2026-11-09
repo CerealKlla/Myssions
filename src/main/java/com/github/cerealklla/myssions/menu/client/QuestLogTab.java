@@ -8,10 +8,12 @@ import java.util.UUID;
 import com.github.cerealklla.myssions.client.BugReportScreen;
 import com.github.cerealklla.myssions.net.AbandonQuestPayload;
 import com.github.cerealklla.myssions.net.AcceptAvailableQuestPayload;
+import com.github.cerealklla.myssions.net.DeclineAvailableQuestPayload;
 import com.github.cerealklla.myssions.net.SetActiveQuestPayload;
 import com.github.cerealklla.myssions.quest.QuestDefinition;
 import com.github.cerealklla.myssions.quest.QuestInstance;
 import com.github.cerealklla.myssions.quest.QuestMilestone;
+import com.github.cerealklla.myssions.quest.PlayerQuestData;
 import com.github.cerealklla.myssions.quest.QuestRegistry;
 import com.github.cerealklla.myssions.quest.QuestReward;
 import com.github.cerealklla.myssions.quest.QuestStatus;
@@ -89,6 +91,7 @@ public final class QuestLogTab implements NuclyusMenu {
     private int listScroll;
     private int detailsScroll;
     private Button actionButton;
+    private Button declineButton;
     private Button abandonButton;
     private Button reportBugButton;
 
@@ -96,7 +99,24 @@ public final class QuestLogTab implements NuclyusMenu {
     // the still-stale synced attachment.
     private UUID optimisticActiveQuestId;
     private final java.util.Set<UUID> optimisticallyAbandoned = new java.util.HashSet<>();
-    private final java.util.Set<Identifier> optimisticallyAccepted = new java.util.HashSet<>();
+    /** Hides an Available row the instant Accept *or* Decline is sent, without waiting for the still-stale synced attachment to catch up -- renamed 2026-11-06 (was {@code optimisticallyAccepted}) once Decline started reusing the exact same "don't show this id anymore" purpose. */
+    private final java.util.Set<Identifier> optimisticallyRemovedFromAvailable = new java.util.HashSet<>();
+    /** Real bug, found live 2026-11-07: Accept/Decline only ever rebuilt the list from the rows'
+     *  own optimistic bookkeeping, never from the server's actual sync reply -- a freshly-accepted
+     *  quest was invisible everywhere (hidden from Available optimistically, not yet present in the
+     *  still-stale synced {@code PlayerQuestData}) until leaving and reopening this tab (which
+     *  happens to re-run {@link #rebuildListRows} via {@link #onShown}). {@link #render} now detects
+     *  the real synced attachment actually changing (a fresh instance, since it's replaced wholesale
+     *  on every sync) and rebuilds immediately instead of waiting for the next tab switch. */
+    private PlayerQuestData lastRenderedData;
+    /** Real UX request, 2026-11-07: "clicking accept should immediately show you the full quest
+     *  details where you could click set as active, I shouldn't have to click accept, then click
+     *  the quest on the left, then click mark active." Set the instant Accept is clicked; the real
+     *  synced instance doesn't exist client-side yet at that point (see {@link #lastRenderedData}'s
+     *  own doc), so this is resolved to a real {@code instanceId} and auto-selected the moment the
+     *  real sync actually arrives in {@link #render}, instead of leaving row selection to fall back
+     *  to "whatever happens to be first" once the list is rebuilt. */
+    private Identifier pendingSelectAcceptedDefinitionId;
 
     @Override
     public Component title() {
@@ -170,12 +190,10 @@ public final class QuestLogTab implements NuclyusMenu {
             }
         }
         // QuestChain (2026-11-06) -- shown first, above everything else, so a freshly-unlocked
-        // follow-up quest is impossible to miss. optimisticallyAccepted mirrors the existing
-        // optimisticActiveQuestId/optimisticallyAbandoned pattern just below -- hides a row the
-        // instant its own Accept click is sent, without waiting for the still-stale synced
-        // attachment to catch up.
+        // follow-up quest is impossible to miss. optimisticallyRemovedFromAvailable mirrors the
+        // existing optimisticActiveQuestId/optimisticallyAbandoned pattern just below.
         List<Identifier> availableNow = data.availableQuestIds().stream()
-                .filter(id -> !optimisticallyAccepted.contains(id)).toList();
+                .filter(id -> !optimisticallyRemovedFromAvailable.contains(id)).toList();
         if (!availableNow.isEmpty()) {
             rows.add(ListRow.header("-- Available --"));
             for (Identifier questId : availableNow) {
@@ -226,6 +244,10 @@ public final class QuestLogTab implements NuclyusMenu {
             widgetHost.removeMenuWidget(actionButton);
             actionButton = null;
         }
+        if (declineButton != null) {
+            widgetHost.removeMenuWidget(declineButton);
+            declineButton = null;
+        }
         if (abandonButton != null) {
             widgetHost.removeMenuWidget(abandonButton);
             abandonButton = null;
@@ -247,6 +269,13 @@ public final class QuestLogTab implements NuclyusMenu {
             int buttonY = area.getY() + MARGIN;
             actionButton = widgetHost.addMenuWidget(Button.builder(Component.literal("Accept Quest"), b -> acceptAvailable())
                     .bounds(detailsLeft, buttonY, 150, 20).build());
+            // QuestDefinition#disableDecline (2026-11-06) -- a quest offered this way has no way off
+            // the Available list except accepting it, so the button simply isn't shown at all.
+            boolean canDecline = QuestRegistry.get(selectedAvailableQuestId).map(def -> !def.disableDecline()).orElse(true);
+            if (canDecline) {
+                declineButton = widgetHost.addMenuWidget(Button.builder(Component.literal("Decline"), b -> declineAvailable())
+                        .bounds(detailsLeft + 160, buttonY, 100, 20).build());
+            }
             return;
         }
         if (selectedId == null) {
@@ -272,8 +301,13 @@ public final class QuestLogTab implements NuclyusMenu {
             // Widened 2026-10-19 (real report: a despawned issuing NPC left an AWAITING_REWARD_PICKUP
             // quest with no way to ever collect its reward AND no way to abandon it either, since this
             // was IN_PROGRESS-only) -- see QuestEngine#abandonQuest's own doc for the matching
-            // server-side widening this button now relies on.
-            specs.add(new Spec("Abandon Quest", 150, this::confirmAbandon));
+            // server-side widening this button now relies on. QuestDefinition#disableAbandon
+            // (2026-11-06) hides this entirely for a quest that must be seen through to the end --
+            // real enforcement lives in QuestEngine#abandonQuest itself, this is just matching UX.
+            boolean canAbandon = QuestRegistry.get(instance.definitionId()).map(def -> !def.disableAbandon()).orElse(true);
+            if (canAbandon) {
+                specs.add(new Spec("Abandon Quest", 150, this::confirmAbandon));
+            }
         }
         specs.add(new Spec("Report Bug", 100, () -> Minecraft.getInstance().setScreen(new BugReportScreen(host, instanceId, questName))));
 
@@ -308,7 +342,22 @@ public final class QuestLogTab implements NuclyusMenu {
         }
         Identifier questId = selectedAvailableQuestId;
         Minecraft.getInstance().getConnection().send(new ServerboundCustomPayloadPacket(new AcceptAvailableQuestPayload(questId)));
-        optimisticallyAccepted.add(questId);
+        optimisticallyRemovedFromAvailable.add(questId);
+        pendingSelectAcceptedDefinitionId = questId;
+        selectedAvailableQuestId = null;
+        selectedId = null;
+        rebuildListRows();
+        rebuildActionButton();
+    }
+
+    /** Mirrors {@link #acceptAvailable()} exactly -- added 2026-11-06 for the new offer-review flow's own real decline path. */
+    private void declineAvailable() {
+        if (selectedAvailableQuestId == null) {
+            return;
+        }
+        Identifier questId = selectedAvailableQuestId;
+        Minecraft.getInstance().getConnection().send(new ServerboundCustomPayloadPacket(new DeclineAvailableQuestPayload(questId)));
+        optimisticallyRemovedFromAvailable.add(questId);
         selectedAvailableQuestId = null;
         selectedId = null;
         rebuildListRows();
@@ -413,6 +462,22 @@ public final class QuestLogTab implements NuclyusMenu {
 
     @Override
     public void render(GuiGraphicsExtractor graphics, Rect2i area, int mouseX, int mouseY, float partialTick) {
+        PlayerQuestData liveData = Minecraft.getInstance().player.getData(ModAttachments.QUEST_DATA);
+        if (liveData != lastRenderedData) {
+            lastRenderedData = liveData;
+            rebuildListRows();
+            if (pendingSelectAcceptedDefinitionId != null) {
+                liveData.quests().values().stream()
+                        .filter(i -> i.definitionId().equals(pendingSelectAcceptedDefinitionId))
+                        .findFirst()
+                        .ifPresent(i -> {
+                            selectedId = i.instanceId();
+                            selectedAvailableQuestId = null;
+                            pendingSelectAcceptedDefinitionId = null;
+                        });
+            }
+            rebuildActionButton();
+        }
         Font font = Minecraft.getInstance().font;
         int listLeft = area.getX() + MARGIN;
         int listRight = area.getX() + area.getWidth() * LIST_WIDTH_FRACTION_NUM / FRACTION_DEN;

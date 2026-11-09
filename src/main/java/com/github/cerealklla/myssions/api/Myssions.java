@@ -109,6 +109,21 @@ public final class Myssions {
         return QuestEngine.assignQuest(player, definitionId);
     }
 
+    /** Puts a quest under "Available" for the player to explicitly Accept/Decline, without assigning it -- see {@code QuestEngine#offerQuest}'s own doc. */
+    public static void offerQuest(ServerPlayer player, Identifier definitionId) {
+        QuestEngine.offerQuest(player, definitionId);
+    }
+
+    /** Declines an available (not-yet-accepted) quest -- see {@code QuestEngine#declineQuest}'s own doc. */
+    public static void declineQuest(ServerPlayer player, Identifier definitionId) {
+        QuestEngine.declineQuest(player, definitionId);
+    }
+
+    /** Whether this player has any quest at all currently sitting under "Available," waiting on an Accept/Decline -- the real trigger for the new quest-offer-review prompt (see {@code client.QuestOfferPromptOverlay}). */
+    public static boolean hasAvailableQuests(ServerPlayer player) {
+        return QuestEngine.hasAvailableQuests(player);
+    }
+
     public static Optional<QuestInstance> getQuestInstance(ServerPlayer player, UUID instanceId) {
         return QuestEngine.getInstance(player, instanceId);
     }
@@ -116,6 +131,15 @@ public final class Myssions {
     /** See {@code QuestEngine#findInProgressInstanceId}'s own doc -- for a caller that doesn't itself control/track the instance id (e.g. a QuestChain follow-up quest the player accepted themselves). */
     public static Optional<UUID> findInProgressInstanceId(ServerPlayer player, Identifier definitionId) {
         return QuestEngine.findInProgressInstanceId(player, definitionId);
+    }
+
+    /**
+     * Which plot (if any) issued {@code instanceId} -- only ever meaningful to call from inside a
+     * {@code quest.QuestEndHooks#registerGlobal} listener's own {@code onEnded} callback, the one
+     * moment this is guaranteed still populated (see {@code QuestEngine}'s own doc on this lookup).
+     */
+    public static Optional<UUID> getIssuingPlotId(UUID instanceId) {
+        return QuestEngine.getIssuingPlotId(instanceId);
     }
 
     /**

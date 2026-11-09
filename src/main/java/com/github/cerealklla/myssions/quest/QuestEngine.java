@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 import com.github.cerealklla.myssions.bridge.LyfeXpBridge;
 import com.github.cerealklla.myssions.registration.ModAttachments;
@@ -26,6 +27,24 @@ import net.minecraft.world.item.Items;
  * same definition are two different instances).
  */
 public final class QuestEngine {
+
+    /**
+     * Transient {@code instanceId -> plotId} lookup -- added 2026-11-08 so a global {@link
+     * QuestEndHooks} listener (Terrytories' reputation, Arryval's "quests for your village"
+     * milestone) can learn which plot issued a just-ended instance, without needing a 17th {@link
+     * QuestInstance} field (already at the codec's 16-field arity ceiling). Populated the moment
+     * {@link QuestAssignmentHooks} fires (the one place {@code plotId} is genuinely known), read via
+     * {@link #getIssuingPlotId} by any global-hook listener during its own {@code onEnded} callback,
+     * and removed by this class itself right after firing {@link QuestEndHooks} at each of the three
+     * real termination points -- never persisted, since it only ever needs to answer "what plot
+     * issued this, right now" at the instant an instance assigned and ended within the same server
+     * lifetime.
+     */
+    private static final Map<UUID, UUID> ISSUING_PLOT_BY_INSTANCE = new ConcurrentHashMap<>();
+
+    public static Optional<UUID> getIssuingPlotId(UUID instanceId) {
+        return Optional.ofNullable(ISSUING_PLOT_BY_INSTANCE.get(instanceId));
+    }
 
     /** "Players can only have 5 quests active [accepted] at once" -- explicit user spec, 2026-10-10. Counts only IN_PROGRESS instances; completed/failed/awaiting-pickup ones don't count against the cap. */
     public static final int MAX_ACCEPTED_QUESTS = 5;
@@ -58,6 +77,13 @@ public final class QuestEngine {
         Optional<QuestDefinition> definition = QuestRegistry.get(definitionId);
         if (definition.isEmpty()) {
             return Optional.empty();
+        }
+        if (plotId.isPresent()) {
+            String rejection = QuestAcceptanceGate.checkAcceptance(player, plotId.get(), definitionId);
+            if (rejection != null) {
+                player.sendSystemMessage(Component.literal(rejection));
+                return Optional.empty();
+            }
         }
         PlayerQuestData data = player.getData(ModAttachments.QUEST_DATA);
         // Auto-clean orphaned instances whose definition no longer exists at all (e.g. a quest type
@@ -103,8 +129,56 @@ public final class QuestEngine {
         player.setData(ModAttachments.QUEST_DATA, data);
         player.sendSystemMessage(Component.literal("New quest: " + definition.get().name()));
         grantAcceptanceItems(player, definition.get());
+        plotId.ifPresent(id -> ISSUING_PLOT_BY_INSTANCE.put(instance.instanceId(), id));
         QuestAssignmentHooks.fire(player, instance.instanceId(), definitionId, plotId.orElse(null));
         return Optional.of(instance.instanceId());
+    }
+
+    /**
+     * Explicit user spec, 2026-11-06 -- the new "Press a button, review the offer in your Quest Log,
+     * Accept or Decline" quest-granting style's own offer side: makes {@code definitionId} show up
+     * under "Available" for {@code player} right now, the same real state {@code
+     * QuestDefinition#unlocksQuestId} already puts a quest into on completion -- just reachable
+     * directly, for a caller offering a quest for some other reason (an NPC conversation reaching the
+     * right moment, a future Murmur Tower radio listener's own chance roll, etc.), not only chain
+     * completion. A no-op if the definition doesn't exist, is already available, or the player already
+     * has it in progress/completed-and-done (same "don't re-offer something already settled" shape
+     * {@link #assignQuest} itself already enforces for in-progress).
+     */
+    public static void offerQuest(ServerPlayer player, Identifier definitionId) {
+        if (QuestRegistry.get(definitionId).isEmpty()) {
+            return;
+        }
+        PlayerQuestData data = player.getData(ModAttachments.QUEST_DATA);
+        if (data.availableQuestIds().contains(definitionId)
+                || data.quests().values().stream().anyMatch(i -> i.definitionId().equals(definitionId))) {
+            return;
+        }
+        player.setData(ModAttachments.QUEST_DATA, data.withAvailableQuestAdded(definitionId));
+    }
+
+    /**
+     * Explicit user spec, 2026-11-06 -- the new "Press a button, review the offer in your Quest Log,
+     * Accept or Decline" quest-granting style needs a real decline path, which never existed before
+     * (the only prior way off {@code availableQuestIds} was accepting). A no-op if the quest isn't
+     * actually available, or its own {@link QuestDefinition#disableDecline} is set (enforced here, not
+     * just hidden client-side, same reasoning as {@link #abandonQuest}'s own {@code disableAbandon}
+     * check) -- in that case the only way off the list is to actually accept it.
+     */
+    public static void declineQuest(ServerPlayer player, Identifier definitionId) {
+        PlayerQuestData data = player.getData(ModAttachments.QUEST_DATA);
+        if (!data.availableQuestIds().contains(definitionId)) {
+            return;
+        }
+        if (QuestRegistry.get(definitionId).map(QuestDefinition::disableDecline).orElse(false)) {
+            return;
+        }
+        player.setData(ModAttachments.QUEST_DATA, data.withAvailableQuestRemoved(definitionId));
+    }
+
+    /** See {@code api.Myssions#hasAvailableQuests}'s own doc. */
+    public static boolean hasAvailableQuests(ServerPlayer player) {
+        return !player.getData(ModAttachments.QUEST_DATA).availableQuestIds().isEmpty();
     }
 
     /** {@link QuestDefinition#acceptanceGrants()} -- a fixed item handed over the instant an instance is created, regardless of which path created it (see this method's own call site's doc). */
@@ -412,6 +486,7 @@ public final class QuestEngine {
         player.setData(ModAttachments.QUEST_DATA, updatedData);
         player.sendSystemMessage(Component.literal("Quest complete: " + definition.name()));
         QuestEndHooks.fire(player, instance.instanceId(), definition.id(), QuestEndHooks.EndReason.COMPLETED);
+        ISSUING_PLOT_BY_INSTANCE.remove(instance.instanceId());
     }
 
     /** {@code multiplier} scales XP same as Gold/Item -- see {@link QuestInstance#rewardMultiplier()}'s own doc ("scale the reward with the difficulty/distance from starting point"). */
@@ -933,6 +1008,7 @@ public final class QuestEngine {
         QuestRegistry.get(instance.definitionId()).ifPresent(def ->
                 player.sendSystemMessage(Component.literal("Quest failed: " + def.name())));
         QuestEndHooks.fire(player, instanceId, instance.definitionId(), QuestEndHooks.EndReason.FAILED);
+        ISSUING_PLOT_BY_INSTANCE.remove(instanceId);
     }
 
     /**
@@ -961,11 +1037,21 @@ public final class QuestEngine {
                 || (instance.status() != QuestStatus.IN_PROGRESS && instance.status() != QuestStatus.AWAITING_REWARD_PICKUP)) {
             return;
         }
+        // Explicit user spec, 2026-11-06 (QuestDefinition#disableAbandon) -- enforced here, not just
+        // hidden client-side, so a modified client sending AbandonQuestPayload directly can't bypass
+        // it. A quest whose own definition no longer exists at all (the pre-existing "bugged quest"
+        // escape hatch this method's own doc describes) is never gated -- there's nothing to read a
+        // flag off of, and refusing to abandon it would recreate the exact stuck-forever problem this
+        // method exists to prevent.
+        if (QuestRegistry.get(instance.definitionId()).map(QuestDefinition::disableAbandon).orElse(false)) {
+            return;
+        }
         // Fired BEFORE the delete below -- a hook (e.g. the escort caravan cleanup registered by
         // QuestHooks#registerEscortHook, generalized 2026-10-13 out of what used to be inline here)
         // may need to look this instance back up via QuestEngine#getInstance, which would find
         // nothing once withoutQuest has actually removed it.
         QuestEndHooks.fire(player, instanceId, instance.definitionId(), QuestEndHooks.EndReason.ABANDONED);
+        ISSUING_PLOT_BY_INSTANCE.remove(instanceId);
         player.setData(ModAttachments.QUEST_DATA, data.withoutQuest(instanceId));
         QuestRegistry.get(instance.definitionId()).ifPresent(def ->
                 player.sendSystemMessage(Component.literal("Quest abandoned: " + def.name())));

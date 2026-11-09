@@ -104,6 +104,14 @@ public final class QuestKillListener {
 
     private void creditKillToPlayer(ServerPlayer player, Identifier deadType, boolean deadIsHostile, BlockPos deadPos, String deadDimensionId, Long deadTaggedPlaceId) {
         var data = player.getData(ModAttachments.QUEST_DATA);
+        // TEMPORARY diagnostic logging, 2026-11-06 -- tracing a real "killed zombies after respawning
+        // but got no credit" report. Confirms, with hard evidence, whether this method even sees the
+        // in-progress quest instance at all post-respawn (vs. a client-side display-only desync).
+        com.github.cerealklla.myssions.MyssionsMod.LOGGER.info(
+                "[KillCreditDebug] player={} deadType={} deadIsHostile={} inProgressInstances={}",
+                player.getName().getString(), deadType, deadIsHostile,
+                data.quests().values().stream().filter(i -> i.status() == QuestStatus.IN_PROGRESS)
+                        .map(i -> i.definitionId() + ":" + i.instanceId() + ":" + i.milestoneProgress()).toList());
         for (QuestInstance instance : data.quests().values()) {
             if (instance.status() != QuestStatus.IN_PROGRESS) {
                 continue;
@@ -142,8 +150,13 @@ public final class QuestKillListener {
                     }
                     int current = instance.milestoneProgress().getOrDefault(milestone.id(), 0);
                     if (current >= milestone.requiredCount()) {
+                        com.github.cerealklla.myssions.MyssionsMod.LOGGER.info(
+                                "[KillCreditDebug] milestone={} already at cap {}/{} -- skipping",
+                                milestone.id(), current, milestone.requiredCount());
                         continue; // Already fully progressed -- no further proof to grant.
                     }
+                    com.github.cerealklla.myssions.MyssionsMod.LOGGER.info(
+                            "[KillCreditDebug] milestone={} progressing {} -> {}", milestone.id(), current, current + 1);
                     QuestEngine.reportMilestoneProgress(player, instance.instanceId(), milestone.id(), 1);
                     milestone.proofId().ifPresent(proofId -> {
                         ItemStack proof = ProofItemCatalog.create(proofId);
