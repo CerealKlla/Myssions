@@ -39,6 +39,18 @@ import net.neoforged.neoforge.event.tick.ServerTickEvent;
  * (a local {@code lastKnownDay} compared against {@code TICKS_PER_DAY}), rather than depending on
  * that class directly -- it's private to Settlemynts, and this only needs the same cheap two-line
  * calculation, not a shared utility.
+ *
+ * <p><b>Immediate first roll, 2026-11-09</b> -- explicit request: "spawn the 8 starter towns so
+ * there is something for the player to interact with when talking to the NPCs immediately." Without
+ * this, a brand-new world's quest boards stay empty until the first real in-game midnight actually
+ * passes, which can be many real minutes away depending on spawn time -- not "immediately" by any
+ * reasonable reading. {@link #initialRollDone} tracks this separately from the normal day-boundary
+ * gate: every tick until at least one real plot is registered anywhere (a plain, cheap index
+ * lookup), this keeps waiting rather than burning its one shot rolling against nothing -- the 8
+ * starter settlements' own plots aren't necessarily registered the instant the server boots
+ * (Settlemynts' own natural-village plot generation runs on its own separate ticker, independent of
+ * this one). The moment at least one plot exists, this rolls once immediately and never repeats this
+ * early path again, falling back to the normal once-per-real-day behavior from then on.
  */
 public final class QuestBoardMidnightTicker {
 
@@ -46,19 +58,32 @@ public final class QuestBoardMidnightTicker {
     private static final double GENERATE_CHANCE = 0.5;
 
     private long lastKnownDay = -1;
+    private boolean initialRollDone = false;
 
     @SubscribeEvent
     public void onServerTick(ServerTickEvent.Post event) {
         MinecraftServer server = event.getServer();
         long currentDay = Math.floorDiv(server.overworld().getOverworldClockTime(), TICKS_PER_DAY);
+        boolean dayBoundaryRoll = false;
         if (lastKnownDay < 0) {
             lastKnownDay = currentDay; // First tick since this listener was created -- establish the baseline only.
+        } else if (currentDay > lastKnownDay) {
+            lastKnownDay = currentDay;
+            dayBoundaryRoll = true;
+        }
+
+        boolean initialRoll = false;
+        if (!initialRollDone) {
+            if (PlotConfigSignIndex.get(server).all().isEmpty()) {
+                return; // Nothing registered anywhere yet -- keep waiting rather than rolling against nothing.
+            }
+            initialRollDone = true;
+            initialRoll = true;
+        }
+
+        if (!dayBoundaryRoll && !initialRoll) {
             return;
         }
-        if (currentDay <= lastKnownDay) {
-            return;
-        }
-        lastKnownDay = currentDay;
 
         IssuerQuestBoard board = IssuerQuestBoard.get(server);
         for (Map.Entry<UUID, GlobalPos> entry : PlotConfigSignIndex.get(server).all().entrySet()) {

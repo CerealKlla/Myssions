@@ -28,7 +28,40 @@ public final class DebugCommands {
                 .then(Commands.literal("assign")
                         .then(Commands.argument("questId", StringArgumentType.greedyString())
                                 .executes(ctx -> assignQuestById(ctx.getSource(),
-                                        StringArgumentType.getString(ctx, "questId"))))));
+                                        StringArgumentType.getString(ctx, "questId")))))
+                .then(Commands.literal("complete")
+                        .then(Commands.argument("instanceId", StringArgumentType.word())
+                                .executes(ctx -> completeByInstanceId(ctx.getSource(),
+                                        StringArgumentType.getString(ctx, "instanceId"))))));
+    }
+
+    /** One-off remediation for a real live bug, 2026-11-09: a chain-unlocked tutorial quest with no
+     *  real NPC issuer (Arryval's Finding Your Footing/Lending a Hand) could reach {@code
+     *  AWAITING_REWARD_PICKUP} with no way to ever open the reward GUI, since that normally only
+     *  happens via a "talk to the quest giver" interaction -- see {@code api.Myssions
+     *  #tryCompleteQuest}'s own real callers for the actual fix (both quests now self-trigger this on
+     *  their own last milestone). This command exists purely to unstick an instance that was already
+     *  in that state before the fix shipped; {@code tryCompleteQuest} is itself a safe no-op for
+     *  anything not already awaiting pickup. */
+    private static int completeByInstanceId(CommandSourceStack source, String instanceIdArg) {
+        if (!(source.getEntity() instanceof ServerPlayer player)) {
+            source.sendFailure(Component.literal("Only a player can run this."));
+            return 0;
+        }
+        java.util.UUID instanceId;
+        try {
+            instanceId = java.util.UUID.fromString(instanceIdArg);
+        } catch (IllegalArgumentException e) {
+            source.sendFailure(Component.literal("'" + instanceIdArg + "' isn't a valid instance UUID."));
+            return 0;
+        }
+        boolean opened = Myssions.tryCompleteQuest(player, instanceId);
+        if (opened) {
+            source.sendSuccess(() -> Component.literal("Opened the reward pickup screen."), false);
+            return 1;
+        }
+        source.sendFailure(Component.literal("That instance isn't awaiting reward pickup (or doesn't exist)."));
+        return 0;
     }
 
     /** Assigns any registered quest definition by its raw id -- added so a specific quest (e.g. a
