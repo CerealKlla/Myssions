@@ -7,6 +7,7 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
+import com.github.cerealklla.myssions.bridge.LyfeCatchBagBridge;
 import com.github.cerealklla.myssions.bridge.LyfeXpBridge;
 import com.github.cerealklla.myssions.registration.ModAttachments;
 
@@ -976,6 +977,11 @@ public final class QuestEngine {
                 total += stack.getCount();
             }
         }
+        // Real gap found 2026-11-16, see com.github.cerealklla.myssions.bridge.LyfeCatchBagBridge's
+        // own doc -- fish kept in a Catch Bag are invisible to the flat scan above.
+        if (LyfeCatchBagBridge.isLoaded()) {
+            total += LyfeCatchBagBridge.countInCatchBags(player, BuiltInRegistries.ITEM.getValue(itemId));
+        }
         return total;
     }
 
@@ -988,6 +994,9 @@ public final class QuestEngine {
                 stack.shrink(take);
                 remaining -= take;
             }
+        }
+        if (remaining > 0 && LyfeCatchBagBridge.isLoaded()) {
+            remaining -= LyfeCatchBagBridge.removeFromCatchBags(player, BuiltInRegistries.ITEM.getValue(itemId), remaining);
         }
     }
 
