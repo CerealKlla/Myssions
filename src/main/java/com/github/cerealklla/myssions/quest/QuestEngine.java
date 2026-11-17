@@ -5,7 +5,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 
 import com.github.cerealklla.myssions.bridge.LyfeCatchBagBridge;
 import com.github.cerealklla.myssions.bridge.LyfeXpBridge;
@@ -30,21 +29,22 @@ import net.minecraft.world.item.Items;
 public final class QuestEngine {
 
     /**
-     * Transient {@code instanceId -> plotId} lookup -- added 2026-11-08 so a global {@link
-     * QuestEndHooks} listener (Terrytories' reputation, Arryval's "quests for your village"
-     * milestone) can learn which plot issued a just-ended instance, without needing a 17th {@link
-     * QuestInstance} field (already at the codec's 16-field arity ceiling). Populated the moment
-     * {@link QuestAssignmentHooks} fires (the one place {@code plotId} is genuinely known), read via
+     * {@code instanceId -> plotId} lookup -- added 2026-11-08 so a global {@link QuestEndHooks}
+     * listener (Terrytories' reputation, Arryval's "quests for your village" milestone) can learn
+     * which plot issued a just-ended instance, without needing a 17th {@link QuestInstance} field
+     * (already at the codec's 16-field arity ceiling). Populated the moment {@link
+     * QuestAssignmentHooks} fires (the one place {@code plotId} is genuinely known), read via
      * {@link #getIssuingPlotId} by any global-hook listener during its own {@code onEnded} callback,
      * and removed by this class itself right after firing {@link QuestEndHooks} at each of the three
-     * real termination points -- never persisted, since it only ever needs to answer "what plot
-     * issued this, right now" at the instant an instance assigned and ended within the same server
-     * lifetime.
+     * real termination points. Backed by {@link IssuingPlotIndex} (persisted {@code SavedData}) as
+     * of 2026-11-17 -- the original plain in-memory map was wiped on every server restart, which was
+     * believed safe ("only ever needs to answer this within the same server lifetime") but wasn't: a
+     * real report the same day found every quest a player had accepted before a restart permanently
+     * lost its plotId the moment that restart happened, silently breaking both consumers' crediting
+     * for any such instance. See that class's own doc for the full account.
      */
-    private static final Map<UUID, UUID> ISSUING_PLOT_BY_INSTANCE = new ConcurrentHashMap<>();
-
-    public static Optional<UUID> getIssuingPlotId(UUID instanceId) {
-        return Optional.ofNullable(ISSUING_PLOT_BY_INSTANCE.get(instanceId));
+    public static Optional<UUID> getIssuingPlotId(net.minecraft.server.MinecraftServer server, UUID instanceId) {
+        return IssuingPlotIndex.get(server).get(instanceId);
     }
 
     /** "Players can only have 5 quests active [accepted] at once" -- explicit user spec, 2026-10-10. Counts only IN_PROGRESS instances; completed/failed/awaiting-pickup ones don't count against the cap. */
@@ -130,7 +130,7 @@ public final class QuestEngine {
         player.setData(ModAttachments.QUEST_DATA, data);
         player.sendSystemMessage(Component.literal("New quest: " + definition.get().name()));
         grantAcceptanceItems(player, definition.get());
-        plotId.ifPresent(id -> ISSUING_PLOT_BY_INSTANCE.put(instance.instanceId(), id));
+        plotId.ifPresent(id -> IssuingPlotIndex.get(serverOf(player)).put(instance.instanceId(), id));
         QuestAssignmentHooks.fire(player, instance.instanceId(), definitionId, plotId.orElse(null));
         return Optional.of(instance.instanceId());
     }
@@ -487,7 +487,7 @@ public final class QuestEngine {
         player.setData(ModAttachments.QUEST_DATA, updatedData);
         player.sendSystemMessage(Component.literal("Quest complete: " + definition.name()));
         QuestEndHooks.fire(player, instance.instanceId(), definition.id(), QuestEndHooks.EndReason.COMPLETED);
-        ISSUING_PLOT_BY_INSTANCE.remove(instance.instanceId());
+        IssuingPlotIndex.get(serverOf(player)).remove(instance.instanceId());
     }
 
     /** {@code multiplier} scales XP same as Gold/Item -- see {@link QuestInstance#rewardMultiplier()}'s own doc ("scale the reward with the difficulty/distance from starting point"). */
@@ -1017,7 +1017,7 @@ public final class QuestEngine {
         QuestRegistry.get(instance.definitionId()).ifPresent(def ->
                 player.sendSystemMessage(Component.literal("Quest failed: " + def.name())));
         QuestEndHooks.fire(player, instanceId, instance.definitionId(), QuestEndHooks.EndReason.FAILED);
-        ISSUING_PLOT_BY_INSTANCE.remove(instanceId);
+        IssuingPlotIndex.get(serverOf(player)).remove(instanceId);
     }
 
     /**
@@ -1060,9 +1060,13 @@ public final class QuestEngine {
         // may need to look this instance back up via QuestEngine#getInstance, which would find
         // nothing once withoutQuest has actually removed it.
         QuestEndHooks.fire(player, instanceId, instance.definitionId(), QuestEndHooks.EndReason.ABANDONED);
-        ISSUING_PLOT_BY_INSTANCE.remove(instanceId);
+        IssuingPlotIndex.get(serverOf(player)).remove(instanceId);
         player.setData(ModAttachments.QUEST_DATA, data.withoutQuest(instanceId));
         QuestRegistry.get(instance.definitionId()).ifPresent(def ->
                 player.sendSystemMessage(Component.literal("Quest abandoned: " + def.name())));
+    }
+
+    private static net.minecraft.server.MinecraftServer serverOf(ServerPlayer player) {
+        return ((net.minecraft.server.level.ServerLevel) player.level()).getServer();
     }
 }

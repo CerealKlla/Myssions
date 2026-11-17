@@ -135,11 +135,13 @@ public final class Myssions {
 
     /**
      * Which plot (if any) issued {@code instanceId} -- only ever meaningful to call from inside a
-     * {@code quest.QuestEndHooks#registerGlobal} listener's own {@code onEnded} callback, the one
-     * moment this is guaranteed still populated (see {@code QuestEngine}'s own doc on this lookup).
+     * {@code quest.QuestEndHooks#registerGlobal} listener's own {@code onEnded} callback. Backed by
+     * persisted {@code SavedData} (see {@code QuestEngine}'s own doc) as of 2026-11-17, so this is
+     * now safe to call regardless of whether the instance was accepted before or after a server
+     * restart -- it used to only work within the same server lifetime the instance was accepted in.
      */
-    public static Optional<UUID> getIssuingPlotId(UUID instanceId) {
-        return QuestEngine.getIssuingPlotId(instanceId);
+    public static Optional<UUID> getIssuingPlotId(net.minecraft.server.MinecraftServer server, UUID instanceId) {
+        return QuestEngine.getIssuingPlotId(server, instanceId);
     }
 
     /**
